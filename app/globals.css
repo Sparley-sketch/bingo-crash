@@ -1,0 +1,13 @@
+:root { --bg: #0f1020; --fg: #e8e8f0; --muted: #9aa0a6; --card: #17182b; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji';
+       background: var(--bg); color: var(--fg); }
+a { color: #9ecbff; text-decoration: none; }
+.wrap { max-width: 980px; margin: 0 auto; padding: 24px; }
+.card { background: var(--card); border-radius: 16px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); }
+.row { display: flex; gap: 12px; align-items: center; }
+.btn { background: #2d5cff; color: white; padding: 10px 16px; border-radius: 12px; border: none; cursor: pointer; font-weight: 600; }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+input, textarea { background: #0e0f1c; color: var(--fg); border: 1px solid #2b2d42; border-radius: 10px; padding: 10px; width: 100%; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 8px 10px; border-bottom: 1px solid #2b2d42; text-align: left; }

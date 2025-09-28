@@ -1,0 +1,4 @@
+/* Bingo+Crash v3.7 export styles
+   Most styling is done via Tailwind utilities; this file is here for any overrides.
+*/
+html, body, #root { height: 100%; }

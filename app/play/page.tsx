@@ -1,9 +1,11 @@
-import Game from '@/components/Game';
-
 export default function PlayPage() {
   return (
-    <main className="wrap">
-      <Game />
+    <main className="wrap" style={{ maxWidth: 'unset', padding: 0 }}>
+      <iframe
+        src="/bingo/index.html"
+        style={{ border: 'none', width: '100%', height: '100vh' }}
+        title="Bingo Crash"
+      />
     </main>
   );
 }

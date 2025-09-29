@@ -34,18 +34,6 @@ function useInterval(cb, delay) {
   }, [delay]);
 }
 
-// near your imports / component top:
-const getDelayFromQuery = () => {
-  if (typeof window === 'undefined') return undefined;
-  const ms = Number(new URLSearchParams(window.location.search).get('round_ms'));
-  return Number.isFinite(ms) ? ms : undefined;
-};
-
-// inside your component:
-const [delay, setDelay] = React.useState(() => getDelayFromQuery() ?? 800);
-
-// if you have a slider that updates speed, it should call setDelay(newMs)
-
 let _ctx = null;
 function audioCtx() {
   const Ctx = window.AudioContext || window.webkitAudioContext;

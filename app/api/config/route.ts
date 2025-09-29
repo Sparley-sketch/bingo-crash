@@ -18,6 +18,7 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   const supabase = createRouteHandlerClient({ cookies });
 
+  // Must be logged in
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -29,6 +30,7 @@ export async function PUT(req: NextRequest) {
 
   const { key, value } = parsed.data;
 
+  // RLS enforces admin permissions (see SQL). No service role key needed.
   const { error } = await supabase
     .from('config')
     .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });

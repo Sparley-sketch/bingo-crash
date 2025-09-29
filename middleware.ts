@@ -5,6 +5,7 @@ import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
   const supabase = createMiddlewareClient({ req, res });
+  // This refreshes the session if needed and adds the session cookie
   await supabase.auth.getSession();
   return res;
 }

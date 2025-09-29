@@ -1,10 +1,6 @@
 // Bingo+Crash v3.7 — Full playable app (Lock UI merged onto v3.6 base)
 // React UMD + Babel (no build step).
 
-var CALL_INTERVAL_MS = (typeof window !== 'undefined' && Number.isFinite(window.ROUND_MS))
-  ? window.ROUND_MS
-  : 800; // default/fallback
-
 const { useEffect, useMemo, useRef, useState } = React;
 
 const TABS = ["Setup", "Play", "Spectate"];

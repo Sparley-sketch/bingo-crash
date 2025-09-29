@@ -1,8 +1,12 @@
 // app/play/page.tsx
 import { createClient } from '@supabase/supabase-js';
 
+// Force dynamic rendering (no static cache)
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default async function PlayPage() {
-  // Default pace if anything fails
+  // default if anything fails
   let durationMs = 800;
 
   try {
@@ -22,7 +26,7 @@ export default async function PlayPage() {
       }
     }
   } catch {
-    // swallow errors and keep default 800ms
+    // swallow and keep default
   }
 
   const src = `/bingo-v37/index.html?round_ms=${durationMs}`;

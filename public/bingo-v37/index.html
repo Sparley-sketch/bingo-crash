@@ -17,7 +17,13 @@
 
     <!-- Optional: provide a custom explosion image -->
     <!-- <script>window.EXPLOSION_IMG = './explosion.webp';</script> -->
-
+    <script>
+      // Expose round_ms from the URL to the game
+      (function () {
+        const ms = Number(new URL(location.href).searchParams.get('round_ms'));
+        if (Number.isFinite(ms)) window.ROUND_MS = ms;   // e.g. 1200
+      })();
+    </script>
     <script type="text/babel" data-type="module" data-presets="react" src="./app.js"></script>
   </body>
 </html>

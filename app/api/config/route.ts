@@ -1,28 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 
 const PUTSchema = z.object({
   key: z.string().min(1),
   value: z.any()
 });
 
-const ADMIN_SECRET = process.env.ADMIN_SECRET;
-
 export async function GET() {
-  const { data, error } = await supabaseAdmin.from('config').select('*').order('key');
+  const supabase = createRouteHandlerClient({ cookies });
+  const { data, error } = await supabase.from('config').select('*').order('key');
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ items: data || [] });
 }
 
 export async function PUT(req: NextRequest) {
-  if (!ADMIN_SECRET) {
-    return NextResponse.json({ error: 'Server missing ADMIN_SECRET' }, { status: 500 });
-  }
-  const headerSecret = req.headers.get('x-admin-secret');
-  if (headerSecret !== ADMIN_SECRET) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const supabase = createRouteHandlerClient({ cookies });
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const json = await req.json();
   const parsed = PUTSchema.safeParse(json);
@@ -31,13 +28,14 @@ export async function PUT(req: NextRequest) {
   }
 
   const { key, value } = parsed.data;
-  const { error } = await supabaseAdmin
+
+  const { error } = await supabase
     .from('config')
     .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: error.message }, { status: 403 });
 
-  const { data: items, error: e2 } = await supabaseAdmin.from('config').select('*').order('key');
+  const { data: items, error: e2 } = await supabase.from('config').select('*').order('key');
   if (e2) return NextResponse.json({ error: e2.message }, { status: 500 });
   return NextResponse.json({ ok: true, items });
 }

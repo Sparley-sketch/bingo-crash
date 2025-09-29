@@ -4,15 +4,14 @@ import { useEffect, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 type ConfigItem = { key: string; value: any; updated_at?: string };
-type Role = 'admin' | 'viewer';
 
-export default function AdminClient() {
+export default function AdminClient({ canWrite }: { canWrite: boolean }) {
   const [items, setItems] = useState<ConfigItem[]>([]);
   const [keyName, setKeyName] = useState('round.duration_ms');
   const [valText, setValText] = useState('5000');
   const [newEmail, setNewEmail] = useState('');
   const [newPass, setNewPass] = useState('');
-  const [newRole, setNewRole] = useState<Role>('viewer');
+  const [newRole, setNewRole] = useState<'admin' | 'viewer'>('viewer');
   const [msg, setMsg] = useState<string | null>(null);
 
   const supabase = createClientComponentClient();
@@ -38,6 +37,7 @@ export default function AdminClient() {
   }
 
   async function save() {
+    if (!canWrite) return;
     const body = { key: keyName, value: parseValue(valText) };
     const res = await fetch('/api/config', {
       method: 'PUT',
@@ -59,6 +59,7 @@ export default function AdminClient() {
   }
 
   async function createUser() {
+    if (!canWrite) return;
     setMsg(null);
     if (!newEmail || !newPass) { setMsg('Email and password are required'); return; }
     const res = await fetch('/api/admin/users', {
@@ -76,14 +77,14 @@ export default function AdminClient() {
     <main className="wrap">
       <div className="card">
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-          <h2>Admin — Config</h2>
+          <h2>Admin — Config {canWrite ? '' : '(read-only)'}</h2>
           <button className="btn ghost" onClick={signOut}>Sign out</button>
         </div>
 
         <div className="row" style={{ marginTop: 8 }}>
-          <input placeholder="key (e.g., round.duration_ms)" value={keyName} onChange={e => setKeyName(e.target.value)} />
-          <input placeholder="value (JSON or raw)" value={valText} onChange={e => setValText(e.target.value)} />
-          <button className="btn" onClick={save}>Save</button>
+          <input placeholder="key (e.g., round.duration_ms)" value={keyName} onChange={e => setKeyName(e.target.value)} disabled={!canWrite} />
+          <input placeholder="value (JSON or raw)" value={valText} onChange={e => setValText(e.target.value)} disabled={!canWrite} />
+          <button className="btn" onClick={save} disabled={!canWrite} title={canWrite ? '' : 'Viewer cannot change config'}>Save</button>
         </div>
 
         <div style={{ marginTop: 16 }}>
@@ -102,21 +103,18 @@ export default function AdminClient() {
         </div>
       </div>
 
-      <div className="card" style={{ marginTop: 16 }}>
+      <div className="card" style={{ marginTop: 16, opacity: canWrite ? 1 : 0.6 }}>
         <h3>User Management</h3>
         <div className="row" style={{marginTop:8, gap:8}}>
-          <input type="email" placeholder="user@email.com" value={newEmail} onChange={e=>setNewEmail(e.target.value)} />
-          <select value={newRole} onChange={e=>setNewRole(e.target.value as Role)}>
+          <input type="email" placeholder="user@email.com" value={newEmail} onChange={e=>setNewEmail(e.target.value)} disabled={!canWrite} />
+          <select value={newRole} onChange={e=>setNewRole(e.target.value as 'admin' | 'viewer')} disabled={!canWrite}>
             <option value="viewer">viewer</option>
             <option value="admin">admin</option>
           </select>
-          <input type="password" placeholder="temporary password (min 8 chars)" value={newPass} onChange={e=>setNewPass(e.target.value)} />
-          <button className="btn" onClick={createUser}>Create user</button>
+          <input type="password" placeholder="temporary password (min 8 chars)" value={newPass} onChange={e=>setNewPass(e.target.value)} disabled={!canWrite} />
+          <button className="btn" onClick={createUser} disabled={!canWrite} title={canWrite ? '' : 'Viewer cannot create users'}>Create user</button>
         </div>
-        {msg && <p className="muted" style={{marginTop:8}}>{msg}</p>}
-        <p className="muted small" style={{marginTop:8}}>
-          No SMTP needed. Share the temp password out-of-band, and ask the user to change it after first login.
-        </p>
+        {!canWrite && <p className="muted small" style={{marginTop:8}}>Viewers can see configuration but cannot make changes.</p>}
       </div>
     </main>
   );

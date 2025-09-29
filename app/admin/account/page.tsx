@@ -14,10 +14,20 @@ export default function Account() {
     setMsg(null);
     if (pw1.length < 8) { setMsg('Password must be at least 8 characters'); return; }
     if (pw1 !== pw2) { setMsg('Passwords do not match'); return; }
+
     const { error } = await supabase.auth.updateUser({ password: pw1 });
     if (error) { setMsg(error.message); return; }
-    setMsg('Password updated.');
-    setPw1(''); setPw2('');
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { error: upErr } = await supabase
+        .from('profiles')
+        .update({ force_password_change: false })
+        .eq('id', user.id);
+      if (upErr) { setMsg('Updated password, but could not update profile flag: ' + upErr.message); return; }
+    }
+
+    window.location.href = '/admin/login';
   }
 
   return (
@@ -28,7 +38,7 @@ export default function Account() {
           <input type="password" placeholder="new password" value={pw1} onChange={e=>setPw1(e.target.value)} />
           <input type="password" placeholder="confirm password" value={pw2} onChange={e=>setPw2(e.target.value)} />
           {msg && <div>{msg}</div>}
-          <button className="btn" type="submit">Update</button>
+          <button className="btn" type="submit">Update & Return to Login</button>
         </form>
       </div>
     </main>

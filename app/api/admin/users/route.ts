@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
   const userId = data.user?.id;
   if (!userId) return NextResponse.json({ error: 'User creation returned no id' }, { status: 500 });
 
-  const { error: pErr } = await admin.from('profiles').upsert({ id: userId, email, role });
+  const { error: pErr } = await admin.from('profiles').upsert({ id: userId, email, role, force_password_change: true });
   if (pErr) return NextResponse.json({ error: pErr.message }, { status: 400 });
 
   return NextResponse.json({ ok: true, user_id: userId, email, role });

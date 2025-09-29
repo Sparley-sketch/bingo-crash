@@ -10,13 +10,18 @@ export default async function AdminPage() {
 
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, force_password_change')
     .eq('id', session.user.id)
     .single();
 
-  if (error || !profile || profile.role !== 'admin') {
-    redirect('/admin/forbidden');
+  if (error || !profile) {
+    redirect('/admin/login');
   }
 
-  return <AdminClient />;
+  if (profile.role === 'viewer' && profile.force_password_change) {
+    redirect('/admin/account');
+  }
+
+  const canWrite = profile.role === 'admin';
+  return <AdminClient canWrite={canWrite} />;
 }

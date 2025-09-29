@@ -21,24 +21,24 @@ function uid(prefix = "id") {
 
 }
 
-'function useInterval(cb, delay) {
-'  const ref = useRef(cb);
-'  useEffect(() => { ref.current = cb; }, [cb]);
-'  useEffect(() => {
-'    if (delay == null) return;
-'    const id = setInterval(() => ref.current(), delay);
-'    return () => clearInterval(id);
-'  }, [delay]);
+function useInterval(cb, delay) {
+  const ref = useRef(cb);
+  useEffect(() => { ref.current = cb; }, [cb]);
+  useEffect(() => {
+    if (delay == null) return;
+    const id = setInterval(() => ref.current(), delay);
+    return () => clearInterval(id);
+  }, [delay]);
 
-// helper: read ?round_ms= from the page URL
-function getInitialDelay() {
+function getRoundMsFromQuery(defaultMs = 800) {
   try {
     const ms = Number(new URLSearchParams(window.location.search).get('round_ms'));
     if (Number.isFinite(ms) && ms >= 100 && ms <= 5000) return ms;
-  } catch (_) {}
-  return 800; // fallback
+  } catch {}
+  return defaultMs;
 }
 
+ 
 // Example if you use React state for delay:
 const [delay, setDelay] = React.useState(() => getInitialDelay());
 
@@ -170,7 +170,13 @@ function makeCard(id, name) {
 }
 
 function newCaller() {
-  return { deck: shuffle(Array.from({ length: 25 }, (_, i) => i + 1)), called: [], auto: false, speedMs: 3000 };
+  const initialMs = getRoundMsFromQuery(800); // default 800ms if no param
+  return {
+    deck: shuffle(Array.from({ length: 25 }, (_, i) => i + 1)),
+    called: [],
+    auto: false,
+    speedMs: initialMs
+  };
 }
 
 function RulesModal({ open, onClose, onAccept }) {
@@ -295,7 +301,7 @@ function App() {
     try {
       const c = newCaller();
       console.assert(c.deck.length === 25 && new Set(c.deck).size === 25, "Deck must be 25 unique");
-      console.assert(c.speedMs === 3000, "Auto speed should be fixed at 3000ms");
+      console.assert(c.speedMs >= 100 && c.speedMs <= 5000, "Auto speed should be within 100–5000ms");
       const test = makeCard("t", "T");
       console.assert(test.grid.length === 3 && test.grid.every((r) => r.length === 5), "Card must be 3x5");
       console.assert(test.grid.every((r) => r.filter((x) => x.bomb).length === 1), "One bomb per row");

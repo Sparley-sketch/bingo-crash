@@ -18,16 +18,33 @@ function classNames(...xs) {
 }
 function uid(prefix = "id") {
   return prefix + Math.random().toString(36).slice(2, 8);
+
 }
 
-function useInterval(cb, delay) {
-  const ref = useRef(cb);
-  useEffect(() => { ref.current = cb; }, [cb]);
-  useEffect(() => {
-    if (delay == null) return;
-    const id = setInterval(() => ref.current(), delay);
-    return () => clearInterval(id);
-  }, [delay]);
+'function useInterval(cb, delay) {
+'  const ref = useRef(cb);
+'  useEffect(() => { ref.current = cb; }, [cb]);
+'  useEffect(() => {
+'    if (delay == null) return;
+'    const id = setInterval(() => ref.current(), delay);
+'    return () => clearInterval(id);
+'  }, [delay]);
+
+// helper: read ?round_ms= from the page URL
+function getInitialDelay() {
+  try {
+    const ms = Number(new URLSearchParams(window.location.search).get('round_ms'));
+    if (Number.isFinite(ms) && ms >= 100 && ms <= 5000) return ms;
+  } catch (_) {}
+  return 800; // fallback
+}
+
+// Example if you use React state for delay:
+const [delay, setDelay] = React.useState(() => getInitialDelay());
+
+// ... later your hook already does:
+const id = setInterval(() => ref.current(), delay);
+
 }
 
 let _ctx = null;

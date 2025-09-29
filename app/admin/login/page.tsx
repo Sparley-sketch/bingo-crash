@@ -16,7 +16,10 @@ export default function AdminLogin() {
     setErr(null);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) { setErr(error.message); return; }
-    router.replace('/admin');
+    // Make sure the server sees the session cookie
+    router.refresh();
+    // Force a real navigation so middleware + server component run
+    window.location.href = '/admin';
   }
 
   return (

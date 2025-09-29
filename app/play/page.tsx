@@ -1,9 +1,36 @@
 // app/play/page.tsx
-export default function PlayPage() {
+import { createClient } from '@supabase/supabase-js';
+
+export default async function PlayPage() {
+  // Default pace if anything fails
+  let durationMs = 800;
+
+  try {
+    const url  = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const sKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // server-only
+    if (url && sKey) {
+      const supabase = createClient(url, sKey);
+      const { data } = await supabase
+        .from('config')
+        .select('value')
+        .eq('key', 'round.duration_ms')
+        .single();
+
+      const raw = typeof data?.value === 'number' ? data.value : Number(data?.value);
+      if (Number.isFinite(raw) && raw >= 100 && raw <= 5000) {
+        durationMs = raw;
+      }
+    }
+  } catch {
+    // swallow errors and keep default 800ms
+  }
+
+  const src = `/bingo-v37/index.html?round_ms=${durationMs}`;
+
   return (
     <main className="wrap" style={{ maxWidth: 'unset', padding: 0 }}>
       <iframe
-        src="/bingo-v37/index.html"
+        src={src}
         style={{ border: 'none', width: '100%', height: '100vh' }}
         title="Bingo + Crash"
       />

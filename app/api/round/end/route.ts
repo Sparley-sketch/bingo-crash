@@ -17,8 +17,15 @@ export async function POST() {
 
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
-  const { data: lives, error: readErr } = await supabase.from('rounds').select('id').eq('phase','live');
-  if (readErr) return NextResponse.json({ error: readErr.message }, { status: 500 });
+const { data: lives } = await supabase
+  .from('rounds')
+  .select('id')
+  .ilike('phase', '%live%');       // was 'live%'
+
+if (lives?.length) {
+  const ids = lives.map((r:any) => r.id);
+  await supabase.from('rounds').update({ phase: 'ended' }).in('id', ids);
+}
 
   if (!lives?.length) return NextResponse.json({ ended: 0 }, { headers:{'Cache-Control':'no-store'} });
 

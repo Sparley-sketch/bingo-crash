@@ -9,13 +9,13 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
-  const { data: live, error: liveErr } = await supabase
-    .from('rounds')
-    .select('*')
-    .eq('phase', 'live')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+const { data: live } = await supabase
+  .from('rounds')
+  .select('*')
+  .ilike('phase', '%live%')        // was 'live%'
+  .order('created_at', { ascending: false })
+  .limit(1)
+  .maybeSingle();
 
   if (liveErr) {
     return NextResponse.json({ error: liveErr.message }, { status: 500, headers: { 'Cache-Control': 'no-store' } });

@@ -3,9 +3,6 @@
 // Plain JavaScript (no TypeScript), React UMD + JSX compiled by Babel not required.
 // Make sure React and ReactDOM UMD are loaded before this script.
 
-const { useEffect, useMemo, useRef, useState } = React;
-const [roundId, setRoundId] = React.useState(null);
-
 const CARD_PRICE = 5;
 const CATALOG_SIZE = 8;
 
@@ -103,6 +100,8 @@ function CardView(props) {
 }
 
 function App() {
+  const [roundId, setRoundId] = useState(null);
+  const lastRoundProcessed = useRef(null);
   const [phase, setPhase] = useState('setup');
   const [roundSpeed, setRoundSpeed] = useState(800);
   const [called, setCalled] = useState([]);
@@ -116,6 +115,20 @@ function App() {
   const [audio, setAudio] = useState(false);
   const [volume, setVolume] = useState(1);
 
+  
+  useEffect(() => {
+  if (!roundId) return;
+  if (lastRoundProcessed.current !== roundId) {
+    lastRoundProcessed.current = roundId;
+    if (phase === 'setup') {
+      setCalled([]);
+      setCards([]);
+      setSelected(new Set());
+      setCatalog(Array.from({ length: CATALOG_SIZE }, () => makeCard(uid('c'))));
+    }
+  }
+}, [roundId, phase]);
+
   // Poll shared round state
   useEffect(()=>{
     let stop = false;
@@ -124,6 +137,7 @@ function App() {
         const r = await fetch('/api/round/state', { cache: 'no-store' });
         const data = await r.json();
         if (stop) return;
+		setRoundId(data.id || null);
         setPhase(data.phase || 'setup');
         setRoundSpeed(Number(data.speed_ms) || 800);
         setCalled(Array.isArray(data.called) ? data.called : []);

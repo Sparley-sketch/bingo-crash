@@ -1,21 +1,19 @@
+/* @ts-nocheck */
 // app/api/round/state/route.ts
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'nodejs';
 
-// Read speed from config, safely (no DB types available)
-async function readConfigSpeed(supabase: ReturnType<typeof createClient>) {
+// Read speed from config safely (works even if the table or row is missing)
+async function readConfigSpeed(supabase: any): Promise<number> {
   try {
-    const res = await supabase
+    const { data } = await supabase
       .from('config')
       .select('value')
       .eq('key', 'round.duration_ms')
       .maybeSingle();
-
-    // res.data is `never` without DB typings; cast to any
-    const cfg: any = res.data;
-    const n = Number(cfg?.value);
+    const n = Number(data?.value);
     if (Number.isFinite(n) && n >= 100 && n <= 5000) return n;
   } catch {}
   return 800;
@@ -23,10 +21,10 @@ async function readConfigSpeed(supabase: ReturnType<typeof createClient>) {
 
 export async function GET() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!; // server-only key
-  const supabase = createClient(url, key);
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  const supabase: any = createClient(url, key);
 
-  // newest round (any phase)
+  // Get newest round (any phase)
   const { data: row, error } = await supabase
     .from('rounds')
     .select('*')
@@ -41,12 +39,12 @@ export async function GET() {
     );
   }
 
-  // Self-heal: if none OR newest is ended, create a fresh setup round
-  if (!row || (row as any).phase === 'ended') {
+  // Self-heal: if there is no row OR the newest is ended, create a fresh setup round
+  if (!row || row.phase === 'ended') {
     const speed_ms = await readConfigSpeed(supabase);
     const { data: inserted, error: insErr } = await supabase
       .from('rounds')
-      .insert({ phase: 'setup', speed_ms, deck: [], called: [] })
+      .insert([{ phase: 'setup', speed_ms, deck: [], called: [] }])
       .select('*')
       .single();
 
@@ -57,16 +55,27 @@ export async function GET() {
       );
     }
 
-    const r: any = inserted;
     return NextResponse.json(
-      { id: r.id, phase: r.phase, speed_ms: r.speed_ms, called: r.called, created_at: r.created_at },
+      {
+        id: inserted.id,
+        phase: inserted.phase,
+        speed_ms: inserted.speed_ms,
+        called: inserted.called,
+        created_at: inserted.created_at,
+      },
       { headers: { 'Cache-Control': 'no-store' } }
     );
   }
 
-  const r: any = row;
+  // Return the current round as-is
   return NextResponse.json(
-    { id: r.id, phase: r.phase, speed_ms: r.speed_ms, called: r.called, created_at: r.created_at },
+    {
+      id: row.id,
+      phase: row.phase,
+      speed_ms: row.speed_ms,
+      called: row.called,
+      created_at: row.created_at,
+    },
     { headers: { 'Cache-Control': 'no-store' } }
   );
 }

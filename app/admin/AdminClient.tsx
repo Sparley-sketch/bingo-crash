@@ -78,18 +78,24 @@ export default function AdminClient({ canWrite }: { canWrite: boolean }) {
 
   async function startRound() {
     const r = await fetch('/api/round/start', { method: 'POST' });
-    if (!r.ok) alert((await r.json().catch(()=>({}))).error || r.statusText);
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok) alert(`Start failed: ${j.error || r.statusText}`);
   }
+  
   async function callOnce() {
     const r = await fetch('/api/round/call', { method: 'POST' });
-    if (!r.ok) alert((await r.json().catch(()=>({}))).error || r.statusText);
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok) alert(`Call failed: ${j.error || r.statusText}`);
   }
+
   async function endRound() {
     const r = await fetch('/api/round/end', { method: 'POST' });
+    const j = await r.json().catch(()=>({}));
     if (!r.ok) alert((await r.json().catch(()=>({}))).error || r.statusText);
   }
   async function resetToSetup() {
     const r = await fetch('/api/round/reset', { method: 'POST' });
+    const j = await r.json().catch(()=>({}));
     if (!r.ok) alert((await r.json().catch(()=>({}))).error || r.statusText);
     setAutoOn(false);
   }

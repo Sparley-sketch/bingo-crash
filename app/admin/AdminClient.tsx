@@ -95,7 +95,27 @@ async function callOnce() {
     alert(`Call failed: ${j.error || r.statusText}`);
   }
 }
-  
+
+async function endRound() {
+  if (!canWrite) return;
+  const r = await fetch('/api/round/end', { method: 'POST' });
+  if (!r.ok) {
+    const j = await r.json().catch(() => ({}));
+    alert(`End failed: ${j.error || r.statusText}`);
+  }
+}
+
+async function resetToSetup() {
+  if (!canWrite) return;
+  const r = await fetch('/api/round/reset', { method: 'POST' });
+  if (!r.ok) {
+    const j = await r.json().catch(() => ({}));
+    alert(`Reset failed: ${j.error || r.statusText}`);
+    return;
+  }
+  // Stop auto after reset
+  setAutoOn(false);
+}  
   return (
     <main className="wrap">
       <div className="card">
@@ -125,6 +145,19 @@ async function callOnce() {
           </table>
         </div>
       </div>
+
+      <div className="row" style={{gap:8, marginTop:8}}>
+  <button className="btn" disabled={!canWrite} onClick={startRound}>Start Round</button>
+  <button className="btn" disabled={!canWrite} onClick={callOnce}>Call Next</button>
+  <button className="btn" disabled={!canWrite} onClick={endRound}>End Round</button>
+  <button className="btn" disabled={!canWrite} onClick={resetToSetup}>Reset to Setup</button>
+
+  <label className="inline-row" style={{display:'inline-flex',alignItems:'center',gap:6}}>
+    <input type="checkbox" checked={autoOn} onChange={e=>setAutoOn(e.target.checked)} disabled={!canWrite} />
+    Auto-run (uses speed_ms)
+  </label>
+  <span className="muted small">Speed: {round?.speed_ms ?? '—'} ms</span>
+  </div>
 
       <div className="card" style={{ marginTop: 16, opacity: canWrite ? 1 : 0.6 }}>
         <h3>Round Control {round ? <span className="muted"> · {round.phase} · {round.called?.length || 0}/25</span> : null}</h3>

@@ -3,33 +3,28 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Bingo + Crash — v3.7</title>
-    <!-- Tailwind Play CDN for utility classes (dev/demo friendly) -->
+    <title>Bingo Crash — Multiplayer</title>
+
+    <!-- (optional) Tailwind CDN for quick styles -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- React 18 UMD + Babel for in-browser JSX transform -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <link rel="stylesheet" href="./styles.css" />
+
+    <!-- Mount point -->
+    <style>
+      html, body { height: 100%; margin: 0; }
+      #root { min-height: 100%; }
+    </style>
   </head>
   <body class="bg-gray-50">
     <div id="root"></div>
 
-    <!-- Optional: provide a custom explosion image -->
-    <!-- <script>window.EXPLOSION_IMG = './explosion.webp';</script> -->
-    <script>
-      // Expose round_ms from the URL to the game
-      (function () {
-        const ms = Number(new URL(location.href).searchParams.get('round_ms'));
-        if (Number.isFinite(ms)) window.ROUND_MS = ms;   // e.g. 1200
-      })();
-    </script>
-    <!-- make Babel transpile app.js (which contains JSX) -->
-<script
-  type="text/babel"
-  data-presets="env,react"
-  src="./app.js">
-</script>
+    <!-- ⚠️ EXACTLY ONE React + ONE ReactDOM, matching versions -->
+    <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js"></script>
 
+    <!-- Babel Standalone (only if your app.js contains JSX) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Your game. Use text/babel so JSX is compiled in the browser. -->
+    <script type="text/babel" data-presets="env,react" src="./app.js"></script>
   </body>
 </html>

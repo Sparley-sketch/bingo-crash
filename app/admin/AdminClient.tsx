@@ -8,25 +8,45 @@ type ConfigItem = { key: string; value: any; updated_at?: string };
 export default function AdminClient({ canWrite }: { canWrite: boolean }) {
   const [items, setItems] = useState<ConfigItem[]>([]);
   const [keyName, setKeyName] = useState('round.duration_ms');
-  const [valText, setValText] = useState('5000');
-  const [newEmail, setNewEmail] = useState('');
-  const [newPass, setNewPass] = useState('');
-  const [newRole, setNewRole] = useState<'admin' | 'viewer'>('viewer');
-  const [msg, setMsg] = useState<string | null>(null);
+  const [valText, setValText] = useState('800');
+
+  const [round, setRound] = useState<{phase:string; speed_ms:number; called:number[]} | null>(null);
+  const [autoOn, setAutoOn] = useState(false);
 
   const supabase = createClientComponentClient();
 
   useEffect(() => {
     (async () => {
       const res = await fetch('/api/config');
-      if (!res.ok) {
-        alert('Failed to load config. Are you logged in?');
-        return;
+      if (res.ok) {
+        const data = await res.json();
+        setItems(data.items || []);
       }
-      const data = await res.json();
-      setItems(data.items || []);
     })();
   }, []);
+
+  useEffect(() => {
+    let stop = false;
+    async function loadRound() {
+      try {
+        const r = await fetch('/api/round/state', { cache: 'no-store' });
+        const data = await r.json();
+        if (!stop) setRound({ phase: data.phase, speed_ms: data.speed_ms, called: data.called || [] });
+      } catch {}
+    }
+    loadRound();
+    const t = setInterval(loadRound, 1000);
+    return () => { stop = true; clearInterval(t); };
+  }, []);
+
+  useEffect(() => {
+    if (!autoOn || !canWrite) return;
+    const ms = round?.speed_ms || 800;
+    const id = setInterval(async () => {
+      await fetch('/api/round/call', { method: 'POST' });
+    }, ms);
+    return () => clearInterval(id);
+  }, [autoOn, round?.speed_ms, canWrite]);
 
   function parseValue(txt: string) {
     try { return JSON.parse(txt); } catch {}
@@ -58,19 +78,13 @@ export default function AdminClient({ canWrite }: { canWrite: boolean }) {
     window.location.href = '/admin/login';
   }
 
-  async function createUser() {
+  async function startRound() {
     if (!canWrite) return;
-    setMsg(null);
-    if (!newEmail || !newPass) { setMsg('Email and password are required'); return; }
-    const res = await fetch('/api/admin/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: newEmail, password: newPass, role: newRole }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) { setMsg(data.error || 'Failed'); return; }
-    setMsg(`Created ${data.email} (${data.user_id}) as ${newRole}`);
-    setNewEmail(''); setNewPass('');
+    await fetch('/api/round/start', { method: 'POST' });
+  }
+  async function callOnce() {
+    if (!canWrite) return;
+    await fetch('/api/round/call', { method: 'POST' });
   }
 
   return (
@@ -104,17 +118,16 @@ export default function AdminClient({ canWrite }: { canWrite: boolean }) {
       </div>
 
       <div className="card" style={{ marginTop: 16, opacity: canWrite ? 1 : 0.6 }}>
-        <h3>User Management</h3>
-        <div className="row" style={{marginTop:8, gap:8}}>
-          <input type="email" placeholder="user@email.com" value={newEmail} onChange={e=>setNewEmail(e.target.value)} disabled={!canWrite} />
-          <select value={newRole} onChange={e=>setNewRole(e.target.value as 'admin' | 'viewer')} disabled={!canWrite}>
-            <option value="viewer">viewer</option>
-            <option value="admin">admin</option>
-          </select>
-          <input type="password" placeholder="temporary password (min 8 chars)" value={newPass} onChange={e=>setNewPass(e.target.value)} disabled={!canWrite} />
-          <button className="btn" onClick={createUser} disabled={!canWrite} title={canWrite ? '' : 'Viewer cannot create users'}>Create user</button>
+        <h3>Round Control {round ? <span className="muted"> · {round.phase} · {round.called?.length || 0}/25</span> : null}</h3>
+        <div className="row" style={{gap:8, marginTop:8}}>
+          <button className="btn" disabled={!canWrite} onClick={startRound}>Start Round</button>
+          <button className="btn" disabled={!canWrite} onClick={callOnce}>Call Next</button>
+          <label className="inline-row" style={{display:'inline-flex',alignItems:'center',gap:6}}>
+            <input type="checkbox" checked={autoOn} onChange={e=>setAutoOn(e.target.checked)} disabled={!canWrite} />
+            Auto-run (uses speed_ms)
+          </label>
+          <span className="muted small">Speed: {round?.speed_ms ?? '—'} ms</span>
         </div>
-        {!canWrite && <p className="muted small" style={{marginTop:8}}>Viewers can see configuration but cannot make changes.</p>}
       </div>
     </main>
   );

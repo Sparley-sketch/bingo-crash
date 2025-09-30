@@ -24,6 +24,12 @@
         if (Number.isFinite(ms)) window.ROUND_MS = ms;   // e.g. 1200
       })();
     </script>
-    <script src="./app.js"></script>
+    <!-- make Babel transpile app.js (which contains JSX) -->
+<script
+  type="text/babel"
+  data-presets="env,react"
+  src="./app.js">
+</script>
+
   </body>
 </html>

@@ -79,14 +79,23 @@ export default function AdminClient({ canWrite }: { canWrite: boolean }) {
   }
 
   async function startRound() {
-    if (!canWrite) return;
-    await fetch('/api/round/start', { method: 'POST' });
+  if (!canWrite) return;
+  const r = await fetch('/api/round/start', { method: 'POST' });
+  if (!r.ok) {
+    const j = await r.json().catch(() => ({}));
+    alert(`Start failed: ${j.error || r.statusText}`);
   }
-  async function callOnce() {
-    if (!canWrite) return;
-    await fetch('/api/round/call', { method: 'POST' });
-  }
+}
 
+async function callOnce() {
+  if (!canWrite) return;
+  const r = await fetch('/api/round/call', { method: 'POST' });
+  if (!r.ok) {
+    const j = await r.json().catch(() => ({}));
+    alert(`Call failed: ${j.error || r.statusText}`);
+  }
+}
+  
   return (
     <main className="wrap">
       <div className="card">

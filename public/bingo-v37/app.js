@@ -1,5 +1,7 @@
+
 // Multiplayer-enabled Bingo+Crash — Pre-game + Play (shared caller)
-// React UMD + Babel (no build step).
+// Plain JavaScript (no TypeScript), React UMD + JSX compiled by Babel not required.
+// Make sure React and ReactDOM UMD are loaded before this script.
 
 const { useEffect, useMemo, useRef, useState } = React;
 
@@ -14,10 +16,14 @@ function shuffle(arr) {
   }
   return a;
 }
-function classNames(...xs) { return xs.filter(Boolean).join(" "); }
-function uid(prefix = "id") { return prefix + Math.random().toString(36).slice(2, 8); }
+function classNames() {
+  return Array.from(arguments).filter(Boolean).join(" ");
+}
+function uid(prefix = "id") {
+  return prefix + Math.random().toString(36).slice(2, 8);
+}
 
-// --- FX + Audio (same as your current build) ---
+// --- FX + Audio ---
 let _ctx = null;
 function audioCtx(){const Ctx=window.AudioContext||window.webkitAudioContext;if(!_ctx&&Ctx)_ctx=new Ctx();return _ctx;}
 async function enableAudio(){const c=audioCtx();if(!c)return false;if(c.state==='suspended'){try{await c.resume();}catch{}}return true;}
@@ -34,7 +40,8 @@ function makeCard(id) {
   return { id, grid, paused: false, exploded: false, daubs: 0, wantsShield: false, shieldUsed: false };
 }
 
-function CatalogCard({ card, selected, onToggle }) {
+function CatalogCard(props) {
+  const { card, selected, onToggle } = props;
   return (
     <div className={classNames("rounded-2xl border p-3 bg-white shadow-sm relative", selected ? "ring-2 ring-black" : "")}>
       <div className="absolute left-2 top-2 text-xs px-2 py-0.5 rounded-full bg-amber-100 border border-amber-300 text-amber-900">Price: {CARD_PRICE}</div>
@@ -44,7 +51,7 @@ function CatalogCard({ card, selected, onToggle }) {
       <div className="mt-5 grid grid-cols-5 gap-2">
         {card.grid.flatMap((row, r) =>
           row.map((cell, c) => (
-            <div key={`${r}-${c}`} className={classNames("aspect-square rounded-xl border flex items-center justify-center relative select-none","min-h-[38px] min-w-[38px]","bg-white border-gray-200")}>
+            <div key={r + "-" + c} className={classNames("aspect-square rounded-xl border flex items-center justify-center relative select-none","min-h-[38px] min-w-[38px]","bg-white border-gray-200")}>
               <div className="text-sm font-semibold">{cell.n}</div>
               {cell.bomb && <div className="absolute bottom-1 right-1">💣</div>}
             </div>
@@ -55,14 +62,15 @@ function CatalogCard({ card, selected, onToggle }) {
   );
 }
 
-function CardView({ card, lastCalled, phase }) {
+function CardView(props) {
+  const { card, lastCalled, phase } = props;
   if (phase !== 'live') {
     return (
       <div className="rounded-2xl border p-3 md:p-4 bg-white shadow-sm">
         <div className="mt-1 grid grid-cols-5 gap-2">
           {card.grid.flatMap((row, r) =>
             row.map((cell, c) => (
-              <div key={`${r}-${c}`} className={classNames("aspect-square rounded-xl border flex items-center justify-center relative select-none","min-h-[44px] min-w-[44px]","bg-white border-gray-200")}>
+              <div key={r + "-" + c} className={classNames("aspect-square rounded-xl border flex items-center justify-center relative select-none","min-h-[44px] min-w-[44px]","bg-white border-gray-200")}>
                 <div className="text-base md:text-lg font-semibold">{cell.n}</div>
                 {cell.bomb && <div className="absolute bottom-1 right-1">💣</div>}
               </div>
@@ -81,7 +89,7 @@ function CardView({ card, lastCalled, phase }) {
             const hl = lastCalled === cell.n && !cell.daubed;
             const cls = cell.daubed ? "bg-emerald-100 border-emerald-300" : (hl ? "bg-yellow-50 border-yellow-300" : "bg-white border-gray-200");
             return (
-              <div key={`${r}-${c}`} className={classNames("aspect-square rounded-xl border flex items-center justify-center relative select-none","min-h-[44px] min-w-[44px]", cls)}>
+              <div key={r + "-" + c} className={classNames("aspect-square rounded-xl border flex items-center justify-center relative select-none","min-h-[44px] min-w-[44px]", cls)}>
                 <div className="text-base md:text-lg font-semibold">{cell.n}</div>
                 {cell.bomb && <div className="absolute bottom-1 right-1">💣</div>}
               </div>
@@ -96,14 +104,14 @@ function CardView({ card, lastCalled, phase }) {
 function App() {
   const [phase, setPhase] = useState('setup');
   const [roundSpeed, setRoundSpeed] = useState(800);
-  const [called, setCalled] = useState<number[]>([]);
+  const [called, setCalled] = useState([]);
   const lastCalled = called[called.length-1];
 
   const [wallet, setWallet] = useState(100);
   const [catalog, setCatalog] = useState(()=>Array.from({ length: CATALOG_SIZE }, ()=>makeCard(uid('c'))));
-  const [selected, setSelected] = useState(()=>new Set<string>());
+  const [selected, setSelected] = useState(()=>new Set());
   const [buyN, setBuyN] = useState(2);
-  const [cards, setCards] = useState<any[]>([]);
+  const [cards, setCards] = useState([]);
   const [audio, setAudio] = useState(false);
   const [volume, setVolume] = useState(1);
 
@@ -118,22 +126,28 @@ function App() {
         setPhase(data.phase || 'setup');
         setRoundSpeed(Number(data.speed_ms) || 800);
         setCalled(Array.isArray(data.called) ? data.called : []);
-      } catch {}
+      } catch (e) {
+        // keep UI alive even if API not ready
+      }
     }
     load();
     const t = setInterval(load, 700);
     return ()=>{ stop = true; clearInterval(t); };
   }, []);
 
-  function toggleSelectCard(id: string) {
-    setSelected(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+  function toggleSelectCard(id) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   }
 
   function buySelected() {
     const n = selected.size;
     if (!n) return;
     const cost = n * CARD_PRICE;
-    if (wallet < cost) { alert(`Not enough coins: need ${cost.toFixed(2)}`); return; }
+    if (wallet < cost) { alert("Not enough coins: need " + cost.toFixed(2)); return; }
     const toBuy = catalog.filter(c => selected.has(c.id));
     setCards(cs => [...cs, ...toBuy]);
     setWallet(w => w - cost);
@@ -143,11 +157,11 @@ function App() {
     setSelected(new Set());
   }
 
-  function buyRandom(n: number) {
+  function buyRandom(n) {
     const count = Math.max(0, Math.floor(n || 0));
     if (!count) return;
     const cost = count * CARD_PRICE;
-    if (wallet < cost) { alert(`Not enough coins: need ${cost.toFixed(2)}`); return; }
+    if (wallet < cost) { alert("Not enough coins: need " + cost.toFixed(2)); return; }
     const newOnes = Array.from({ length: count }, () => makeCard(uid('c')));
     setCards(cs => [...cs, ...newOnes]);
     setWallet(w => w - cost);
@@ -183,16 +197,12 @@ function App() {
   const winners = useMemo(()=>{
     const alive = cards.filter(c => !c.exploded);
     if (!alive.length) return [];
-    const m = Math.max(...alive.map(c => c.daubs));
+    const m = Math.max.apply(null, alive.map(c => c.daubs));
     return alive.filter(c => c.daubs === m);
   }, [cards]);
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      <style>{`
-        /* reuse your FX styles here if needed (omitted for brevity) */
-      `}</style>
-
       <div className="max-w-7xl mx-auto grid gap-3 md:gap-6">
         <div className="flex items-center justify-between">
           <div>
@@ -283,7 +293,7 @@ function App() {
                 {cards.filter(c=>!c.exploded).length===0 ? (
                   <div className="text-sm">No winners (all exploded).</div>
                 ) : (
-                  <div className="text-sm">Best daubs: {Math.max(0, ...cards.filter(c=>!c.exploded).map(c=>c.daubs))}</div>
+                  <div className="text-sm">Best daubs: {Math.max.apply(null, cards.filter(c=>!c.exploded).map(c=>c.daubs))}</div>
                 )}
               </div>
             )}

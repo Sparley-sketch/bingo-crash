@@ -10,11 +10,11 @@ export default function AdminClient({ canWrite }: { canWrite: boolean }) {
   const [keyName, setKeyName] = useState('round.duration_ms');
   const [valText, setValText] = useState('800');
 
-  const [round, setRound] = useState<{phase:string; speed_ms:number; called:number[]} | null>(null);
+  const [round, setRound] = useState<{ id?: string; phase: string; speed_ms: number; called: number[] } | null>(null);
   const [autoOn, setAutoOn] = useState(false);
-
   const supabase = createClientComponentClient();
 
+  // Load config table
   useEffect(() => {
     (async () => {
       const res = await fetch('/api/config');
@@ -25,13 +25,14 @@ export default function AdminClient({ canWrite }: { canWrite: boolean }) {
     })();
   }, []);
 
+  // Poll round state
   useEffect(() => {
     let stop = false;
     async function loadRound() {
       try {
         const r = await fetch('/api/round/state', { cache: 'no-store' });
         const data = await r.json();
-        if (!stop) setRound({ phase: data.phase, speed_ms: data.speed_ms, called: data.called || [] });
+        if (!stop) setRound({ id: data.id, phase: data.phase, speed_ms: data.speed_ms, called: data.called || [] });
       } catch {}
     }
     loadRound();
@@ -39,6 +40,7 @@ export default function AdminClient({ canWrite }: { canWrite: boolean }) {
     return () => { stop = true; clearInterval(t); };
   }, []);
 
+  // Auto-run caller
   useEffect(() => {
     if (!autoOn || !canWrite) return;
     const ms = round?.speed_ms || 800;
@@ -59,17 +61,13 @@ export default function AdminClient({ canWrite }: { canWrite: boolean }) {
   async function save() {
     if (!canWrite) return;
     const body = { key: keyName, value: parseValue(valText) };
-    const res = await fetch('/api/config', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      alert(`Save failed: ${err.error || res.statusText}`);
+    const r = await fetch('/api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      alert(`Save failed: ${j.error || r.statusText}`);
       return;
     }
-    const data = await res.json();
+    const data = await r.json();
     setItems(data.items);
   }
 
@@ -79,43 +77,23 @@ export default function AdminClient({ canWrite }: { canWrite: boolean }) {
   }
 
   async function startRound() {
-  if (!canWrite) return;
-  const r = await fetch('/api/round/start', { method: 'POST' });
-  if (!r.ok) {
-    const j = await r.json().catch(() => ({}));
-    alert(`Start failed: ${j.error || r.statusText}`);
+    const r = await fetch('/api/round/start', { method: 'POST' });
+    if (!r.ok) alert((await r.json().catch(()=>({}))).error || r.statusText);
   }
-}
+  async function callOnce() {
+    const r = await fetch('/api/round/call', { method: 'POST' });
+    if (!r.ok) alert((await r.json().catch(()=>({}))).error || r.statusText);
+  }
+  async function endRound() {
+    const r = await fetch('/api/round/end', { method: 'POST' });
+    if (!r.ok) alert((await r.json().catch(()=>({}))).error || r.statusText);
+  }
+  async function resetToSetup() {
+    const r = await fetch('/api/round/reset', { method: 'POST' });
+    if (!r.ok) alert((await r.json().catch(()=>({}))).error || r.statusText);
+    setAutoOn(false);
+  }
 
-async function callOnce() {
-  if (!canWrite) return;
-  const r = await fetch('/api/round/call', { method: 'POST' });
-  if (!r.ok) {
-    const j = await r.json().catch(() => ({}));
-    alert(`Call failed: ${j.error || r.statusText}`);
-  }
-}
-
-async function endRound() {
-  if (!canWrite) return;
-  const r = await fetch('/api/round/end', { method: 'POST' });
-  if (!r.ok) {
-    const j = await r.json().catch(() => ({}));
-    alert(`End failed: ${j.error || r.statusText}`);
-  }
-}
-
-async function resetToSetup() {
-  if (!canWrite) return;
-  const r = await fetch('/api/round/reset', { method: 'POST' });
-  if (!r.ok) {
-    const j = await r.json().catch(() => ({}));
-    alert(`Reset failed: ${j.error || r.statusText}`);
-    return;
-  }
-  // Stop auto after reset
-  setAutoOn(false);
-}  
   return (
     <main className="wrap">
       <div className="card">
@@ -127,7 +105,7 @@ async function resetToSetup() {
         <div className="row" style={{ marginTop: 8 }}>
           <input placeholder="key (e.g., round.duration_ms)" value={keyName} onChange={e => setKeyName(e.target.value)} disabled={!canWrite} />
           <input placeholder="value (JSON or raw)" value={valText} onChange={e => setValText(e.target.value)} disabled={!canWrite} />
-          <button className="btn" onClick={save} disabled={!canWrite} title={canWrite ? '' : 'Viewer cannot change config'}>Save</button>
+          <button className="btn" onClick={save} disabled={!canWrite}>Save</button>
         </div>
 
         <div style={{ marginTop: 16 }}>
@@ -146,24 +124,14 @@ async function resetToSetup() {
         </div>
       </div>
 
-      <div className="row" style={{gap:8, marginTop:8}}>
-  <button className="btn" disabled={!canWrite} onClick={startRound}>Start Round</button>
-  <button className="btn" disabled={!canWrite} onClick={callOnce}>Call Next</button>
-  <button className="btn" disabled={!canWrite} onClick={endRound}>End Round</button>
-  <button className="btn" disabled={!canWrite} onClick={resetToSetup}>Reset to Setup</button>
-
-  <label className="inline-row" style={{display:'inline-flex',alignItems:'center',gap:6}}>
-    <input type="checkbox" checked={autoOn} onChange={e=>setAutoOn(e.target.checked)} disabled={!canWrite} />
-    Auto-run (uses speed_ms)
-  </label>
-  <span className="muted small">Speed: {round?.speed_ms ?? '—'} ms</span>
-  </div>
-
       <div className="card" style={{ marginTop: 16, opacity: canWrite ? 1 : 0.6 }}>
-        <h3>Round Control {round ? <span className="muted"> · {round.phase} · {round.called?.length || 0}/25</span> : null}</h3>
+        <h3>Round Control · {round?.phase || '—'} · {round?.called?.length || 0}/25</h3>
         <div className="row" style={{gap:8, marginTop:8}}>
           <button className="btn" disabled={!canWrite} onClick={startRound}>Start Round</button>
           <button className="btn" disabled={!canWrite} onClick={callOnce}>Call Next</button>
+          <button className="btn" disabled={!canWrite} onClick={endRound}>End Round</button>
+          <button className="btn" disabled={!canWrite} onClick={resetToSetup}>Reset to Setup</button>
+
           <label className="inline-row" style={{display:'inline-flex',alignItems:'center',gap:6}}>
             <input type="checkbox" checked={autoOn} onChange={e=>setAutoOn(e.target.checked)} disabled={!canWrite} />
             Auto-run (uses speed_ms)

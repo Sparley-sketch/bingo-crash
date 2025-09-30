@@ -5,6 +5,7 @@
 
 const CARD_PRICE = 5;
 const CATALOG_SIZE = 8;
+const { useEffect, useMemo, useRef, useState } = React;
 
 function shuffle(arr) {
   const a = arr.slice();

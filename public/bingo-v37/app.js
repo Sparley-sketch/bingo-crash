@@ -1,10 +1,14 @@
-// Bingo+Crash v3.7 — Full playable app (Lock UI merged onto v3.6 base)
+
+// Bingo+Crash v3.8 — Merged Pre-game + Play UI with Purchase Panel
 // React UMD + Babel (no build step).
 
 const { useEffect, useMemo, useRef, useState } = React;
 
-const TABS = ["Setup", "Play", "Spectate"];
+/** Config **/
+const CARD_PRICE = 5;            // price per card (coins)
+const CATALOG_SIZE = 8;          // how many selectable cards to show pre-game
 
+/** Helpers **/
 function shuffle(arr) {
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--) {
@@ -18,9 +22,7 @@ function classNames(...xs) {
 }
 function uid(prefix = "id") {
   return prefix + Math.random().toString(36).slice(2, 8);
-
 }
-
 function useInterval(cb, delay) {
   const ref = useRef(cb);
   useEffect(() => { ref.current = cb; }, [cb]);
@@ -30,7 +32,6 @@ function useInterval(cb, delay) {
     return () => clearInterval(id);
   }, [delay]);
 }
-
 // Read ?round_ms= from the page URL, fallback to 800ms
 function getRoundMsFromQuery(defaultMs = 800) {
   try {
@@ -40,7 +41,7 @@ function getRoundMsFromQuery(defaultMs = 800) {
   return defaultMs;
 }
 
-
+/** Audio FX (unchanged) **/
 let _ctx = null;
 function audioCtx() {
   const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -87,13 +88,15 @@ function boom(vol = 1) {
   } catch {}
 }
 
+/** Visual FX (unchanged CSS-in-JS) **/
 function FX() {
   return (
     <style>{`
 @keyframes explodeFlashLong {0%{opacity:0}10%{opacity:1}60%{opacity:.6}100%{opacity:0}}
 .fx-flash-red{animation:explodeFlashLong 900ms ease-out forwards;background:radial-gradient(circle at center, rgba(255,0,0,.45), rgba(255,255,255,0) 65%)}
 .fx-flash-blue{animation:explodeFlashLong 900ms ease-out forwards;background:radial-gradient(circle at center, rgba(59,130,246,.45), rgba(255,255,255,0) 65%)}
-@keyframes shakeStrong{0%{transform:scale(1) translate(0)}20%{transform:scale(1.03) translate(-3px,3px)}40%{transform:scale(1.02) translate(3px,-3px)}60%{transform:scale(1.01) translate(-3px,-2px)}80%{transform:scale(1.02) translate(2px,3px)}100%{transform:scale(1) translate(0)}}
+@keyframes shakeStrong{0%{transform:scale(1) translate(0)}20%{transform:scale(1.03) translate(-3px,3px)}40%{transform:scale(1.02) translate(3px,-3px)}60%{transform:scale(1.01) translate(-3px,-2px)}80%{transform:scale(1.02) translate(2px,3px)}100%{transform:scale(1) translate(0)}
+}
 .fx-shake-strong{animation:shakeStrong 750ms ease-in-out 1}
 @keyframes puff{0%{transform:translateY(0) scale(.7);opacity:.95;filter:blur(2px)}60%{opacity:.6}100%{transform:translateY(-28px) scale(1.35);opacity:0;filter:blur(4px)}}
 .puff{position:absolute;width:20px;height:20px;border-radius:9999px;background:radial-gradient(circle at 30% 30%, rgba(200,200,200,.95), rgba(200,200,200,.15));animation:puff 800ms ease-out forwards}
@@ -104,7 +107,6 @@ function FX() {
 `}</style>
   );
 }
-
 function Puffs() {
   return (
     <>
@@ -139,7 +141,6 @@ function Debris() {
   });
   return <>{parts}</>;
 }
-
 function ExplosionFX() {
   const src = window.EXPLOSION_IMG;
   return (
@@ -153,101 +154,104 @@ function ExplosionFX() {
   );
 }
 
-function makeCard(id, name) {
+/** Game model **/
+function makeCard(id) {
   const nums = shuffle(Array.from({ length: 25 }, (_, i) => i + 1)).slice(0, 15);
   const gridNums = [0, 1, 2].map((r) => nums.slice(r * 5, r * 5 + 5));
   const grid = gridNums.map((row) => {
     const bombCol = Math.floor(Math.random() * 5);
     return row.map((n, c) => ({ n, bomb: c === bombCol, daubed: false }));
   });
-  return { id, name, grid, paused: false, exploded: false, daubs: 0, wantsShield: false, shieldUsed: false };
+  return { id, grid, paused: false, exploded: false, daubs: 0, wantsShield: false, shieldUsed: false };
 }
-
 function newCaller() {
-  const initialMs = getRoundMsFromQuery(800); // default 800ms if no param
-  return {
-    deck: shuffle(Array.from({ length: 25 }, (_, i) => i + 1)),
-    called: [],
-    auto: false,
-    speedMs: initialMs
-  };
+  const initialMs = getRoundMsFromQuery(800);
+  return { deck: shuffle(Array.from({ length: 25 }, (_, i) => i + 1)), called: [], auto: false, speedMs: initialMs };
 }
 
-function RulesModal({ open, onClose, onAccept }) {
-  if (!open) return null;
+/** UI pieces **/
+function CatalogCard({ card, selected, onToggle }) {
   return (
-    <div className="fixed inset-0 z-40 flex items-end md:items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full md:w-auto mx-2 md:mx-0 mb-4 md:mb-0 rounded-2xl bg-white p-4 md:p-6 shadow-xl border max-w-md">
-        <h3 className="text-lg md:text-xl font-bold">How to Play</h3>
-        <ul className="mt-2 text-sm text-gray-700 space-y-2 list-disc pl-5">
-          <li>Tap the <b>Lock</b> button to lockin your card.</li>
-          <li>If a called number has a bomb, your card <b className='text-red-600'>explodes</b> (unless shielded).</li>
-          <li><b>Shield</b>: choose before the round. Absorbs the first bomb on that card. You can set shields per-card or bulk for all a player's cards.</li>
-          <li><b>Winner(s)</b>: non-exploded card(s) with the most daubs. Ties split the prize equally.</li>
-        </ul>
-        <div className="mt-4 flex items-center justify-end gap-2">
-          <button onClick={onClose} className="rounded-xl px-3 py-2 bg-gray-100 text-sm">Close</button>
-          <button onClick={onAccept} className="rounded-xl px-4 py-2 bg-black text-white text-sm">Got it, start</button>
-        </div>
+    <div className={classNames(
+      "rounded-2xl border p-3 bg-white shadow-sm relative",
+      selected ? "ring-2 ring-black" : ""
+    )}>
+      <div className="absolute left-2 top-2 text-xs px-2 py-0.5 rounded-full bg-amber-100 border border-amber-300 text-amber-900">
+        Price: {CARD_PRICE}
+      </div>
+      <label className="absolute right-2 top-2 text-xs flex items-center gap-1">
+        <input type="checkbox" checked={selected} onChange={onToggle} />
+        Select
+      </label>
+      <div className="mt-5 grid grid-cols-5 gap-2">
+        {card.grid.flatMap((row, r) =>
+          row.map((cell, c) => (
+            <div key={`${r}-${c}`} className={classNames(
+              "aspect-square rounded-xl border flex items-center justify-center relative select-none",
+              "min-h-[38px] min-w-[38px]",
+              "bg-white border-gray-200"
+            )}>
+              <div className="text-sm font-semibold">{cell.n}</div>
+              {cell.bomb && <div className="absolute bottom-1 right-1">💣</div>}
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
 }
 
-function CellView({ cell, highlight }) {
-  const stateClass = cell.daubed
-    ? "bg-emerald-100 border-emerald-300"
-    : highlight
-    ? "bg-yellow-50 border-yellow-300"
-    : "bg-white border-gray-200";
+function CardView({ card, lastCalled, onPause, phase }) {
+  if (phase !== "live") {
+    // Pre-game: show plain card without controls
+    return (
+      <div className="rounded-2xl border p-3 md:p-4 bg-white shadow-sm relative overflow-hidden">
+        <div className="mt-1 grid grid-cols-5 gap-2">
+          {card.grid.flatMap((row, r) =>
+            row.map((cell, c) => (
+              <div key={`${r}-${c}`} className={classNames(
+                "aspect-square rounded-xl border flex items-center justify-center relative select-none",
+                "min-h-[44px] min-w-[44px]",
+                "bg-white border-gray-200"
+              )}>
+                <div className="text-base md:text-lg font-semibold">{cell.n}</div>
+                {cell.bomb && <div className="absolute bottom-1 right-1">💣</div>}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Live round view
+  const stateBadge = card.exploded
+    ? <span className="ml-2 rounded-full bg-red-200 text-red-900 px-2 py-0.5 text-[11px]">EXPLODED</span>
+    : card.paused
+    ? <span className="ml-2 rounded-full bg-yellow-200 text-yellow-900 px-2 py-0.5 text-[11px]">LOCKED</span>
+    : <span className="ml-2 rounded-full bg-emerald-200 text-emerald-900 px-2 py-0.5 text-[11px]">LIVE</span>;
+
+  const shieldBadge = card.wantsShield && !card.shieldUsed
+    ? <span className="ml-1 rounded-full bg-emerald-200 text-emerald-900 px-2 py-0.5 text-[10px]">shield active</span>
+    : card.shieldUsed
+    ? <span className="ml-1 rounded-full bg-red-200 text-red-900 px-2 py-0.5 text-[10px]">shield used</span>
+    : null;
+
   return (
-    <div
-      className={classNames(
-        "aspect-square rounded-xl border flex items-center justify-center relative select-none",
-        "min-h-[44px] min-w-[44px]",
-        stateClass
-      )}
-    >
-      <div className="text-base md:text-lg font-semibold">{cell.n}</div>
-      {cell.bomb && <div className="absolute bottom-1 right-1">💣</div>}
-    </div>
-  );
-}
-
-function CardView({ card, lastCalled, onPause }) {
-  const badge = card.exploded ? (
-    <span className="ml-2 rounded-full bg-red-200 text-red-900 px-2 py-0.5 text-[11px]">EXPLODED</span>
-  ) : card.paused ? (
-    <span className="ml-2 rounded-full bg-yellow-200 text-yellow-900 px-2 py-0.5 text-[11px]">LOCKED</span>
-  ) : (
-    <span className="ml-2 rounded-full bg-emerald-200 text-emerald-900 px-2 py-0.5 text-[11px]">LIVE</span>
-  );
-
-  const shieldBadge = card.wantsShield && !card.shieldUsed ? (
-    <span className="ml-1 rounded-full bg-emerald-200 text-emerald-900 px-2 py-0.5 text-[10px]">shield active</span>
-  ) : card.shieldUsed ? (
-    <span className="ml-1 rounded-full bg-red-200 text-red-900 px-2 py-0.5 text-[10px]">shield used</span>
-  ) : null;
-
-  return (
-    <div
-      className={classNames(
-        "rounded-2xl md:rounded-3xl border p-3 md:p-4 bg-white shadow-sm relative overflow-hidden",
-        (card.justExploded || card.justSaved) && "fx-shake-strong"
-      )}
-    >
+    <div className={classNames(
+      "rounded-2xl md:rounded-3xl border p-3 md:p-4 bg-white shadow-sm relative overflow-hidden",
+      (card.justExploded || card.justSaved) && "fx-shake-strong"
+    )}>
       {card.justExploded && <ExplosionFX />}
       {card.justSaved && <div className="pointer-events-none absolute inset-0 fx-flash-blue" />}
+
       <div className="flex items-center justify-between gap-2">
         <div className="font-semibold text-sm md:text-base flex items-center gap-2">
-          {card.name} {badge}
+          {/* Name removed per spec; show only status */}
+          {stateBadge}
           {shieldBadge}
         </div>
         <div className="flex items-center gap-2">
-          <div className="text-xs md:text-sm text-gray-600">
-            Daubs: <span className="font-semibold text-gray-900">{card.daubs}</span>
-          </div>
           <button
             disabled={card.paused || card.exploded}
             onClick={onPause}
@@ -263,10 +267,20 @@ function CardView({ card, lastCalled, onPause }) {
           </button>
         </div>
       </div>
+
       <div className="mt-3 grid grid-cols-5 gap-2">
         {card.grid.flatMap((row, r) =>
           row.map((cell, c) => (
-            <CellView key={`${r}-${c}`} cell={cell} highlight={lastCalled === cell.n && !cell.daubed} />
+            <div key={`${r}-${c}`} className={classNames(
+              "aspect-square rounded-xl border flex items-center justify-center relative select-none",
+              "min-h-[44px] min-w-[44px]",
+              cell.daubed
+                ? "bg-emerald-100 border-emerald-300"
+                : (lastCalled === cell.n ? "bg-yellow-50 border-yellow-300" : "bg-white border-gray-200")
+            )}>
+              <div className="text-base md:text-lg font-semibold">{cell.n}</div>
+              {cell.bomb && <div className="absolute bottom-1 right-1">💣</div>}
+            </div>
           ))
         )}
       </div>
@@ -274,151 +288,137 @@ function CardView({ card, lastCalled, onPause }) {
   );
 }
 
+/** App **/
 function App() {
-  const [tab, setTab] = useState("Setup");
-  const [phase, setPhase] = useState("setup");
+  const [phase, setPhase] = useState("setup"); // setup → live → ended
   const [caller, setCaller] = useState(() => newCaller());
   const [players, setPlayers] = useState(() => {
-    const p1 = { id: uid("p"), name: "Player 1", cards: [makeCard(uid("c"), "P1 #1"), makeCard(uid("c"), "P1 #2")] };
-    const p2 = { id: uid("p"), name: "Player 2", cards: [makeCard(uid("c"), "P2 #1"), makeCard(uid("c"), "P2 #2")] };
-    return [p1, p2];
+    const you = { id: uid("p"), name: "You", cards: [] };
+    return [you];
   });
+  const you = players[0];
+
+  // Wallet + audio
+  const [wallet, setWallet] = useState(100);
   const [audio, setAudio] = useState(false);
   const [volume, setVolume] = useState(1);
-  const [shieldCostPct, setShieldCostPct] = useState(25);
-  const [wallet, setWallet] = useState(100);
+
+  // Catalog & selection (pre-game)
+  const [catalog, setCatalog] = useState(() => Array.from({ length: CATALOG_SIZE }, () => makeCard(uid("c"))));
+  const [selected, setSelected] = useState(() => new Set());
+  const [buyN, setBuyN] = useState(2);
   const [rulesAccepted, setRulesAccepted] = useState(false);
   const [showRules, setShowRules] = useState(true);
   const [pendingStart, setPendingStart] = useState(false);
 
-  useEffect(() => {
-    try {
-      const c = newCaller();
-      console.assert(c.deck.length === 25 && new Set(c.deck).size === 25, "Deck must be 25 unique");
-      console.assert(c.speedMs >= 100 && c.speedMs <= 5000, "Auto speed should be within 100–5000ms");
-      const test = makeCard("t", "T");
-      console.assert(test.grid.length === 3 && test.grid.every((r) => r.length === 5), "Card must be 3x5");
-      console.assert(test.grid.every((r) => r.filter((x) => x.bomb).length === 1), "One bomb per row");
-      (function testShieldSave() {
-        const card = makeCard("ts", "Test");
-        card.wantsShield = true; card.shieldUsed = false;
-        const bombNum = 99;
-        card.grid[0][0] = { n: bombNum, bomb: true, daubed: false };
-        let exploded = false; let shieldUsed = card.shieldUsed; let daubs = card.daubs;
-        const grid = card.grid.map((row) => row.map((cell) => {
-          if (cell.n === bombNum) {
-            if (cell.bomb) {
-              if (card.wantsShield && !shieldUsed) { shieldUsed = true; daubs += 1; return { ...cell, daubed: true }; }
-              else { exploded = true; }
-            }
-          }
-          return cell;
-        }));
-        const savedCell = grid[0][0];
-        console.assert(savedCell.daubed && shieldUsed && !exploded && daubs === 1, "Shield save must daub & count");
-      })();
-    } catch (e) {
-      console.warn("Self-tests failed", e);
-    }
-  }, []);
-
-  const allCards = React.useMemo(() => players.flatMap((p) => p.cards), [players]);
+  // Derived
+  const allCards = useMemo(() => you.cards, [you]);
   const lastCalled = caller.called[caller.called.length - 1];
   const liveCards = allCards.filter((c) => !c.paused && !c.exploded).length;
   const deckExhausted = caller.called.length === 25;
   const roundOver = deckExhausted || liveCards === 0;
 
-  const winners = React.useMemo(() => {
+  const winners = useMemo(() => {
     const alive = allCards.filter((c) => !c.exploded);
     if (!alive.length) return [];
     const m = Math.max(...alive.map((c) => c.daubs));
     return alive.filter((c) => c.daubs === m);
   }, [allCards]);
 
+  // Interval driving the caller
   useInterval(() => {
     if (!caller.auto || phase !== "live" || roundOver) return;
     callNext();
   }, caller.auto ? caller.speedMs : null);
 
+  // FX cleanup
   useEffect(() => {
     if (!allCards.some((c) => c.justExploded || c.justSaved)) return;
-    const t = setTimeout(() => setPlayers((ps) => ps.map((pl) => ({ ...pl, cards: pl.cards.map((c) => ({ ...c, justExploded: false, justSaved: false })) }))), 900);
+    const t = setTimeout(() => {
+      setPlayers((ps) => {
+        const me = ps[0];
+        return [{ ...me, cards: me.cards.map((c) => ({ ...c, justExploded: false, justSaved: false })) }];
+      });
+    }, 900);
     return () => clearTimeout(t);
   }, [allCards]);
 
   useEffect(() => {
-    if (roundOver && phase === "live") {
-      setPhase("ended");
-      setTab("Spectate");
+    // self-tests (adjusted)
+    try {
+      const c = newCaller();
+      console.assert(c.deck.length === 25 && new Set(c.deck).size === 25, "Deck must be 25 unique");
+      console.assert(c.speedMs >= 100 && c.speedMs <= 5000, "Auto speed should be within 100–5000ms");
+    } catch (e) {
+      console.warn("Self-tests failed", e);
     }
-  }, [roundOver, phase]);
+  }, []);
 
-  function addPlayer() {
-    const idx = players.length + 1;
-    setPlayers((ps) => [...ps, { id: uid("p"), name: `Player ${idx}`, cards: [] }]);
-  }
-  function removePlayer(id) {
-    setPlayers((ps) => (ps.length > 1 ? ps.filter((p) => p.id !== id) : ps));
-  }
-  function renamePlayer(id, name) {
-    setPlayers((ps) => ps.map((p) => (p.id === id ? { ...p, name } : p)));
-  }
-  function buyCards(id, count) {
-    if (count <= 0) return;
-    setPlayers((ps) =>
-      ps.map((p) => {
-        if (p.id !== id) return p;
-        const next = [...p.cards];
-        for (let i = 0; i < count; i++) {
-          next.push(makeCard(uid("c"), `${p.name} #${next.length + 1}`));
-        }
-        return { ...p, cards: next };
-      })
-    );
+  /** Actions **/
+  function resetAll() {
+    setCaller(newCaller());
+    setPlayers([{ id: uid("p"), name: "You", cards: [] }]);
+    setPhase("setup");
+    setRulesAccepted(false);
+    setShowRules(true);
+    setCatalog(Array.from({ length: CATALOG_SIZE }, () => makeCard(uid("c"))));
+    setSelected(new Set());
   }
 
-  function toggleCardShield(cardId, on) {
-    setPlayers((ps) => ps.map((p) => ({ ...p, cards: p.cards.map((c) => (c.id === cardId ? { ...c, wantsShield: on } : c)) })));
+  function toggleSelectCard(cardId) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(cardId)) next.delete(cardId);
+      else next.add(cardId);
+      return next;
+    });
   }
-  function shieldAllForPlayer(playerId, on) {
-    setPlayers((ps) => ps.map((p) => (p.id === playerId ? { ...p, cards: p.cards.map((c) => ({ ...c, wantsShield: on })) } : p)));
+
+  function buySelectedCards() {
+    const count = selected.size;
+    if (!count) return;
+    const cost = count * CARD_PRICE;
+    if (wallet < cost) {
+      alert(`Not enough coins: need ${cost.toFixed(2)}`);
+      return;
+    }
+    const toBuy = catalog.filter((c) => selected.has(c.id));
+    setPlayers((ps) => {
+      const me = ps[0];
+      return [{ ...me, cards: [...me.cards, ...toBuy] }];
+    });
+    setWallet((w) => w - cost);
+    // remove bought from catalog & refill
+    const remaining = catalog.filter((c) => !selected.has(c.id));
+    const refill = Array.from({ length: Math.max(0, CATALOG_SIZE - remaining.length) }, () => makeCard(uid("c")));
+    setCatalog([...remaining, ...refill]);
+    setSelected(new Set());
+  }
+
+  function buyRandomCards(n) {
+    const count = Math.max(0, Math.floor(n || 0));
+    if (!count) return;
+    const cost = count * CARD_PRICE;
+    if (wallet < cost) {
+      alert(`Not enough coins: need ${cost.toFixed(2)}`);
+      return;
+    }
+    const newOnes = Array.from({ length: count }, () => makeCard(uid("c")));
+    setPlayers((ps) => {
+      const me = ps[0];
+      return [{ ...me, cards: [...me.cards, ...newOnes] }];
+    });
+    setWallet((w) => w - cost);
   }
 
   function pauseCard(cardId) {
-    setPlayers((ps) =>
-      ps.map((p) => ({ ...p, cards: p.cards.map((c) => (c.id === cardId && !c.paused && !c.exploded ? { ...c, paused: true } : c)) }))
-    );
-  }
-
-  function startRound() {
-    const shieldedCount = allCards.filter((c) => c.wantsShield).length;
-    const cost = shieldedCount * (shieldCostPct / 100);
-    if (wallet < cost) {
-      alert(`Not enough coins: need ${cost.toFixed(2)} for ${shieldedCount} shields`);
-      return;
-    }
-    setWallet((w) => w - cost);
-    setPhase("live");
-    setTab("Play");
-  }
-  function handleStartRound() {
-    if (!rulesAccepted) {
-      setShowRules(true);
-      setPendingStart(true);
-      return;
-    }
-    startRound();
-  }
-  function resetAll() {
-    setCaller(newCaller());
-    setPlayers([
-      { id: uid("p"), name: "Player 1", cards: [makeCard(uid("c"), "P1 #1"), makeCard(uid("c"), "P1 #2")] },
-      { id: uid("p"), name: "Player 2", cards: [makeCard(uid("c"), "P2 #1"), makeCard(uid("c"), "P2 #2")] },
-    ]);
-    setPhase("setup");
-    setTab("Setup");
-    setRulesAccepted(false);
-    setShowRules(true);
+    setPlayers((ps) => {
+      const me = ps[0];
+      return [{
+        ...me,
+        cards: me.cards.map((c) => (c.id === cardId && !c.paused && !c.exploded ? { ...c, paused: true } : c))
+      }];
+    });
   }
 
   function callNext() {
@@ -430,10 +430,11 @@ function App() {
       const called = [...prev.called, n];
       let anyBoom = false;
 
-      setPlayers((ps) =>
-        ps.map((player) => ({
-          ...player,
-          cards: player.cards.map((card) => {
+      setPlayers((ps) => {
+        const me = ps[0];
+        const nextMe = {
+          ...me,
+          cards: me.cards.map((card) => {
             if (card.paused || card.exploded) return card;
             let exploded = card.exploded;
             let shieldUsed = card.shieldUsed;
@@ -465,35 +466,44 @@ function App() {
               justExploded = true;
             }
             return { ...card, grid, exploded, daubs, shieldUsed, justExploded, justSaved };
-          }),
-        }))
-      );
+          })
+        };
+        return [nextMe];
+      });
 
       if (anyBoom && audio) boom(volume);
       return { ...prev, deck: rest, called };
     });
   }
 
+  function startRound() {
+    if (!you.cards.length) {
+      alert("Buy at least one card to start.");
+      return;
+    }
+    setPhase("live");
+  }
+
+  /** Render **/
+  const header = (
+    <div className="flex items-center justify-between">
+      <div>
+        <h1 className="text-xl md:text-2xl font-bold">Bingo + Crash — 25 Ball (v3.8)</h1>
+        <p className="text-xs md:text-sm text-gray-600">Merged pre-game and play · Purchase Panel → Caller</p>
+      </div>
+      <div className="text-xs text-gray-600">
+        Wallet: <span className="font-semibold">{wallet.toFixed(2)}</span>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <FX />
       <div className="max-w-7xl mx-auto grid gap-3 md:gap-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold">Bingo + Crash — 25 Ball (v3.7)</h1>
-            <p className="text-xs md:text-sm text-gray-600">Multi-player · Shields · 3s auto-caller · Explosion FX</p>
-          </div>
-          <div className="text-xs text-gray-600">
-            Wallet: <span className="font-semibold">{wallet.toFixed(2)}</span>
-          </div>
-        </div>
+        {header}
 
         <div className="bg-white rounded-2xl p-3 border shadow-sm flex items-center gap-2 overflow-auto">
-          {TABS.map((t) => (
-            <button key={t} onClick={() => setTab(t)} className={classNames("px-3 py-2 rounded-xl text-sm", tab === t ? "bg-black text-white" : "bg-gray-100")}>
-              {t}
-            </button>
-          ))}
           <div className="ml-auto flex items-center gap-2">
             {!audio ? (
               <button
@@ -526,104 +536,79 @@ function App() {
           </div>
         </div>
 
-        <RulesModal
-          open={showRules}
-          onClose={() => {
-            setShowRules(false);
-            setPendingStart(false);
-          }}
-          onAccept={() => {
-            setRulesAccepted(true);
-            setShowRules(false);
-            if (pendingStart) {
-              setPendingStart(false);
-              startRound();
-            }
-          }}
-        />
-
-        {tab === "Setup" && (
-          <div className="grid gap-3">
-            <div className="rounded-2xl border p-3 bg-white">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold">Players</h3>
-                <div className="text-xs text-gray-600">
-                  Shield cost per card:{" "}
-                  <input
-                    className="w-16 text-center border rounded ml-1"
-                    type="number"
-                    value={shieldCostPct}
-                    onChange={(e) => setShieldCostPct(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
-                  />
-                  %
-                </div>
-              </div>
-              <div className="mt-3 grid gap-3">
-                {players.map((p) => (
-                  <div key={p.id} className="rounded-xl border p-3">
-                    <div className="flex flex-wrap items-center gap-2 justify-between">
-                      <div className="flex items-center gap-2">
-                        <input className="border rounded px-2 py-1 text-sm" value={p.name} onChange={(e) => renamePlayer(p.id, e.target.value)} />
-                        <button className="rounded-lg px-2 py-1 bg-gray-100 text-xs disabled:opacity-50" disabled={players.length <= 1} onClick={() => removePlayer(p.id)}>
-                          Remove
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input className="border rounded px-2 py-1 w-16 text-sm" type="number" min={1} defaultValue={2} id={`buy-${p.id}`} />
-                        <button
-                          className="rounded-lg px-2 py-1 bg-black text-white text-xs"
-                          onClick={() => {
-                            const input = document.getElementById(`buy-${p.id}`);
-                            const n = Math.max(1, Number(input?.value) || 0);
-                            buyCards(p.id, n);
-                          }}
-                        >
-                          Buy n cards
-                        </button>
-                        <button className="rounded-lg px-2 py-1 bg-sky-100 text-sky-900 text-xs" onClick={() => shieldAllForPlayer(p.id, true)}>
-                          Shield all
-                        </button>
-                        <button className="rounded-lg px-2 py-1 bg-sky-50 text-sky-700 text-xs" onClick={() => shieldAllForPlayer(p.id, false)}>
-                          Unshield all
-                        </button>
-                      </div>
-                    </div>
-                    {p.cards.length > 0 ? (
-                      <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                        {p.cards.map((c) => (
-                          <label key={c.id} className="rounded-lg border p-2 flex items-center justify-between text-xs">
-                            <span className="truncate mr-2">{c.name}</span>
-                            <span className="flex items-center gap-1">
-                              <input type="checkbox" checked={c.wantsShield} onChange={(e) => toggleCardShield(c.id, e.target.checked)} />
-                              Shield
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-xs text-gray-500 mt-2">No cards yet.</div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <div className="mt-3 flex items-center gap-2">
-                <button className="rounded-xl px-3 py-2 bg-gray-100" onClick={addPlayer}>
-                  Add Player
-                </button>
-                <button className="ml-auto rounded-xl px-4 py-2 bg-emerald-600 text-white" onClick={handleStartRound}>
-                  Start Round
-                </button>
+        {/* Rules modal */}
+        {showRules && (
+          <div className="fixed inset-0 z-40 flex items-end md:items-center justify-center">
+            <div className="absolute inset-0 bg-black/40" onClick={() => { setShowRules(false); setPendingStart(false); }} />
+            <div className="relative w-full md:w-auto mx-2 md:mx-0 mb-4 md:mb-0 rounded-2xl bg-white p-4 md:p-6 shadow-xl border max-w-md">
+              <h3 className="text-lg md:text-xl font-bold">How to Play</h3>
+              <ul className="mt-2 text-sm text-gray-700 space-y-2 list-disc pl-5">
+                <li>Pre-game: pick cards to buy, or buy N random from the left panel.</li>
+                <li>When round starts, Purchase Panel turns into the Caller.</li>
+                <li>If a called number has a bomb, your card <b className='text-red-600'>explodes</b> (unless shielded).</li>
+                <li><b>Shield</b> absorbs the first bomb on that card.</li>
+                <li><b>Winners</b>: non-exploded cards with the most daubs.</li>
+              </ul>
+              <div className="mt-4 flex items-center justify-end gap-2">
+                <button onClick={() => { setShowRules(false); setPendingStart(false); }} className="rounded-xl px-3 py-2 bg-gray-100 text-sm">Close</button>
+                <button onClick={() => { setRulesAccepted(true); setShowRules(false); if (pendingStart) { setPendingStart(false); startRound(); } }} className="rounded-xl px-4 py-2 bg-black text-white text-sm">Got it</button>
               </div>
             </div>
           </div>
         )}
 
-        {tab === "Play" && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6">
+        {/* Main 2-column layout */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6">
+          {/* Left column: Purchase Panel OR Caller */}
+          {phase === "setup" ? (
+            <div className="rounded-3xl border p-4 bg-white shadow-sm">
+              <h3 className="font-semibold mb-2">Purchase Panel</h3>
+              <div className="text-xs text-gray-600">Card price: <span className="font-semibold">{CARD_PRICE}</span></div>
+              <div className="mt-3 flex items-center gap-2">
+                <input
+                  className="border rounded px-2 py-1 w-20 text-sm"
+                  type="number"
+                  min={1}
+                  value={buyN}
+                  onChange={(e) => setBuyN(Math.max(1, Number(e.target.value) || 1))}
+                />
+                <button className="rounded-2xl px-3 py-2 bg-black text-white text-sm"
+                        onClick={() => buyRandomCards(buyN)}>
+                  Buy {buyN}
+                </button>
+              </div>
+              <div className="mt-3">
+                <button
+                  className="rounded-2xl px-3 py-2 bg-emerald-600 text-white text-sm disabled:opacity-50"
+                  disabled={selected.size === 0}
+                  onClick={buySelectedCards}
+                >
+                  Buy Selected ({selected.size}) — {(selected.size * CARD_PRICE).toFixed(2)}
+                </button>
+              </div>
+              <div className="mt-6">
+                <button
+                  className="rounded-2xl px-4 py-2 bg-sky-600 text-white text-sm disabled:opacity-50"
+                  onClick={() => {
+                    if (!rulesAccepted) {
+                      setShowRules(true);
+                      setPendingStart(true);
+                      return;
+                    }
+                    startRound();
+                  }}
+                  disabled={you.cards.length === 0}
+                  title={you.cards.length ? "" : "Buy at least one card"}
+                >
+                  Start Round
+                </button>
+              </div>
+            </div>
+          ) : (
             <div className="rounded-3xl border p-4 bg-white shadow-sm">
               <h3 className="font-semibold mb-3">Caller</h3>
               <div className="h-16 rounded-xl bg-gray-100 flex items-center justify-center text-3xl font-bold">{lastCalled ?? "—"}</div>
-              <div className="mt-2 text-xs text-gray-600">Speed: {(caller.speedMs/1000).toFixed(0)}s · Live cards: {liveCards}</div>
+              <div className="mt-2 text-xs text-gray-600">Speed: {(caller.speedMs/1000).toFixed(1)}s · Live cards: {you.cards.filter(c=>!c.paused && !c.exploded).length}</div>
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <button className="rounded-2xl px-3 py-2 bg-black text-white text-sm disabled:opacity-50" onClick={callNext} disabled={phase !== "live" || roundOver}>
                   Call Next
@@ -645,64 +630,63 @@ function App() {
                 ))}
               </div>
             </div>
+          )}
 
-            <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-6">
-              {allCards.map((card) => (
-                <CardView key={card.id} card={card} lastCalled={lastCalled} onPause={() => pauseCard(card.id)} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {tab === "Spectate" && (
-          <div className="grid gap-3">
-            <div className="rounded-2xl border p-3 bg-white">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold">Spectator Mode</h3>
-                <div className="text-xs text-gray-600">Phase: {phase}</div>
-              </div>
-              <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
-                {players.map((p) => {
-                  const alive = p.cards.filter((c) => !c.exploded);
-                  const maxDaubs = alive.length ? Math.max(...alive.map((c) => c.daubs)) : 0;
-                  return (
-                    <div key={p.id} className="rounded-xl border p-3 bg-gray-50">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-semibold">{p.name}</span>
-                        <span className="text-xs text-gray-600">Cards: {p.cards.length}</span>
-                      </div>
-                      <div className="mt-1 text-xs text-gray-600">Best daubs: {maxDaubs}</div>
-                      <div className="mt-2 grid grid-cols-3 gap-1">
-                        {p.cards.slice(0, 6).map((c) => (
-                          <div key={c.id} className="text-[11px] px-2 py-1 rounded bg-white border truncate">
-                            {c.exploded ? "💥" : c.paused ? "🔒" : "•"} {c.daubs}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border p-3 bg-white">
-              <h3 className="font-semibold">Round Summary</h3>
-              {winners.length === 0 ? (
-                <div className="text-sm">No winners (all exploded).</div>
-              ) : winners.length === 1 ? (
-                <div className="text-sm">
-                  Winner: <span className="font-semibold">{winners[0].name}</span> with {winners[0].daubs} daubs.
+          {/* Right column: Cards */}
+          <div className="md:col-span-2 grid grid-cols-1 gap-3 md:gap-6">
+            {/* Owned cards (always visible) */}
+            <div className="rounded-3xl border p-4 bg-white shadow-sm">
+              <h3 className="font-semibold mb-3">Your Cards ({you.cards.length})</h3>
+              {you.cards.length ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3">
+                  {you.cards.map((card) => (
+                    <CardView key={card.id} card={card} lastCalled={lastCalled} onPause={() => pauseCard(card.id)} phase={phase} />
+                  ))}
                 </div>
               ) : (
-                <div className="text-sm">Winners ({winners.length}) with {winners[0].daubs} daubs. Prize split equally.</div>
+                <div className="text-xs text-gray-500">No cards yet. Buy some from the Purchase Panel.</div>
               )}
             </div>
+
+            {/* Catalog only pre-game */}
+            {phase === "setup" && (
+              <div className="rounded-3xl border p-4 bg-white shadow-sm">
+                <h3 className="font-semibold mb-3">Available Cards (select to buy)</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3">
+                  {catalog.map((card) => (
+                    <CatalogCard
+                      key={card.id}
+                      card={card}
+                      selected={selected.has(card.id)}
+                      onToggle={() => toggleSelectCard(card.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Round summary only after live */}
+            {phase !== "setup" && (
+              <div className="rounded-3xl border p-3 bg-white">
+                <h3 className="font-semibold">Round Summary</h3>
+                {winners.length === 0 ? (
+                  <div className="text-sm">No winners (all exploded).</div>
+                ) : winners.length === 1 ? (
+                  <div className="text-sm">
+                    Winner: <span className="font-semibold">Your card</span> with {winners[0].daubs} daubs.
+                  </div>
+                ) : (
+                  <div className="text-sm">Winning cards: {winners.length} with {winners[0].daubs} daubs.</div>
+                )}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
 }
 
+// Mount
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(<App />);

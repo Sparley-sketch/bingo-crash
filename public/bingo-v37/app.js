@@ -4,6 +4,7 @@
 // Make sure React and ReactDOM UMD are loaded before this script.
 
 const { useEffect, useMemo, useRef, useState } = React;
+const [roundId, setRoundId] = React.useState(null);
 
 const CARD_PRICE = 5;
 const CATALOG_SIZE = 8;

@@ -58,43 +58,70 @@ function applyCallToCards(cards, n, audioOn, volume){
   return next;
 }
 
+// tiny inline lock image (light) – data URI
+const LOCK_IMG =
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="%231e293b"><path d="M17 8V7a5 5 0 0 0-10 0v1H5v14h14V8h-2zm-8-1a3 3 0 0 1 6 0v1H9V7zm8 13H7v-9h10v9z"/></svg>';
+
 function Cell({cell,highlight}){
   const cls=['cell']; if(cell.daubed) cls.push('daub'); else if(highlight) cls.push('hl');
   return <div className={cls.join(' ')}><div style={{fontWeight:700}}>{cell.n}</div>{cell.bomb && <div className="bomb">💣</div>}</div>;
 }
 
-function Card({card,lastCalled,onPause,onShieldToggle}){
+function Card({
+  card,
+  lastCalled,
+  onPause,
+  onShieldToggle,
+  selectable,
+  selected,
+  onSelectToggle
+}){
   const status = card.exploded ? <span className="badge boom">EXPLODED</span>
                : card.paused   ? <span className="badge lock">LOCKED</span>
                                : <span className="badge live">LIVE</span>;
   const sBadge = card.wantsShield && !card.shieldUsed ? <span className="badge shield">shield</span>
                 : card.shieldUsed ? <span className="badge" style={{background:'#ffe4e6',borderColor:'#fecdd3'}}>shield used</span>
                 : null;
+
+  const wrapperCls = ['card'];
+  if (selectable && selected) wrapperCls.push('isSelected');
+
   return (
-    <div className="card">
+    <div
+      className={wrapperCls.join(' ')}
+      onClick={() => { if (selectable) onSelectToggle(card.id); }}
+      style={selectable ? { cursor: 'pointer', outline: selected ? '3px solid #2563eb40' : 'none' } : undefined}
+    >
       <div className="row" style={{justifyContent:'space-between'}}>
-        <div className="row" style={{gap:8}}><div style={{fontWeight:700}}>Card</div>{status}{sBadge}</div>
+        {/* left: small image + title */}
+        <div className="row" style={{gap:10, alignItems:'center'}}>
+          <img src={LOCK_IMG} alt="" style={{width:20, height:20, opacity: card.paused ? 1 : 0.25}} />
+          <div className="row" style={{gap:8}}>
+            <div style={{fontWeight:700}}>Card</div>
+            {status}{sBadge}
+            <span className="badge">Daubs: <b>{card.daubs}</b></span>
+          </div>
+        </div>
+        {/* right: per-card actions */}
         <div className="row" style={{gap:8}}>
-          <label className="row" style={{gap:6, fontSize:12, color:'#475569'}}>
-            <input type="checkbox" checked={card.wantsShield} onChange={e=>onShieldToggle(card.id,e.target.checked)} /> Shield
+          <label className="row" style={{gap:6, fontSize:12, color:'#475569'}}
+                 onClick={(e)=>e.stopPropagation()}>
+            <input type="checkbox"
+                   checked={card.wantsShield}
+                   onChange={e=>onShieldToggle(card.id,e.target.checked)} />
+            Shield
           </label>
-          <button className="btn gray" onClick={()=>onPause(card.id)} disabled={card.paused || card.exploded}>{card.paused || card.exploded ? 'Locked' : 'Lock'}</button>
+          <button className="btn gray"
+                  onClick={(e)=>{ e.stopPropagation(); onPause(card.id); }}
+                  disabled={card.paused || card.exploded}>
+            {card.paused || card.exploded ? 'Locked' : 'Lock'}
+          </button>
         </div>
       </div>
       <div className="gridCard" style={{marginTop:10}}>
-        {card.grid.flatMap((row,r)=>row.map((cell,c)=><Cell key={r+'-'+c} cell={cell} highlight={lastCalled===cell.n && !cell.daubed} />))}
-      </div>
-    </div>
-  );
-}
-
-// --------- NEW: selectable cards (Option 1) ----------
-function MiniPreview({card, selected}){
-  return (
-    <div className={`selectCard ${selected?'sel':''}`}>
-      <div className="selectHeader"><span>Card</span><span className="chip">{card.grid.flat().filter(x=>x.bomb).length}💣</span></div>
-      <div className="miniGrid" style={{marginTop:6}}>
-        {card.grid.flat().map((_,i)=><div key={i} className="miniCell"/>)}
+        {card.grid.flatMap((row,r)=>row.map((cell,c)=>
+          <Cell key={r+'-'+c} cell={cell} highlight={lastCalled===cell.n && !cell.daubed} />
+        ))}
       </div>
     </div>
   );
@@ -102,32 +129,30 @@ function MiniPreview({card, selected}){
 
 function App(){
   // Player (single viewer’s cards)
-  const [player, setPlayer] = useState(()=>({ id:uid('p'), cards:[makeCard(uid('c'),'#1'), makeCard(uid('c'),'#2')] }));
+  const [player, setPlayer] = useState(()=>({ id:uid('p'), cards:[makeCard(uid('c'),'#1'), makeCard(uid('c'),'#2'), makeCard(uid('c'),'#3'), makeCard(uid('c'),'#4')] }));
   const [audio, setAudio] = useState(false);
   const [volume, setVolume] = useState(0.8);
+
+  // Selection of existing cards (pre-game)
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   // Server state
   const [phase,setPhase] = useState('setup');
   const [speedMs,setSpeedMs] = useState(800);
   const [called,setCalled] = useState([]);
 
-  // Selection pool (Option 1)
-  const [pool,setPool] = useState(()=>Array.from({length:12},(_,i)=>makeCard(uid('pool'), '')));
-  const [selected,setSelected] = useState(new Set()); // ids in pool
-
-  function regenPool(){ setPool(Array.from({length:12},()=>makeCard(uid('pool'),''))); setSelected(new Set()); }
-  function togglePick(id){ setSelected(s=>{ const n=new Set(s); n.has(id)?n.delete(id):n.add(id); return n; }); }
-  function buySelected(){
-    if(selected.size===0) return;
-    const picks = pool.filter(c=>selected.has(c.id)).map(c=>makeCard(uid('c'), '#'+(player.cards.length+1))); // new ids
-    setPlayer(p=>({...p, cards:[...p.cards, ...picks]}));
-    setSelected(new Set());
+  function toggleSelect(id){
+    setSelectedIds(s => {
+      const n = new Set(s);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
   }
-  function buyCards(n){
+
+  function addCards(n){
     n=Math.max(1, Math.min(12, Number(n)||0));
     setPlayer(p=>({...p, cards:[...p.cards, ...Array.from({length:n}).map((_,i)=>makeCard(uid('c'), '#'+(p.cards.length+i+1)))]}));
   }
-
   function shieldAll(on){ setPlayer(p=>({...p, cards:p.cards.map(c=>({...c, wantsShield:on}))})); }
   function toggleShield(cardId,on){ setPlayer(p=>({...p, cards:p.cards.map(c=>c.id===cardId?({...c, wantsShield:on}):c)})); }
   function pauseCard(cardId){ setPlayer(p=>({...p, cards:p.cards.map(c=>(c.id===cardId && !c.paused && !c.exploded)?({...c, paused:true}):c)})); }
@@ -145,20 +170,18 @@ function App(){
         const newCalls = Array.isArray(s.called) ? s.called : [];
         const oldCalls = called;
 
-        // Update phase & speed immediately
         setPhase(newPhase);
         setSpeedMs(Number(s.speed_ms)||800);
 
-        // If round reset or moved to setup -> wipe local daubs/explosions
+        // Reset visuals when round resets / goes back to setup
         if (newPhase==='setup' && (oldCalls.length !== 0 || called.length !== 0)) {
           setPlayer(p=>({...p, cards: resetCardsForNewRound(p.cards)}));
         }
-        // If call list shrank (reset) -> also wipe
         if (newCalls.length < oldCalls.length) {
           setPlayer(p=>({...p, cards: resetCardsForNewRound(p.cards)}));
         }
 
-        // Apply any new calls in order
+        // Apply new calls in order
         if (newCalls.length > oldCalls.length) {
           const news = newCalls.slice(oldCalls.length);
           let next = player.cards;
@@ -166,7 +189,6 @@ function App(){
           setPlayer(p=>({...p, cards: next}));
         }
 
-        // Always set called (so client reflects reset/end instantly)
         setCalled(newCalls);
       }catch{}
     }
@@ -207,43 +229,37 @@ function App(){
                   <div className="muted">Purchase Panel</div>
                   <div className="row" style={{gap:6}}>
                     <input id="buyN" className="chip" style={{padding:'8px 10px'}} type="number" min="1" max="12" defaultValue="2"/>
-                    <button className="btn green" onClick={()=>{ const el=document.getElementById('buyN'); buyCards(Number(el?.value)||2); }}>Buy n cards</button>
+                    <button className="btn green" onClick={()=>{ const el=document.getElementById('buyN'); addCards(Number(el?.value)||2); }}>Add n cards</button>
                     <button className="btn gray" onClick={()=>shieldAll(true)}>Shield all</button>
                     <button className="btn gray" onClick={()=>shieldAll(false)}>Unshield all</button>
                   </div>
                 </div>
-
-                {/* Option 1: pick by tap/click */}
-                <div className="row" style={{justifyContent:'space-between', marginTop:10}}>
-                  <div className="muted">Tap to select · {selected.size} selected</div>
-                  <div className="row" style={{gap:6}}>
-                    <button className="btn" onClick={regenPool}>Regenerate</button>
-                    <button className="btn primary" onClick={buySelected} disabled={selected.size===0}>Buy selected</button>
-                  </div>
-                </div>
-                <div className="selectGrid" style={{marginTop:10}}>
-                  {pool.map(c=>{
-                    const sel=selected.has(c.id);
-                    return (
-                      <div key={c.id} onClick={()=>togglePick(c.id)}>
-                        <MiniPreview card={c} selected={sel}/>
-                      </div>
-                    );
-                  })}
-                </div>
+                <div className="muted" style={{marginTop:8}}>Tip: tap your cards on the right to select them (pre-game only).</div>
               </>)
           }
         </div>
 
-        {/* Right: Your Cards */}
+        {/* Right: Your Cards (click/tap to select in setup) */}
         <div className="card">
           <div className="row" style={{justifyContent:'space-between'}}>
             <div className="muted">Your Cards ({player.cards.length})</div>
+            {phase==='setup' && <div className="muted">Selected: {selectedIds.size}</div>}
           </div>
           {player.cards.length===0
-            ? <div className="muted" style={{marginTop:8}}>No cards yet. Buy some from the Purchase Panel.</div>
+            ? <div className="muted" style={{marginTop:8}}>No cards yet. Use “Add n cards”.</div>
             : <div className="grid" style={{gridTemplateColumns:'1fr 1fr', gap:12, marginTop:10}}>
-                {player.cards.map(c=><Card key={c.id} card={c} lastCalled={lastCalled} onPause={pauseCard} onShieldToggle={toggleShield} />)}
+                {player.cards.map(c=>
+                  <Card
+                    key={c.id}
+                    card={c}
+                    lastCalled={lastCalled}
+                    onPause={pauseCard}
+                    onShieldToggle={toggleShield}
+                    selectable={phase==='setup'}
+                    selected={selectedIds.has(c.id)}
+                    onSelectToggle={toggleSelect}
+                  />
+                )}
               </div>
           }
         </div>

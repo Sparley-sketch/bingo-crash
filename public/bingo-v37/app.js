@@ -106,6 +106,7 @@ function FXStyles(){
       @keyframes explodeFlash {0%{opacity:0}15%{opacity:1}60%{opacity:.6}100%{opacity:0}}
       .fx-flash{animation:explodeFlash 900ms ease-out forwards;background:radial-gradient(circle at center, rgba(239,68,68,.25), rgba(255,255,255,0) 65%);position:absolute;inset:0;pointer-events:none;border-radius:14px}
       .priceTag{position:absolute;left:8px;top:8px;font-size:11px;padding:2px 6px;border-radius:999px;background:#f1f5f9;border:1px solid #e2e8f0}
+      .ownedCard{ border:1.5px solid #22c55e !important; box-shadow:0 0 0 3px rgba(34,197,94,.12); }
     `}</style>
   );
 }
@@ -113,7 +114,11 @@ function FXStyles(){
 function CardView({
   card, lastCalled,
   onPause, onShieldToggle,
-  phase, selectable, selected, onSelectToggle
+  phase,
+  selectable, selected, onSelectToggle,
+  owned=false,            // <<< new: style purchased cards
+  showShield=false,       // <<< new: control shield visibility
+  showLock=false          // <<< new: control lock visibility
 }){
   const status = card.exploded ? <span className="badge boom">EXPLODED</span>
                : card.paused   ? <span className="badge lock">LOCKED</span>
@@ -123,9 +128,9 @@ function CardView({
                 : card.shieldUsed ? <span className="badge" style={{background:'#ffe4e6',borderColor:'#fecdd3'}}>shield used</span>
                 : null;
 
-  const wrapperCls=['card']; if(selectable && selected) wrapperCls.push('isSelected');
-
-  const showLock = phase === 'live';   // <<< hide in pre-game
+  const wrapperCls=['card']; 
+  if(selectable && selected) wrapperCls.push('isSelected');
+  if(owned) wrapperCls.push('ownedCard');
 
   return (
     <div
@@ -146,8 +151,8 @@ function CardView({
           </div>
         </div>
 
-        {showLock && (
-          <div className="row" style={{gap:8}}>
+        <div className="row" style={{gap:8}}>
+          {showShield && (
             <label className="row" style={{gap:6, fontSize:12, color:'#475569'}}
                    onClick={(e)=>e.stopPropagation()}>
               <input type="checkbox"
@@ -155,6 +160,8 @@ function CardView({
                      onChange={e=>onShieldToggle(card.id,e.target.checked)} />
               Shield
             </label>
+          )}
+          {showLock && (
             <button className="btn gray"
                     onClick={(e)=>{ e.stopPropagation(); onPause(card.id); }}
                     disabled={card.paused || card.exploded}>
@@ -163,8 +170,8 @@ function CardView({
                 {card.paused || card.exploded ? 'Locked' : 'Lock'}
               </span>
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <div className="gridCard" style={{marginTop:10}}>
@@ -230,9 +237,11 @@ function App(){
     if (picks.length === 0) return;
     if (wallet < cost) { alert(`Not enough coins. Need ${cost}.`); return; }
     setWallet(w=>w - cost);
-    // move picks from available -> owned
+
+    // Move EXACT selected cards into owned (keep bombs/nums); just refresh id.
+    const ownedAdd = picks.map(c => ({ ...c, id: uid('c') }));
+    setPlayer(p=>({...p, cards:[...p.cards, ...ownedAdd]}));
     setAvailable(a=>a.filter(c=>!selectedPool.has(c.id)));
-    setPlayer(p=>({...p, cards:[...p.cards, ...picks.map(c=>({ ...makeCard(uid('c'), ''), wantsShield:c.wantsShield }))]}));
     setSelectedPool(new Set());
   }
   function shieldAllOwned(on){ setPlayer(p=>({...p, cards:p.cards.map(c=>({...c, wantsShield:on}))})); }
@@ -256,7 +265,6 @@ function App(){
         // reset to setup -> clear visuals + show howto + alias prompt
         if (lastPhase !== 'setup' && newPhase === 'setup') {
           setPlayer(p=>({...p, cards: resetCardsForNewRound(p.cards)}));
-          setAvailable(a=>a.map(c=>makeCard(uid('pool'),'')));
           setShowHowTo(true);
           setSyncedWinner(null);
           setAsk(true);
@@ -356,21 +364,46 @@ function App(){
                     <button className="btn primary" onClick={buySelected}>Buy selected</button>
                   </div>
                 </div>
-                <div className="muted" style={{marginTop:8}}>Tap cards on the right (Available Cards) to select them. Each costs 1 coin.</div>
+                <div className="muted" style={{marginTop:8}}>Tap **Available** cards below to select them. Each costs 1 coin.</div>
               </>)
           }
         </div>
 
-        {/* Right: Available in setup, My Cards in live */}
+        {/* Right: In setup show OWNED first (green), then AVAILABLE; in live show only OWNED */}
         <div className="card">
-          <div className="row" style={{justifyContent:'space-between'}}>
-            <div className="muted">{phase==='setup' ? `Available Cards (${available.length})` : `My Cards (${player.cards.length})`}</div>
-            {phase==='setup' && <div className="muted">Selected: {selectedPool.size}</div>}
-          </div>
+          {phase==='setup' ? (
+            <>
+              {/* Purchased / Owned */}
+              <div className="row" style={{justifyContent:'space-between'}}>
+                <div className="muted">Your Purchased Cards ({player.cards.length})</div>
+              </div>
+              {player.cards.length===0
+                ? <div className="muted" style={{marginTop:8}}>You don’t own any cards yet.</div>
+                : <div className="grid" style={{gridTemplateColumns:'1fr 1fr', gap:12, marginTop:10}}>
+                    {player.cards.map(c=>
+                      <CardView
+                        key={c.id}
+                        card={c}
+                        lastCalled={null}
+                        onPause={()=>{}}
+                        onShieldToggle={toggleShieldOwned}
+                        phase="setup"
+                        selectable={false}
+                        selected={false}
+                        onSelectToggle={()=>{}}
+                        owned={true}
+                        showShield={true}   // <<< shields visible for purchased cards pre-game
+                        showLock={false}
+                      />
+                    )}
+                  </div>
+              }
 
-          {phase==='setup'
-            ? (
-              available.length===0
+              {/* Available pool */}
+              <div className="row" style={{justifyContent:'space-between', marginTop:16}}>
+                <div className="muted">Available Cards ({available.length}) · Selected: {selectedPool.size}</div>
+              </div>
+              {available.length===0
                 ? <div className="muted" style={{marginTop:8}}>No available cards. Use “Generate n”.</div>
                 : <div className="grid" style={{gridTemplateColumns:'1fr 1fr', gap:12, marginTop:10}}>
                     {available.map(c=>
@@ -384,12 +417,20 @@ function App(){
                         selectable={true}
                         selected={selectedPool.has(c.id)}
                         onSelectToggle={toggleSelectPool}
+                        owned={false}
+                        showShield={false}
+                        showLock={false}
                       />
                     )}
                   </div>
-            )
-            : (
-              player.cards.length===0
+              }
+            </>
+          ) : (
+            <>
+              <div className="row" style={{justifyContent:'space-between'}}>
+                <div className="muted">My Cards ({player.cards.length})</div>
+              </div>
+              {player.cards.length===0
                 ? <div className="muted" style={{marginTop:8}}>No cards owned.</div>
                 : <div className="grid" style={{gridTemplateColumns:'1fr 1fr', gap:12, marginTop:10}}>
                     {player.cards.map(c=>
@@ -403,14 +444,19 @@ function App(){
                         selectable={false}
                         selected={false}
                         onSelectToggle={()=>{}}
+                        owned={true}
+                        showShield={true}
+                        showLock={true}
                       />
                     )}
                   </div>
-            )}
+              }
+            </>
+          )}
         </div>
       </div>
 
-      {/* How to + Winner */}
+      {/* Popups */}
       <Modal
         open={showHowTo}
         onClose={()=>setShowHowTo(false)}
@@ -421,15 +467,6 @@ function App(){
         {'\n'}• If a called number has a <b>bomb</b>, your card explodes <i>(unless shielded)</i>.
         {'\n'}• <b>Shield</b>: choose before the round. Absorbs the first bomb on that card. You can set shields per-card or bulk for all a player's cards.
         {'\n'}• <b>Winner(s)</b>: non-exploded card(s) with the most daubs. Ties split the prize equally.
-      </Modal>
-
-      <Modal
-        open={!!syncedWinner}
-        onClose={()=>setSyncedWinner(null)}
-        title="Game Over"
-        primaryText="OK"
-      >
-        {syncedWinner ? <>Winner: <b>{syncedWinner.alias}</b> with <b>{syncedWinner.daubs}</b> daubs.</> : '—'}
       </Modal>
 
       {/* Alias prompt */}

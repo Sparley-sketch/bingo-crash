@@ -20,7 +20,7 @@ function boom(vol=0.85){ try{ const c=audioCtx(); if(!c) return; const t=c.curre
 }catch{} }
 
 // ---- Card helpers ----
-// 5x3 grid, 15 numbers (1..25) with **3 bombs** at random positions.
+// 5x3 grid, 15 numbers (1..25) with 3 bombs at random positions.
 function makeCard(id,name){
   const nums = shuffle(Array.from({length:25},(_,i)=>i+1)).slice(0,15);
   const gridNums = [0,1,2].map(r => nums.slice(r*5, r*5+5));
@@ -116,9 +116,9 @@ function CardView({
   onPause, onShieldToggle,
   phase,
   selectable, selected, onSelectToggle,
-  owned=false,            // <<< new: style purchased cards
-  showShield=false,       // <<< new: control shield visibility
-  showLock=false          // <<< new: control lock visibility
+  owned=false,
+  showShield=false,
+  showLock=false
 }){
   const status = card.exploded ? <span className="badge boom">EXPLODED</span>
                : card.paused   ? <span className="badge lock">LOCKED</span>
@@ -206,8 +206,9 @@ function App(){
   const [askAlias, setAsk]    = useState(true);
   const [wallet, setWallet]   = useState(100);
 
-  // Cards: available (pre-game pool you can buy) vs owned (“My Cards” you play with)
-  const [available, setAvailable] = useState(()=>Array.from({length:4},()=>makeCard(uid('pool'),'')));
+  // Available (pre-buy) vs Owned (purchased)
+  const freshAvail = () => Array.from({length:4},()=>makeCard(uid('pool'),''));
+  const [available, setAvailable] = useState(freshAvail);
   const [selectedPool, setSelectedPool] = useState(new Set());
   const [player, setPlayer] = useState(()=>({ id:uid('p'), cards:[] })); // owned
 
@@ -224,7 +225,7 @@ function App(){
   const [showHowTo, setShowHowTo] = useState(true);
   const [syncedWinner, setSyncedWinner] = useState(null); // {alias, daubs} | null
 
-  // Helpers
+  // ---------- Pre-buy actions (now include shields) ----------
   function toggleSelectPool(id){ setSelectedPool(s=>{ const n=new Set(s); n.has(id)?n.delete(id):n.add(id); return n; }); }
   function generateCards(n){
     n=Math.max(1,Math.min(12,Number(n)||0));
@@ -238,17 +239,27 @@ function App(){
     if (wallet < cost) { alert(`Not enough coins. Need ${cost}.`); return; }
     setWallet(w=>w - cost);
 
-    // Move EXACT selected cards into owned (keep bombs/nums); just refresh id.
+    // Move selected available -> owned preserving wantsShield; refresh ids
     const ownedAdd = picks.map(c => ({ ...c, id: uid('c') }));
     setPlayer(p=>({...p, cards:[...p.cards, ...ownedAdd]}));
     setAvailable(a=>a.filter(c=>!selectedPool.has(c.id)));
     setSelectedPool(new Set());
   }
+  // NEW: shield per-card for AVAILABLE pool
+  function toggleShieldAvailable(cardId,on){
+    setAvailable(a=>a.map(c=>c.id===cardId?({...c, wantsShield:on}):c));
+  }
+  // NEW: bulk shields on SELECTED available cards
+  function shieldSelectedAvailable(on){
+    setAvailable(a=>a.map(c=> selectedPool.has(c.id) ? ({...c, wantsShield:on}) : c ));
+  }
+
+  // Owned management
   function shieldAllOwned(on){ setPlayer(p=>({...p, cards:p.cards.map(c=>({...c, wantsShield:on}))})); }
   function toggleShieldOwned(cardId,on){ setPlayer(p=>({...p, cards:p.cards.map(c=>c.id===cardId?({...c, wantsShield:on}):c)})); }
   function pauseOwned(cardId){ setPlayer(p=>({...p, cards:p.cards.map(c=>(c.id===cardId && !c.paused && !c.exploded)?({...c, paused:true}):c)})); }
 
-  // Poll state + transitions + winner sync
+  // Poll state + transitions + global winner sync
   useEffect(()=>{
     let mounted=true, lastPhase='setup', lastCount=0;
 
@@ -262,16 +273,11 @@ function App(){
         const newCalls = Array.isArray(s.called) ? s.called : [];
         setRoundId(s.id || null);
 
-        // reset to setup -> clear visuals + show howto + alias prompt
-        if (lastPhase !== 'setup' && newPhase === 'setup') {
-          setPlayer(p=>({...p, cards: resetCardsForNewRound(p.cards)}));
-          setShowHowTo(true);
-          setSyncedWinner(null);
-          setAsk(true);
-        }
-
-        if (newCalls.length < lastCount) {
-          setPlayer(p=>({...p, cards: resetCardsForNewRound(p.cards)}));
+        // RESET TO SETUP: clear purchases & selections, regenerate all Available
+        if ((lastPhase !== 'setup' && newPhase === 'setup') || (newCalls.length < lastCount)) {
+          setPlayer({ id: uid('p'), cards: [] });
+          setAvailable(freshAvail());
+          setSelectedPool(new Set());
           setShowHowTo(true);
           setSyncedWinner(null);
           setAsk(true);
@@ -285,23 +291,26 @@ function App(){
           setPlayer(p=>({...p, cards: next}));
         }
 
-        // Post my best score if I’m out of live cards
-        if (newPhase === 'live' && roundId) {
-          const live = player.cards.filter(c => !c.exploded && !c.paused).length;
-          if (live === 0) {
+        // End-game detection (for *global* winner sync):
+        // Condition A: deck exhausted
+        // Condition B: this viewer has 0 live cards
+        if (newPhase === 'live' && s.id) {
+          const deckExhausted = newCalls.length >= 25;
+          const liveMine = player.cards.filter(c => !c.exploded && !c.paused).length;
+          if (deckExhausted || liveMine === 0) {
             const alive = player.cards.filter(c=>!c.exploded);
             const best = alive.length ? Math.max(...alive.map(c=>c.daubs)) : 0;
             if (alias) {
               fetch(`/api/round/winner?ts=${Date.now()}`, {
                 method:'POST',
                 headers:{'Content-Type':'application/json', Accept:'application/json'},
-                body: JSON.stringify({ round_id: roundId, alias, daubs: best })
+                body: JSON.stringify({ round_id: s.id, alias, daubs: best })
               }).catch(()=>{});
             }
           }
         }
 
-        // Poll current winner for everyone
+        // Poll current winner (same for everyone)
         if (s.id) {
           fetch(`/api/round/winner?round_id=${encodeURIComponent(s.id)}&ts=${Date.now()}`, { cache:'no-store' })
             .then(r=>r.json())
@@ -322,7 +331,7 @@ function App(){
     const id=setInterval(pull, 1000);
     return ()=>{ mounted=false; clearInterval(id); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [player.cards, audio, volume, alias, roundId]);
+  }, [player.cards, audio, volume, alias]);
 
   const lastCalled = called[called.length-1];
 
@@ -359,17 +368,21 @@ function App(){
                   <div className="row" style={{gap:6}}>
                     <input id="genN" className="chip" style={{padding:'8px 10px'}} type="number" min="1" max="12" defaultValue="2"/>
                     <button className="btn" onClick={()=>{ const el=document.getElementById('genN'); generateCards(Number(el?.value)||2); }}>Generate n</button>
-                    <button className="btn" onClick={()=>shieldAllOwned(true)}>Shield all owned</button>
-                    <button className="btn" onClick={()=>shieldAllOwned(false)}>Unshield owned</button>
-                    <button className="btn primary" onClick={buySelected}>Buy selected</button>
+                    {/* bulk shields for SELECTED AVAILABLE */}
+                    <button className="btn" onClick={()=>shieldSelectedAvailable(true)} disabled={selectedPool.size===0}>Shield selected</button>
+                    <button className="btn" onClick={()=>shieldSelectedAvailable(false)} disabled={selectedPool.size===0}>Unshield selected</button>
+                    {/* bulk shields for OWNED */}
+                    <button className="btn" onClick={()=>shieldAllOwned(true)} disabled={player.cards.length===0}>Shield all owned</button>
+                    <button className="btn" onClick={()=>shieldAllOwned(false)} disabled={player.cards.length===0}>Unshield owned</button>
+                    <button className="btn primary" onClick={buySelected} disabled={selectedPool.size===0}>Buy selected</button>
                   </div>
                 </div>
-                <div className="muted" style={{marginTop:8}}>Tap **Available** cards below to select them. Each costs 1 coin.</div>
+                <div className="muted" style={{marginTop:8}}>Tap Available cards to select them. Each costs 1 coin. You can set shields before buying.</div>
               </>)
           }
         </div>
 
-        {/* Right: In setup show OWNED first (green), then AVAILABLE; in live show only OWNED */}
+        {/* Right: Setup → OWNED (green) then AVAILABLE; Live → OWNED only */}
         <div className="card">
           {phase==='setup' ? (
             <>
@@ -392,7 +405,7 @@ function App(){
                         selected={false}
                         onSelectToggle={()=>{}}
                         owned={true}
-                        showShield={true}   // <<< shields visible for purchased cards pre-game
+                        showShield={true}
                         showLock={false}
                       />
                     )}
@@ -412,13 +425,13 @@ function App(){
                         card={c}
                         lastCalled={null}
                         onPause={()=>{}}
-                        onShieldToggle={()=>{}}
+                        onShieldToggle={toggleShieldAvailable}   // <— per-card shield on available
                         phase="setup"
                         selectable={true}
                         selected={selectedPool.has(c.id)}
                         onSelectToggle={toggleSelectPool}
                         owned={false}
-                        showShield={false}
+                        showShield={true}                        // <— show shields in pre-buy
                         showLock={false}
                       />
                     )}
@@ -467,6 +480,16 @@ function App(){
         {'\n'}• If a called number has a <b>bomb</b>, your card explodes <i>(unless shielded)</i>.
         {'\n'}• <b>Shield</b>: choose before the round. Absorbs the first bomb on that card. You can set shields per-card or bulk for all a player's cards.
         {'\n'}• <b>Winner(s)</b>: non-exploded card(s) with the most daubs. Ties split the prize equally.
+      </Modal>
+
+      {/* Winner modal (synced across players) */}
+      <Modal
+        open={!!syncedWinner}
+        onClose={()=>setSyncedWinner(null)}
+        title="Game Over"
+        primaryText="OK"
+      >
+        {syncedWinner ? <>Winner: <b>{syncedWinner.alias}</b> with <b>{syncedWinner.daubs}</b> daubs.</> : '—'}
       </Modal>
 
       {/* Alias prompt */}

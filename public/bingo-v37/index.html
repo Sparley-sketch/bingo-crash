@@ -5,46 +5,51 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Bingo + Crash — Multiplayer</title>
 
+  <!-- Light theme (no Tailwind required) -->
   <style>
-    :root { --bg:#0f1220; --panel:#12162a; --text:#e9ecff; --muted:#aeb6d8; --border:rgba(255,255,255,.1); }
+    :root { --bg:#f7f8fb; --panel:#ffffff; --text:#0f172a; --muted:#475569; --border:#e2e8f0; }
     html, body { margin:0; padding:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif; }
     .wrap { max-width:1080px; margin:0 auto; padding:16px; }
     .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
     .grid { display:grid; gap:12px; }
-    .card { background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:14px; box-shadow: 0 6px 22px rgba(0,0,0,.25); }
+    .card { background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:14px; box-shadow: 0 6px 16px rgba(15,23,42,.06); }
     .title { font-weight:800; font-size:22px; margin:0 0 6px; }
     .muted { color:var(--muted); font-size:14px; }
-    .btn { background:rgba(255,255,255,.07); color:var(--text); border:1px solid var(--border); border-radius:10px; padding:8px 12px; cursor:pointer; }
+    .btn { background:#eef2ff; color:#1e293b; border:1px solid #c7d2fe; border-radius:10px; padding:8px 12px; cursor:pointer; }
     .btn:disabled { opacity:.5; cursor:not-allowed; }
-    .btn.primary { background:#2b6cff; border-color:#2b6cff; }
-    .btn.green   { background:#16a34a; border-color:#16a34a; }
-    .btn.blue    { background:#2081e2; border-color:#2081e2; }
-    .tag { display:inline-block; padding:2px 8px; border-radius:999px; background:rgba(255,255,255,.07); border:1px solid var(--border); font-size:12px; }
-    .grid-2 { grid-template-columns: 1fr 1fr; }
-    .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
-    .callerNum { font-size:40px; font-weight:900; text-align:center; background:#0c1020; border-radius:12px; padding:12px 0; }
-    .chip { font-size:12px; padding:4px 8px; border-radius:8px; background:#0c1020; border:1px solid var(--border); }
+    .btn.primary { background:#2563eb; color:#fff; border-color:#2563eb; }
+    .btn.green   { background:#16a34a; color:#fff; border-color:#16a34a; }
+    .btn.gray    { background:#f1f5f9; border-color:#e2e8f0; }
+    .chip { font-size:12px; padding:4px 8px; border-radius:8px; background:#f8fafc; border:1px solid #e2e8f0; }
     .cap { text-transform:capitalize; }
     .gridCard { display:grid; grid-template-columns: repeat(5, 1fr); gap:8px; }
-    .cell { aspect-ratio:1/1; min-height:44px; display:flex; align-items:center; justify-content:center; border-radius:10px; border:1px solid #2a3358; background:#0c1020; position:relative; }
-    .cell.daub { background:#153f2b; border-color:#1e7a52; }
-    .cell.hl   { box-shadow: 0 0 0 3px rgba(255,221,0,.25) inset; }
+    .miniGrid { display:grid; grid-template-columns: repeat(5, 12px); gap:3px; }
+    .miniCell { width:12px; height:12px; border-radius:2px; background:#e2e8f0; }
+    .cell { aspect-ratio:1/1; min-height:44px; display:flex; align-items:center; justify-content:center; border-radius:10px; border:1px solid #dbe3ef; background:#f8fafc; position:relative; }
+    .cell.daub { background:#dcfce7; border-color:#86efac; }
+    .cell.hl   { box-shadow: 0 0 0 3px rgba(234,179,8,.35) inset; }
     .bomb { position:absolute; right:6px; bottom:4px; }
-    .badge { font-size:10px; padding:3px 8px; border-radius:999px; }
-    .badge.live { background:#1f883d; }
-    .badge.lock { background:#d97706; }
-    .badge.boom { background:#ef4444; }
-    .shield { background:#0b2d4f; border:1px solid #2563eb; color:#bfe1ff; }
+    .badge { font-size:10px; padding:3px 8px; border-radius:999px; background:#f1f5f9; border:1px solid #e2e8f0; }
+    .badge.live { background:#dcfce7; border-color:#86efac; }
+    .badge.lock { background:#fee2e2; border-color:#fecaca; }
+    .badge.boom { background:#fecaca; border-color:#fca5a5; }
+    .shield { background:#dbeafe; border:1px solid #93c5fd; color:#1e3a8a; }
     .list { display:flex; gap:6px; flex-wrap:wrap; }
+
+    /* selectable cards (pre-game) */
+    .selectGrid { display:grid; grid-template-columns: repeat(auto-fill, minmax(128px,1fr)); gap:10px; }
+    .selectCard { border:1px solid #e2e8f0; border-radius:12px; padding:8px; cursor:pointer; background:#ffffff; }
+    .selectCard.sel { outline:3px solid #2563eb40; }
+    .selectHeader { display:flex; align-items:center; justify-content:space-between; font-size:12px; color:#475569; }
   </style>
 
+  <!-- React UMD + Babel -->
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body>
   <div class="wrap" id="root"></div>
-
   <script type="text/babel" data-type="module" src="./app.js"></script>
 </body>
 </html>

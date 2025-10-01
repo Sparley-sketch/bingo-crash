@@ -110,7 +110,7 @@ export default function AdminPage() {
 
   const phase = state?.phase ?? '—';
   const called = Array.isArray(state?.called) ? state!.called.length : 0;
-  const speed = state?.speed_ms ?? Number(cfgValue) || 800;
+const speed = (state?.speed_ms ?? Number(cfgValue)) || 800;
 
   return (
     <main className="wrap">

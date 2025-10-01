@@ -10,25 +10,23 @@ type RoundState = {
   created_at: string | null;
 };
 
-function cx(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(' ');
-}
-
 export default function AdminPage() {
-  // ----- CONFIG -----
   const CFG_KEY = 'round.duration_ms';
+
+  // Config UI
   const [cfgValue, setCfgValue] = React.useState('1500');
   const [saving, setSaving] = React.useState(false);
 
-  // ----- ROUND STATE / CONTROL -----
+  // Round state
   const [state, setState] = React.useState<RoundState | null>(null);
-  const [lastAction, setLastAction] = React.useState<any>(null);
+  const [busy, setBusy] = React.useState<string | null>(null);
+
+  // Polling + Auto-run
   const [pollMs, setPollMs] = React.useState(1000);
   const [polling, setPolling] = React.useState(true);
-  const [busy, setBusy] = React.useState<string | null>(null);
   const [autoRun, setAutoRun] = React.useState(false);
 
-  // ---------- helpers ----------
+  // ---------------- helpers ----------------
   async function fetchStateOnce() {
     const r = await fetch(`/api/round/state?ts=${Date.now()}`, {
       cache: 'no-store',
@@ -48,20 +46,17 @@ export default function AdminPage() {
         cache: 'no-store',
         headers: { Accept: 'application/json' },
       });
-      const json = await r.json().catch(() => ({}));
-      setLastAction({ path, status: r.status, ok: r.ok, json });
-      // Pull state twice to avoid race with DB write
+      await r.json().catch(() => ({}));
+      // Re-pull twice to avoid race with DB write
       await fetchStateOnce();
       await new Promise((res) => setTimeout(res, 120));
       await fetchStateOnce();
-    } catch (e: any) {
-      setLastAction({ path, error: e?.message || String(e) });
     } finally {
       setBusy(null);
     }
   }
 
-  // ---------- config ----------
+  // Config endpoints
   async function loadConfig() {
     const r = await fetch(`/api/config/get?key=${encodeURIComponent(CFG_KEY)}&ts=${Date.now()}`, {
       cache: 'no-store',
@@ -81,16 +76,14 @@ export default function AdminPage() {
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(body),
       });
-      const j = await r.json();
-      setLastAction({ path: '/api/config/set', status: r.status, ok: r.ok, json: j });
-      // Refresh visible speed in UI
+      await r.json().catch(() => ({}));
       await fetchStateOnce();
     } finally {
       setSaving(false);
     }
   }
 
-  // ---------- effects ----------
+  // ---------------- effects ----------------
   React.useEffect(() => {
     fetchStateOnce();
     loadConfig();
@@ -102,7 +95,7 @@ export default function AdminPage() {
     return () => clearInterval(id);
   }, [pollMs, polling]);
 
-  // Auto-run: call automatically when LIVE
+  // Auto-run calls while LIVE
   React.useEffect(() => {
     if (!autoRun || state?.phase !== 'live') return;
     const id = setInterval(() => {
@@ -116,125 +109,115 @@ export default function AdminPage() {
   }, [autoRun, state?.phase, state?.speed_ms]);
 
   const phase = state?.phase ?? '—';
-  const calledLen = Array.isArray(state?.called) ? state!.called.length : 0;
+  const called = Array.isArray(state?.called) ? state!.called.length : 0;
+  const speed = state?.speed_ms ?? Number(cfgValue) || 800;
 
   return (
-    <main className="min-h-screen bg-[#0f1220] text-white">
-      <div className="max-w-5xl mx-auto p-4 md:p-6 space-y-4">
-        <h1 className="text-2xl font-bold">Admin — Config</h1>
+    <main className="wrap">
+      <header className="header">
+        <h1>Admin — Config</h1>
+        <div className="status">
+          <span>Phase: <b className="cap">{phase}</b></span>
+          <span>· Called: <b>{called}</b>/25</span>
+          <span>· Speed: <b>{speed}</b> ms</span>
+        </div>
+      </header>
 
-        {/* Config Card (like your old screenshot) */}
-        <section className="rounded-2xl bg-[#12162a] border border-white/10 p-4 space-y-3">
-          <div className="grid md:grid-cols-[1fr_auto] gap-3 items-end">
-            <div>
-              <label className="text-sm text-white/70">Key</label>
-              <input
-                disabled
-                value="round.duration_ms"
-                className="w-full mt-1 rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm"
-              />
-              <p className="text-xs text-white/50 mt-2">
-                The round duration (ms) controls the auto-caller speed when Auto-run is used.
-              </p>
-            </div>
-            <div>
-              <label className="text-sm text-white/70">Value (ms)</label>
-              <input
-                value={cfgValue}
-                onChange={(e) => setCfgValue(e.target.value)}
-                className="w-full mt-1 rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm"
-              />
-              <div className="mt-2 flex gap-2">
-                <button
-                  onClick={saveConfig}
-                  disabled={saving}
-                  className={cx(
-                    'rounded-xl px-4 py-2 text-sm font-semibold',
-                    saving ? 'bg-white/10 text-white/50' : 'bg-blue-600 hover:bg-blue-500'
-                  )}
-                >
-                  {saving ? 'Saving…' : 'Save'}
-                </button>
-                <button
-                  onClick={loadConfig}
-                  className="rounded-xl px-3 py-2 text-sm bg-white/10 hover:bg-white/20"
-                >
-                  Reload
-                </button>
-              </div>
-            </div>
+      {/* Config card */}
+      <section className="card">
+        <div className="field">
+          <label>Key</label>
+          <input className="input" value="round.duration_ms" readOnly />
+          <p className="hint">The round duration (ms) controls the auto-caller speed when Auto-run is used.</p>
+        </div>
+        <div className="row">
+          <div className="field grow">
+            <label>Value (ms)</label>
+            <input
+              className="input"
+              value={cfgValue}
+              onChange={(e) => setCfgValue(e.target.value)}
+              inputMode="numeric"
+            />
           </div>
-
-          <div className="border-t border-white/10 pt-3 text-sm text-white/70">
-            <b>Current speed:</b> {state?.speed_ms ?? '—'} ms
+          <div className="actions">
+            <button className="btn primary" onClick={saveConfig} disabled={saving}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            <button className="btn" onClick={loadConfig}>Reload</button>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Round Control Card */}
-        <section className="rounded-2xl bg-[#12162a] border border-white/10 p-4">
-          <div className="flex items-center justify-between">
-            <div className="text-white/80 font-semibold">
-              Round Control · <span className="capitalize">{phase}</span> · {calledLen}/25
-            </div>
-            <div className="flex items-center gap-3 text-sm">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={polling}
-                  onChange={(e) => setPolling(e.target.checked)}
-                />
-                Polling
-              </label>
-              <span>Poll: <b>{pollMs}</b> ms</span>
-              <button onClick={() => setPollMs(Math.max(250, pollMs - 250))}
-                      className="rounded-lg px-2 py-1 bg-white/10 hover:bg-white/20">Faster</button>
-              <button onClick={() => setPollMs(Math.min(5000, pollMs + 500))}
-                      className="rounded-lg px-2 py-1 bg-white/10 hover:bg-white/20">Slower</button>
-              <button onClick={fetchStateOnce}
-                      className="rounded-lg px-2 py-1 bg-white/10 hover:bg-white/20">Fetch Once</button>
-            </div>
+      {/* Control card */}
+      <section className="card">
+        <div className="row between">
+          <div className="title">Round Control · <span className="cap">{phase}</span> · {called}/25</div>
+          <div className="row smgap">
+            <label className="check"><input type="checkbox" checked={polling} onChange={e => setPolling(e.target.checked)} />Polling</label>
+            <span>Poll: <b>{pollMs}</b> ms</span>
+            <button className="btn" onClick={() => setPollMs(m => Math.max(250, m - 250))}>Faster</button>
+            <button className="btn" onClick={() => setPollMs(m => Math.min(5000, m + 500))}>Slower</button>
+            <button className="btn" onClick={fetchStateOnce}>Fetch Once</button>
           </div>
+        </div>
 
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button onClick={() => post('/api/round/start')}
-                    disabled={!!busy}
-                    className="rounded-xl px-3 py-2 bg-emerald-600 hover:bg-emerald-500">Start Round</button>
-            <button onClick={() => post('/api/round/call')}
-                    disabled={!!busy}
-                    className="rounded-xl px-3 py-2 bg-blue-600 hover:bg-blue-500">Call Next</button>
-            <button onClick={() => post('/api/round/end')}
-                    disabled={!!busy}
-                    className="rounded-xl px-3 py-2 bg-orange-500 hover:bg-orange-400">End Round</button>
-            <button onClick={() => post('/api/round/reset')}
-                    disabled={!!busy}
-                    className="rounded-xl px-3 py-2 bg-purple-600 hover:bg-purple-500">Reset to Setup</button>
+        <div className="row smgap wrap">
+          <button className="btn success" onClick={() => post('/api/round/start')} disabled={!!busy}>Start Round</button>
+          <button className="btn info"    onClick={() => post('/api/round/call')}  disabled={!!busy}>Call Next</button>
+          <button className="btn warn"    onClick={() => post('/api/round/end')}   disabled={!!busy}>End Round</button>
+          <button className="btn purple"  onClick={() => post('/api/round/reset')} disabled={!!busy}>Reset to Setup</button>
 
-            <label className="ml-auto flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={autoRun}
-                onChange={(e) => setAutoRun(e.target.checked)}
-              />
-              Auto-run (uses speed_ms)
-            </label>
-          </div>
+          <label className="check ml">
+            <input type="checkbox" checked={autoRun} onChange={e => setAutoRun(e.target.checked)} />
+            Auto-run (uses speed_ms)
+          </label>
+        </div>
+      </section>
 
-          <div className="mt-4 grid md:grid-cols-2 gap-3">
-            <div>
-              <h3 className="text-sm text-white/70 mb-2">State</h3>
-              <pre className="rounded-xl bg-black/60 text-green-300 p-3 min-h-[160px] overflow-auto">
-                {JSON.stringify(state ?? { loading: true }, null, 2)}
-              </pre>
-            </div>
-            <div>
-              <h3 className="text-sm text-white/70 mb-2">Last Action</h3>
-              <pre className="rounded-xl bg-black/60 text-blue-300 p-3 min-h-[160px] overflow-auto">
-                {JSON.stringify(lastAction ?? { none: true }, null, 2)}
-              </pre>
-            </div>
-          </div>
-        </section>
-      </div>
+      {/* Scoped styles (no Tailwind required) */}
+      <style jsx>{`
+        :global(html, body) { background:#0f1220; color:#fff; }
+        .wrap { max-width: 1000px; margin: 0 auto; padding: 20px; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+        .header h1 { margin: 0 0 6px; font-size: 28px; font-weight: 800; }
+        .status { color:#b9c0d3; display:flex; gap:10px; flex-wrap:wrap; }
+        .cap { text-transform: capitalize; }
+
+        .card { background:#12162a; border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:16px; margin-top:16px; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+        .title { font-weight:600; color:#dfe6ff; }
+        .row { display:flex; gap:12px; align-items:center; }
+        .row.wrap { flex-wrap:wrap; }
+        .row.between { justify-content:space-between; align-items:center; }
+        .smgap { gap:8px; }
+        .ml { margin-left:auto; }
+
+        .field { margin-bottom:10px; }
+        .field.grow { flex:1; }
+        .field label { display:block; font-size:12px; color:#aab3cc; margin-bottom:6px; }
+        .hint { margin:4px 0 0; font-size:12px; color:#9aa3bd; }
+
+        .input { width:100%; background:#0c1020; color:#fff; border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:10px 12px; font-size:14px; outline:none; }
+        .input:focus { border-color:#5b8cff; box-shadow:0 0 0 3px rgba(91,140,255,.25); }
+
+        .actions { display:flex; gap:8px; align-items:center; }
+
+        .btn { border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.06); color:#e8eeff; padding:8px 12px; border-radius:10px; font-size:14px; cursor:pointer; transition:.15s; }
+        .btn:hover { background:rgba(255,255,255,.12); }
+        .btn:disabled { opacity:.5; cursor:not-allowed; }
+
+        .primary { background:#2b6cff; border-color:#2b6cff; }
+        .primary:hover { background:#3b77ff; }
+        .success { background:#16a34a; border-color:#16a34a; }
+        .success:hover { background:#22b357; }
+        .info { background:#2081e2; border-color:#2081e2; }
+        .info:hover { background:#2a8ff0; }
+        .warn { background:#f59e0b; border-color:#f59e0b; color:#171923; }
+        .warn:hover { background:#ffb31a; }
+        .purple { background:#7c3aed; border-color:#7c3aed; }
+        .purple:hover { background:#8b5cf6; }
+
+        .check { display:inline-flex; align-items:center; gap:8px; font-size:14px; color:#c5cbe0; }
+      `}</style>
     </main>
   );
 }

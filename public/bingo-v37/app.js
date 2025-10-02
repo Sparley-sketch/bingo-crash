@@ -496,7 +496,7 @@ function App(){
               }
 
               {/* Available pool */}
-              <— <div className="row" style={{justifyContent:'space-between', marginTop:16}}>
+              <div className="row" style={{justifyContent:'space-between', marginTop:16}}>
                 <div className="muted">Available Cards ({available.length}) · Selected: {selectedPool.size}</div>
               </div>
               {available.length===0

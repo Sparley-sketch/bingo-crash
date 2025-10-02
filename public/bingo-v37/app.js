@@ -33,7 +33,7 @@ function makeCard(id,name){
   );
   return {
     id, name, grid,
-    paused:false, exploded:false, daubs:0,
+    paused:false, exploded:false, 
     wantsShield:false, shieldUsed:false,
     justExploded:false, justSaved:false
   };
@@ -42,7 +42,7 @@ function makeCard(id,name){
 function resetCardsForNewRound(cards){
   return cards.map(c=>({
     ...c,
-    paused:false, exploded:false, daubs:0, shieldUsed:false, justExploded:false, justSaved:false,
+    paused:false, exploded:false, shieldUsed:false, justExploded:false, justSaved:false,
     grid: c.grid.map(r=>r.map(cell=>({...cell, daubed:false})))
   }));
 }

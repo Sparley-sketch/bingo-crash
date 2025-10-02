@@ -96,7 +96,7 @@ const ICON_LOCK_OPEN  = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2
 const ICON_LOCK_CLOSED= 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="%231e293b"><path d="M7 10V8a5 5 0 1 1 10 0v2h2v12H5V10h2zm2 0h6V8a3 3 0 1 0-6 0v2z"/></svg>';
 
 // Explosion image (animated GIF) — replace with your slower/faster GIF if desired
-const EXPLOSION_SRC = '/bingo-v37/explosion3.gif';
+const EXPLOSION_SRC = '/bingo-v37/explosion2.gif';
 
 function Cell({cell, highlight}){
   const cls=['cell']; if(cell.daubed) cls.push('daub'); else if(highlight) cls.push('hl');

@@ -39,14 +39,6 @@ function makeCard(id,name){
   };
 }
 
-function resetCardsForNewRound(cards){
-  return cards.map(c=>({
-    ...c,
-    paused:false, exploded:false, daubs:0, shieldUsed:false, justExploded:false, justSaved:false,
-    grid: c.grid.map(r=>r.map(cell=>({...cell, daubed:false})))
-  }));
-}
-
 function applyCallToCards(cards, n, audioOn, volume){
   let anyBoom=false;
   const next = cards.map(card=>{
@@ -124,15 +116,15 @@ function FXStyles(){
 .title{ font-size:22px; font-weight:800; margin:0 0 4px; }
 .muted{ color:#64748b; font-size:14px; }
 
-/* Cards container (right panel uses 2 columns) */
+/* Outer grid: 2 columns on the right for cards */
 .cardsGrid{ display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:12px; }
 .twoCol{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 
-/* ========== Card & Grid (mobile safe) ========== */
+/* ========== Card & Grid (mobile-safe, responsive) ========== */
 .card{
   position:relative; overflow:hidden; padding:12px; border-radius:16px; background:#fff;
   border:1px solid #e2e8f0; box-shadow:0 4px 18px rgba(15,23,42,.04);
-  min-width:0; width:100%;
+  min-width:0; width:100%; box-sizing:border-box;
 }
 .ownedCard{ border:1.5px solid #22c55e !important; box-shadow:0 0 0 3px rgba(34,197,94,.12); }
 .burned{ background:#0b0b0b !important; border-color:#111 !important; filter:saturate(.2) contrast(.9); }
@@ -175,31 +167,42 @@ function FXStyles(){
 /* iOS anti-zoom for alias box */
 .aliasInput{ font-size:16px; }
 
-/* ========== Mobile responsiveness (no container queries) ========== */
-@media (max-width: 420px){
-  .twoCol{ grid-template-columns:1fr; }     /* left panel on its own row */
-  .cardsGrid{ grid-template-columns: repeat(2, minmax(0,1fr)); gap:10px; }
-  .gridCard{ --cell-gap:6px; }
-  .cell{ --cell-radius:8px; }
-  .cell .num{ --cell-font: clamp(11px, 3.9vw, 14px); }
-  .bomb{ --bomb-font: clamp(9px, 3.0vw, 11px); top:4px; right:4px; }
-  .phase-live .cell .num{ --cell-font: clamp(10px, 3.6vw, 13px); }
-  .phase-live .bomb{ --bomb-font: clamp(8px, 2.7vw, 10px); }
+/* =================== Mobile responsiveness =================== */
+/* iPhone 12 Pro and similar (≤ 390px wide): shrink cards more aggressively */
+@media (max-width: 400px){
+  .twoCol{ grid-template-columns:1fr; }     /* left panel stacks above */
+  .cardsGrid{ grid-template-columns: repeat(2, minmax(0,1fr)); gap:8px; }
+  .card{ padding:8px; border-radius:12px; }
+  .gridCard{ --cell-gap:4px; }
+  .cell{ --cell-radius:7px; }
+  /* numbers & bombs respond to viewport so 2 columns always fit */
+  .cell .num{ --cell-font: clamp(9px, 3.1vw, 12px); }
+  .bomb{ --bomb-font: clamp(7.5px, 2.5vw, 10px); top:3px; right:3px; }
+  .phase-live .cell .num{ --cell-font: clamp(9px, 3.0vw, 12px); }
+  .phase-live .bomb{ --bomb-font: clamp(7px, 2.3vw, 9.5px); }
   .priceTag{ font-size:11px; padding:2px 6px; }
   .shieldCtl{ font-size:11px; }
 }
 
-@media (min-width: 421px) and (max-width: 640px){
+/* Small phones (401–480px) */
+@media (min-width: 401px) and (max-width: 480px){
   .twoCol{ grid-template-columns:1fr 1fr; }
-  .cardsGrid{ grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .gridCard{ --cell-gap:7px; }
-  .cell .num{ --cell-font: clamp(12px, 2.8vw, 16px); }
-  .bomb{ --bomb-font: clamp(10px, 2.1vw, 12px); }
+  .cardsGrid{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  .card{ padding:10px; border-radius:14px; }
+  .gridCard{ --cell-gap:6px; }
+  .cell{ --cell-radius:8px; }
+  .cell .num{ --cell-font: clamp(10px, 2.9vw, 13px); }
+  .bomb{ --bomb-font: clamp(8.5px, 2.3vw, 11px); top:4px; right:4px; }
+  .phase-live .cell .num{ --cell-font: clamp(10px, 2.8vw, 13px); }
+  .phase-live .bomb{ --bomb-font: clamp(8px, 2.1vw, 10.5px); }
 }
 
-/* Slightly larger tablets */
-@media (min-width: 641px) and (max-width: 820px){
-  .gridCard{ --cell-gap: 7px; }
+/* Larger phones & small tablets */
+@media (min-width: 481px) and (max-width: 820px){
+  .twoCol{ grid-template-columns:1fr 1fr; }
+  .cardsGrid{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+  .gridCard{ --cell-gap:7px; }
+  .cell{ --cell-radius:9px; }
   .cell .num{ --cell-font: clamp(12px, 2.2vw, 16px); }
   .bomb     { --bomb-font: clamp(10px, 1.7vw, 12px); }
 }
@@ -252,25 +255,25 @@ function CardView({
           )}
           {/* Purchased (not selectable) & still in setup -> show "Shield active" */}
           {phase === 'setup' && !selectable && card.wantsShield && (
-            <span className="badge" style={{background:'#22c55e30', color:'#16a34a'}}>shield active</span>
+            <span className="badge" style={{background:'#22c55e30', color:'#16a34a', padding:'2px 6px', borderRadius:'8px'}}>shield active</span>
           )}
         </div>
 
         {/* RIGHT: daubs / badges / lock (game only) */}
         <div className="row" style={{gap:8, alignItems:'center'}}>
           {phase === 'live' && (
-            <span className="badge">Daubs: <b>{card.daubs}</b></span>
+            <span className="badge" style={{background:'#f1f5f9', padding:'2px 6px', borderRadius:'8px'}}>Daubs: <b>{card.daubs}</b></span>
           )}
           {phase === 'live' && card.wantsShield && !card.shieldUsed && (
-            <span className="badge" style={{background:'#22c55e30', color:'#16a34a'}}>shield active</span>
+            <span className="badge" style={{background:'#22c55e30', color:'#16a34a', padding:'2px 6px', borderRadius:'8px'}}>shield active</span>
           )}
           {phase === 'live' && card.shieldUsed && (
-            <span className="badge" style={{background:'#f8717130', color:'#dc2626'}}>shield used</span>
+            <span className="badge" style={{background:'#f8717130', color:'#dc2626', padding:'2px 6px', borderRadius:'8px'}}>shield used</span>
           )}
           {phase === 'live' && (
-            card.exploded ? <span className="badge boom">EXPLODED</span> :
-            card.paused   ? <span className="badge lock">LOCKED</span> :
-                            <span className="badge live">LIVE</span>
+            card.exploded ? <span className="badge" style={{background:'#fee2e2', color:'#991b1b', padding:'2px 6px', borderRadius:'8px'}}>EXPLODED</span> :
+            card.paused   ? <span className="badge" style={{background:'#f1f5f9', color:'#0f172a', padding:'2px 6px', borderRadius:'8px'}}>LOCKED</span> :
+                            <span className="badge" style={{background:'#dcfce7', color:'#14532d', padding:'2px 6px', borderRadius:'8px'}}>LIVE</span>
           )}
           {showLock && (
             <button className="btn gray"

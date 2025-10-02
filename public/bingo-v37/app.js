@@ -111,11 +111,10 @@ function FXStyles(){
   return (
     <style>{`
       /* inline chip, no absolute positioning */
-		.priceTag{ display:inline-flex;  align-items:center;  padding:2px 8px;  font-size:12px;  line-height:1;  border-radius:999px;  background:#f1f5f9;  border:1px solid #e2e8f0;  color:#0f172a;}
+		.priceTag{  display:inline-flex;  align-items:center;  padding:2px 8px;  font-size:12px;  line-height:1;  border-radius:999px;  background:#f1f5f9;  border:1px solid #e2e8f0;  color:#0f172a;}
 
-		.shieldCtl input{
-		  vertical-align:middle;
-		}
+	.shieldCtl input{ vertical-align:middle; }
+
 
 		/* mobile: keep them on one line or wrap nicely */
 		@media (max-width:640px){
@@ -125,14 +124,18 @@ function FXStyles(){
 
       .ownedCard{ border:1.5px solid #22c55e !important; box-shadow:0 0 0 3px rgba(34,197,94,.12); }
       .burned{ background:#0b0b0b !important; border-color:#111 !important; filter:saturate(.2) contrast(.9); }
-      .explosion-img{ position:absolute; inset:auto; left:50%; top:50%; transform:translate(-50%,-50%); width:140%; pointer-events:none; }
+      .explosion-img{ z-index:5; pointer-events:none; }
+		/* Slightly smaller text & bombs during live play to avoid crowding */
+		.phase-live .cell .num{ font-size:15px; }
+		.phase-live .bomb{ font-size:12px; }
 
       /* Base */
       .gridCard { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:8px; }
-      .cell { position:relative; min-width:44px; min-height:44px; display:flex; align-items:center; justify-content:center; border:1px solid #e2e8f0; border-radius:10px; background:#fff; }
+      .cell{ position:relative; display:flex; align-items:center; justify-content:center; box-sizing:border-box;line-height:1;}
+	  .cell .num{  display:flex;  align-items:center;  justify-content:center;  width:100%;  text-align:center;  font-weight:700;  font-size:16px;  /* base size */  z-index:1;  pointer-events:none;}
       .cell.daub { background:#dcfce7; border-color:#86efac; }
       .cell.hl   { background:#fef9c3; border-color:#fde047; }
-      .bomb{ position:absolute; right:6px; bottom:4px; }
+      .bomb{  position:absolute;  right:6px;  top:6px;  font-size:14px;          /* base size */  line-height:1;  z-index:2;  pointer-events:none;}
 
       /* Mobile layout tweaks */
       @media (max-width: 640px){
@@ -140,7 +143,13 @@ function FXStyles(){
         .cardsGrid{ grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
         .topBar   { display:flex; gap:6px; flex-wrap:wrap; }
         .gridCard { gap:6px; }
-        .cell     { min-width:34px; min-height:34px; font-size:14px; border-radius:8px; }
+        .cell     { min-width:34px; min-height:34px; }
+		.cell .num{ font-size:14px; }         /* setup on mobile */
+    	.bomb     { font-size:12px; right:4px; top:4px; }
+		.phase-live .cell .num{ font-size:13px; }  /* 1 step down during game */
+		.phase-live .bomb{ font-size:11px; right:3px; top:3px; }		
+	    .priceTag{ font-size:11px; padding:2px 6px; }
+	    .shieldCtl{ font-size:11px; }		
         .badge    { font-size:10px; padding:2px 6px; }
         .btn      { font-size:12px; padding:6px 8px; }
         .chip     { font-size:12px; }
@@ -200,6 +209,10 @@ function CardView({
         Shield
       </label>
     )}
+    {/* ✅ Purchased (not selectable) & still in setup -> show "Shield active" */}
+    {phase === 'setup' && !selectable && card.wantsShield && (
+      <span className="badge" style={{background:'#22c55e30', color:'#16a34a'}}>shield active</span>
+    )}
   </div>
 
   {/* RIGHT: daubs / badges / lock (game only) */}
@@ -230,8 +243,6 @@ function CardView({
     )}
   </div>
 </div>
-
-
 
       {/* Grid */}
       <div className="gridCard" style={{marginTop:10}}>
@@ -409,7 +420,7 @@ function App(){
   const lastCalled = called[called.length-1];
 
   return (
-    <div key={resetKey} className="grid" style={{gap:14}}>
+			<div key={resetKey} className={`grid ${phase === 'live' ? 'phase-live' : 'phase-setup'}`} style={{gap:14}} >
       {/* Header */}
       <div className="row" style={{justifyContent:'space-between'}}>
         <div>

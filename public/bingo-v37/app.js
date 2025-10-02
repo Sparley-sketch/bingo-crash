@@ -96,7 +96,7 @@ const ICON_LOCK_OPEN  = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2
 const ICON_LOCK_CLOSED= 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="%231e293b"><path d="M7 10V8a5 5 0 1 1 10 0v2h2v12H5V10h2zm2 0h6V8a3 3 0 1 0-6 0v2z"/></svg>';
 
 // Explosion image (animated GIF)
-const EXPLOSION_SRC = '/bingo-v37/explosion4.gif';
+const EXPLOSION_SRC = '/bingo-v37/explosion3.gif';
 
 function Cell({cell, highlight}){
   const cls=['cell']; if(cell.daubed) cls.push('daub'); else if(highlight) cls.push('hl');
@@ -116,19 +116,88 @@ function FXStyles(){
         .cardsGrid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
         .topBar { display:flex; gap:6px; flex-wrap:wrap; }
       }
+	  /* Base (keeps desktop as-is) */
+.gridCard { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:8px; }
+.cell { min-width:44px; min-height:44px; display:flex; align-items:center; justify-content:center; border:1px solid #e2e8f0; border-radius:10px; background:#fff; }
+.cell.daub { background:#dcfce7; border-color:#86efac; }
+.cell.hl   { background:#fef9c3; border-color:#fde047; }
+.bomb{ position:absolute; right:6px; bottom:4px; }
+
+@media (max-width: 640px){
+  .cardsGrid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+  .gridCard  { gap:6px; }
+  .cell      { min-width:34px; min-height:34px; font-size:14px; border-radius:8px; }
+  .badge     { font-size:10px; padding:2px 6px; }
+  .btn       { font-size:12px; padding:6px 8px; }
+  .chip      { font-size:12px; }
+  .title     { font-size:18px; }
+}
     `}</style>
   );
 }
 
 function CardView({
-  card, lastCalled,
-  onPause,
-  phase,
-  selectable, selected, onSelectToggle,
-  owned=false,
-  showShield=false,    // pre-buy only (requested)
-  onShieldToggle,
-  showLock=false
+//  card, lastCalled,
+//  onPause,
+//  phase,
+//  selectable, selected, onSelectToggle,
+//  owned=false,
+//  showShield=false,    // pre-buy only (requested)
+//  onShieldToggle,
+//  showLock=false
+
+{/* price only in pre-buy (available cards) */}
+{phase === 'setup' && selectable && <div className="priceTag">1 coin</div>}
+
+<div className="row" style={{justifyContent:'space-between'}}>
+  {/* left side: (nothing for now) */}
+
+  {/* right side: Daubs + (status/lock/shield) */}
+  <div className="row" style={{gap:8, alignItems:'center'}}>
+
+    {/* Daubs always shown, at right */}
+    <span className="badge">Daubs: <b>{card.daubs}</b></span>
+
+    {/* shield badges during live only (post-buy visual feedback) */}
+    {phase === 'live' && card.wantsShield && !card.shieldUsed && (
+      <span className="badge" style={{background:'#22c55e30', color:'#16a34a'}}>shield active</span>
+    )}
+    {phase === 'live' && card.shieldUsed && (
+      <span className="badge" style={{background:'#f8717130', color:'#dc2626'}}>shield used</span>
+    )}
+
+    {/* status badges only post-buy (live) */}
+    {phase === 'live' && (
+      card.exploded ? <span className="badge boom">EXPLODED</span> :
+      card.paused   ? <span className="badge lock">LOCKED</span> :
+                      <span className="badge live">LIVE</span>
+    )}
+
+    {/* Shield toggle ONLY pre-buy (available cards) */}
+    {showShield && (
+      <label className="row" style={{gap:6, fontSize:12, color:'#475569'}}
+             onClick={(e)=>e.stopPropagation()}>
+        <input type="checkbox"
+               checked={!!card.wantsShield}
+               onChange={e=>onShieldToggle(card.id, e.target.checked)} />
+        Shield
+      </label>
+    )}
+
+    {/* Lock button ONLY post-buy during live */}
+    {showLock && (
+      <button className="btn gray"
+              onClick={(e)=>{ e.stopPropagation(); onPause(card.id); }}
+              disabled={card.paused || card.exploded}>
+        <span className="row" style={{gap:6, alignItems:'center'}}>
+          <img src={card.paused ? ICON_LOCK_CLOSED : ICON_LOCK_OPEN} alt="" />
+          {card.paused || card.exploded ? 'Locked' : 'Lock'}
+        </span>
+      </button>
+    )}
+  </div>
+</div>
+
 }){
   const status = card.exploded ? <span className="badge boom">EXPLODED</span>
                : card.paused   ? <span className="badge lock">LOCKED</span>

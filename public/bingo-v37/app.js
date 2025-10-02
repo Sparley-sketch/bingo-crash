@@ -270,11 +270,6 @@ function CardView({
           {phase === 'live' && card.shieldUsed && (
             <span className="badge" style={{background:'#f8717130', color:'#dc2626', padding:'2px 6px', borderRadius:'8px'}}>shield used</span>
           )}
-          {phase === 'live' && (
-            card.exploded ? <span className="badge" style={{background:'#fee2e2', color:'#991b1b', padding:'2px 6px', borderRadius:'8px'}}>OUT</span> :
-            card.paused   ? <span className="badge" style={{background:'#fef3c7', color:'#b45309', padding:'2px 6px', borderRadius:'8px'}}>LOCKED</span> :
-                            <span className="badge" style={{background:'#dcfce7', color:'#14532d', padding:'2px 6px', borderRadius:'8px'}}>LIVE</span>
-          )}
           {showLock && (
             <button className="btn gray"
                     onClick={(e)=>{ e.stopPropagation(); onPause(card.id); }}

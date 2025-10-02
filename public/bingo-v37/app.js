@@ -100,7 +100,14 @@ const EXPLOSION_SRC = '/bingo-v37/explosion.gif';
 
 function Cell({cell, highlight}){
   const cls=['cell']; if(cell.daubed) cls.push('daub'); else if(highlight) cls.push('hl');
-  return <div className={cls.join(' ')}><div style={{fontWeight:700}}>{cell.n}</div>{cell.bomb && <div className="bomb">💣</div>}</div>;
+  return (
+    <div className={cls.join(' ')}>
+      <span className="num">{cell.n}</span>
+      {cell.bomb && <div className="bomb">💣</div>}
+    </div>
+  );
+}
+
 }
 
 function FXStyles(){
@@ -130,6 +137,13 @@ function FXStyles(){
         .chip     { font-size:12px; }
         .title    { font-size:18px; }
       }
+	  /* keep the number perfectly centered even with an absolute bomb icon */
+		.cell { position:relative; display:flex; align-items:center; justify-content:center; }
+		.cell .num { display:flex; align-items:center; justify-content:center; width:100%; text-align:center; }
+
+		/* make sure explosion overlays above everything */
+		.explosion-img{ z-index: 5; pointer-events:none; }
+
     `}</style>
   );
 }
@@ -160,57 +174,68 @@ function CardView({
       {/* Explosion GIF overlay */}
       {card.justExploded && <img src={EXPLOSION_SRC} className="explosion-img" alt="boom" />}
 
-      {/* price only in pre-buy (available cards) */}
-      {phase === 'setup' && selectable && <div className="priceTag">1 coin</div>}
+     {/* price only in pre-buy (available cards) */}
+{phase === 'setup' && selectable && <div className="priceTag">1 coin</div>}
 
-      {/* Header */}
-      <div className="row" style={{justifyContent:'space-between'}}>
-        {/* left empty on purpose */}
+<div className="row" style={{justifyContent:'space-between'}}>
+  {/* left empty on purpose */}
 
-        {/* right: Daubs + (badges) + controls */}
-        <div className="row" style={{gap:8, alignItems:'center'}}>
-          {/* Daubs always (right side) */}
-          <span className="badge">Daubs: <b>{card.daubs}</b></span>
+  {/* right: Daubs / Shield / Status / Controls */}
+  <div className="row" style={{gap:8, alignItems:'center'}}>
 
-          {/* Live-only: shield state & status */}
-          {phase === 'live' && card.wantsShield && !card.shieldUsed && (
-            <span className="badge" style={{background:'#22c55e30', color:'#16a34a'}}>shield active</span>
-          )}
-          {phase === 'live' && card.shieldUsed && (
-            <span className="badge" style={{background:'#f8717130', color:'#dc2626'}}>shield used</span>
-          )}
-          {phase === 'live' && (
-            card.exploded ? <span className="badge boom">EXPLODED</span> :
-            card.paused   ? <span className="badge lock">LOCKED</span> :
-                            <span className="badge live">LIVE</span>
-          )}
+    {/* Daubs — ONLY during game */}
+    {phase === 'live' && (
+      <span className="badge">Daubs: <b>{card.daubs}</b></span>
+    )}
 
-          {/* Shield checkbox ONLY in pre-buy */}
-          {showShield && (
-            <label className="row" style={{gap:6, fontSize:12, color:'#475569'}}
-                   onClick={(e)=>e.stopPropagation()}>
-              <input
-                type="checkbox"
-                checked={!!card.wantsShield}
-                onChange={e=>onShieldToggle(card.id, e.target.checked)}
-              />
-              Shield
-            </label>
-          )}
+    {/* Shield badges:
+         - pre-game on purchased (setup + !selectable) => "shield active"
+         - during game => "shield active" / "shield used"
+    */}
+    {phase === 'setup' && !selectable && card.wantsShield && (
+      <span className="badge" style={{background:'#22c55e30', color:'#16a34a'}}>shield active</span>
+    )}
+    {phase === 'live' && card.wantsShield && !card.shieldUsed && (
+      <span className="badge" style={{background:'#22c55e30', color:'#16a34a'}}>shield active</span>
+    )}
+    {phase === 'live' && card.shieldUsed && (
+      <span className="badge" style={{background:'#f8717130', color:'#dc2626'}}>shield used</span>
+    )}
 
-          {/* Lock button ONLY post-buy during live */}
-          {showLock && (
-            <button className="btn gray"
-                    onClick={(e)=>{ e.stopPropagation(); onPause(card.id); }}
-                    disabled={card.paused || card.exploded}>
-              <span className="row" style={{gap:6, alignItems:'center'}}>
-                <img src={card.paused ? ICON_LOCK_CLOSED : ICON_LOCK_OPEN} alt="" />
-                {card.paused || card.exploded ? 'Locked' : 'Lock'}
-              </span>
-            </button>
-          )}
-        </div>
-      </div>
+    {/* Status — ONLY during game */}
+    {phase === 'live' && (
+      card.exploded ? <span className="badge boom">EXPLODED</span> :
+      card.paused   ? <span className="badge lock">LOCKED</span> :
+                      <span className="badge live">LIVE</span>
+    )}
+
+    {/* Shield checkbox — ONLY on AVAILABLE (pre-buy) */}
+    {showShield && (
+      <label className="row" style={{gap:6, fontSize:12, color:'#475569'}}
+             onClick={(e)=>e.stopPropagation()}>
+        <input
+          type="checkbox"
+          checked={!!card.wantsShield}
+          onChange={e=>onShieldToggle(card.id, e.target.checked)}
+        />
+        Shield
+      </label>
+    )}
+
+    {/* Lock — ONLY during game (owned cards) */}
+    {showLock && (
+      <button className="btn gray"
+              onClick={(e)=>{ e.stopPropagation(); onPause(card.id); }}
+              disabled={card.paused || card.exploded}>
+        <span className="row" style={{gap:6, alignItems:'center'}}>
+          <img src={card.paused ? ICON_LOCK_CLOSED : ICON_LOCK_OPEN} alt="" />
+          {card.paused || card.exploded ? 'Locked' : 'Lock'}
+        </span>
+      </button>
+    )}
+  </div>
+</div>
+
 
       {/* Grid */}
       <div className="gridCard" style={{marginTop:10}}>
@@ -323,16 +348,16 @@ function App(){
         setRoundId(s.id || null);
 
         // RESET TO SETUP: clear purchases & selections, regenerate Available and force paint
-        if ((lastPhase !== 'setup' && newPhase === 'setup') || (newCalls.length < lastCount)) {
-          setPlayer({ id: uid('p'), cards: [] });
-          setAvailable(freshAvail());
-          setSelectedPool(new Set());
-          setShowHowTo(true);
-          setSyncedWinner(null);
-          setAsk(true);
-          endPostedRef.current = false;
-          setResetKey(k => k + 1);
-        }
+		if ((lastPhase !== 'setup' && newPhase === 'setup') || (newCalls.length < lastCount)) {
+		  setPlayer({ id: uid('p'), cards: [] });
+		  setAvailable(freshAvail());
+		  setSelectedPool(new Set());
+		  setShowHowTo(true);
+		  setSyncedWinner(null);
+		  setAsk(true);
+		  endPostedRef.current = false;
+		  setResetKey(k => k + 1);     // <- forces a repaint
+		}
 
         // Apply new calls to owned cards
         if (newCalls.length > lastCount) {
@@ -530,14 +555,16 @@ function App(){
       </Modal>
 
       {/* Winner modal (synced across players) */}
-      <Modal
-        open={!!syncedWinner}
-        onClose={()=>setSyncedWinner(null)}
-        title="Game Over"
-        primaryText="OK"
-      >
-        {syncedWinner ? <>Winner: <b>{syncedWinner.alias}</b> with <b>{syncedWinner.daubs}</b> daubs.</> : '—'}
-      </Modal>
+		<Modal
+		  open={!!syncedWinner}
+		  onClose={()=>location.reload()}
+		  title="Game Over"
+		  primaryText="OK"
+		  onPrimary={()=>location.reload()}
+		>
+		  {syncedWinner ? <>Winner: <b>{syncedWinner.alias}</b> with <b>{syncedWinner.daubs}</b> daubs.</> : '—'}
+		</Modal>
+
 
       {/* Alias prompt */}
       <Modal

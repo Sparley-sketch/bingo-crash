@@ -1,7 +1,7 @@
 // Bingo + Crash — Multiplayer client (light theme)
 // React (UMD) + Babel — no build step
 
-const { useEffect, useState } = React;
+const { useEffect, useState, useRef } = React;
 
 function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a; }
 function uid(p='id'){ return p+Math.random().toString(36).slice(2,8); }
@@ -95,6 +95,9 @@ function applyCallToCards(cards, n, audioOn, volume){
 const ICON_LOCK_OPEN  = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="%231e293b"><path d="M7 10V7a5 5 0 1 1 10 0h-2a3 3 0 1 0-6 0v3h10v12H5V10h2z"/></svg>';
 const ICON_LOCK_CLOSED= 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="%231e293b"><path d="M7 10V8a5 5 0 1 1 10 0v2h2v12H5V10h2zm2 0h6V8a3 3 0 1 0-6 0v2z"/></svg>';
 
+// Explosion image (animated GIF)
+const EXPLOSION_SRC = '/bingo-v37/explosion.gif';
+
 function Cell({cell, highlight}){
   const cls=['cell']; if(cell.daubed) cls.push('daub'); else if(highlight) cls.push('hl');
   return <div className={cls.join(' ')}><div style={{fontWeight:700}}>{cell.n}</div>{cell.bomb && <div className="bomb">💣</div>}</div>;
@@ -103,61 +106,67 @@ function Cell({cell, highlight}){
 function FXStyles(){
   return (
     <style>{`
-      @keyframes explodeFlash {0%{opacity:0}15%{opacity:1}60%{opacity:.6}100%{opacity:0}}
-      .fx-flash{animation:explodeFlash 900ms ease-out forwards;background:radial-gradient(circle at center, rgba(239,68,68,.25), rgba(255,255,255,0) 65%);position:absolute;inset:0;pointer-events:none;border-radius:14px}
       .priceTag{position:absolute;left:8px;top:8px;font-size:11px;padding:2px 6px;border-radius:999px;background:#f1f5f9;border:1px solid #e2e8f0}
       .ownedCard{ border:1.5px solid #22c55e !important; box-shadow:0 0 0 3px rgba(34,197,94,.12); }
+      .burned{ background:#0b0b0b !important; border-color:#111 !important; filter:saturate(.2) contrast(.9); }
+      .explosion-img{ position:absolute; inset:auto; left:50%; top:50%; transform:translate(-50%,-50%); width:140%; pointer-events:none; }
+      /* Mobile layout tweaks */
+      @media (max-width: 640px){
+        .twoCol { grid-template-columns: 1fr !important; }
+        .cardsGrid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+        .topBar { display:flex; gap:6px; flex-wrap:wrap; }
+      }
     `}</style>
   );
 }
 
 function CardView({
   card, lastCalled,
-  onPause, onShieldToggle,
+  onPause,
   phase,
   selectable, selected, onSelectToggle,
   owned=false,
-  showShield=false,
+  showShield=false,    // pre-buy only (requested)
+  onShieldToggle,
   showLock=false
 }){
   const status = card.exploded ? <span className="badge boom">EXPLODED</span>
                : card.paused   ? <span className="badge lock">LOCKED</span>
                                : <span className="badge live">LIVE</span>;
 
-  const sBadge = card.wantsShield && !card.shieldUsed ? <span className="badge shield">shield</span>
-                : card.shieldUsed ? <span className="badge" style={{background:'#ffe4e6',borderColor:'#fecdd3'}}>shield used</span>
-                : null;
-
   const wrapperCls=['card']; 
   if(selectable && selected) wrapperCls.push('isSelected');
   if(owned) wrapperCls.push('ownedCard');
+  if(card.exploded) wrapperCls.push('burned');
 
   return (
     <div
       className={wrapperCls.join(' ')}
       onClick={() => { if(selectable) onSelectToggle(card.id); }}
-      style={selectable ? { cursor:'pointer', outline:selected?'3px solid #2563eb40':'none' } : undefined}
+      style={selectable ? { cursor:'pointer', outline:selected?'3px solid #2563eb40':'none', position:'relative' } : {position:'relative'}}
     >
       <FXStyles />
-      {card.justExploded && <div className="fx-flash" />}
+      {/* Replaced FX with animated GIF */}
+      {card.justExploded && <img src={EXPLOSION_SRC} className="explosion-img" alt="boom" />}
       <div className="priceTag">1 coin</div>
 
       <div className="row" style={{justifyContent:'space-between'}}>
         <div className="row" style={{gap:8, alignItems:'center'}}>
           <div className="row" style={{gap:8}}>
             <div style={{fontWeight:700}}>Card</div>
-            {status}{sBadge}
+            {status}
             <span className="badge">Daubs: <b>{card.daubs}</b></span>
           </div>
         </div>
 
         <div className="row" style={{gap:8}}>
+          {/* Shield checkbox ONLY in pre-buy */}
           {showShield && (
             <label className="row" style={{gap:6, fontSize:12, color:'#475569'}}
                    onClick={(e)=>e.stopPropagation()}>
               <input type="checkbox"
-                     checked={card.wantsShield}
-                     onChange={e=>onShieldToggle(card.id,e.target.checked)} />
+                     checked={!!card.wantsShield}
+                     onChange={e=>onShieldToggle(card.id, e.target.checked)} />
               Shield
             </label>
           )}
@@ -225,7 +234,10 @@ function App(){
   const [showHowTo, setShowHowTo] = useState(true);
   const [syncedWinner, setSyncedWinner] = useState(null); // {alias, daubs} | null
 
-  // ---------- Pre-buy actions (now include shields) ----------
+  // ensure we only end once
+  const endPostedRef = useRef(false);
+
+  // ---------- Pre-buy actions (include shields) ----------
   function toggleSelectPool(id){ setSelectedPool(s=>{ const n=new Set(s); n.has(id)?n.delete(id):n.add(id); return n; }); }
   function generateCards(n){
     n=Math.max(1,Math.min(12,Number(n)||0));
@@ -245,23 +257,29 @@ function App(){
     setAvailable(a=>a.filter(c=>!selectedPool.has(c.id)));
     setSelectedPool(new Set());
   }
-  // NEW: shield per-card for AVAILABLE pool
+  // shield per-card for AVAILABLE pool (pre-buy only)
   function toggleShieldAvailable(cardId,on){
     setAvailable(a=>a.map(c=>c.id===cardId?({...c, wantsShield:on}):c));
   }
-  // NEW: bulk shields on SELECTED available cards
+  // bulk shields on SELECTED available cards
   function shieldSelectedAvailable(on){
     setAvailable(a=>a.map(c=> selectedPool.has(c.id) ? ({...c, wantsShield:on}) : c ));
   }
 
   // Owned management
-  function shieldAllOwned(on){ setPlayer(p=>({...p, cards:p.cards.map(c=>({...c, wantsShield:on}))})); }
-  function toggleShieldOwned(cardId,on){ setPlayer(p=>({...p, cards:p.cards.map(c=>c.id===cardId?({...c, wantsShield:on}):c)})); }
   function pauseOwned(cardId){ setPlayer(p=>({...p, cards:p.cards.map(c=>(c.id===cardId && !c.paused && !c.exploded)?({...c, paused:true}):c)})); }
 
-  // Poll state + transitions + global winner sync
+  // Poll state + transitions + global winner sync + stop caller on game over
   useEffect(()=>{
     let mounted=true, lastPhase='setup', lastCount=0;
+
+    async function maybeEndRoundOnServer(id){
+      if (endPostedRef.current || !id) return;
+      endPostedRef.current = true;
+      try{
+        await fetch('/api/round/end?ts='+Date.now(), { method:'POST', cache:'no-store', headers:{Accept:'application/json'}});
+      }catch{}
+    }
 
     async function pull(){
       try{
@@ -273,7 +291,7 @@ function App(){
         const newCalls = Array.isArray(s.called) ? s.called : [];
         setRoundId(s.id || null);
 
-        // RESET TO SETUP: clear purchases & selections, regenerate all Available
+        // RESET TO SETUP: clear purchases & selections, regenerate Available
         if ((lastPhase !== 'setup' && newPhase === 'setup') || (newCalls.length < lastCount)) {
           setPlayer({ id: uid('p'), cards: [] });
           setAvailable(freshAvail());
@@ -281,9 +299,10 @@ function App(){
           setShowHowTo(true);
           setSyncedWinner(null);
           setAsk(true);
+          endPostedRef.current = false;
         }
 
-        // Apply new calls to owned cards
+        // Apply new calls to owned cards (only if not ended for client)
         if (newCalls.length > lastCount) {
           const news = newCalls.slice(lastCount);
           let next = player.cards;
@@ -291,12 +310,11 @@ function App(){
           setPlayer(p=>({...p, cards: next}));
         }
 
-        // End-game detection (for *global* winner sync):
-        // Condition A: deck exhausted
-        // Condition B: this viewer has 0 live cards
+        // End-game detection
         if (newPhase === 'live' && s.id) {
           const deckExhausted = newCalls.length >= 25;
           const liveMine = player.cards.filter(c => !c.exploded && !c.paused).length;
+
           if (deckExhausted || liveMine === 0) {
             const alive = player.cards.filter(c=>!c.exploded);
             const best = alive.length ? Math.max(...alive.map(c=>c.daubs)) : 0;
@@ -307,6 +325,8 @@ function App(){
                 body: JSON.stringify({ round_id: s.id, alias, daubs: best })
               }).catch(()=>{});
             }
+            // Stop further calls globally
+            maybeEndRoundOnServer(s.id);
           }
         }
 
@@ -352,7 +372,7 @@ function App(){
       </div>
 
       {/* Body */}
-      <div className="grid" style={{gridTemplateColumns:'1fr 1fr', gap:12}}>
+      <div className="grid twoCol" style={{gridTemplateColumns:'1fr 1fr', gap:12}}>
         {/* Left: Purchase Panel (setup) / Caller (live) */}
         <div className="card">
           {phase==='live'
@@ -363,26 +383,21 @@ function App(){
                 <div className="list" style={{marginTop:8}}>{called.map(n=><span key={n} className="chip">{n}</span>)}</div>
               </>)
             : (<>
-                <div className="row" style={{justifyContent:'space-between', alignItems:'center'}}>
-                  <div className="muted">Purchase Panel</div>
-                  <div className="row" style={{gap:6}}>
-                    <input id="genN" className="chip" style={{padding:'8px 10px'}} type="number" min="1" max="12" defaultValue="2"/>
-                    <button className="btn" onClick={()=>{ const el=document.getElementById('genN'); generateCards(Number(el?.value)||2); }}>Generate n</button>
-                    {/* bulk shields for SELECTED AVAILABLE */}
-                    <button className="btn" onClick={()=>shieldSelectedAvailable(true)} disabled={selectedPool.size===0}>Shield selected</button>
-                    <button className="btn" onClick={()=>shieldSelectedAvailable(false)} disabled={selectedPool.size===0}>Unshield selected</button>
-                    {/* bulk shields for OWNED */}
-                    <button className="btn" onClick={()=>shieldAllOwned(true)} disabled={player.cards.length===0}>Shield all owned</button>
-                    <button className="btn" onClick={()=>shieldAllOwned(false)} disabled={player.cards.length===0}>Unshield owned</button>
-                    <button className="btn primary" onClick={buySelected} disabled={selectedPool.size===0}>Buy selected</button>
-                  </div>
+                <div className="topBar">
+                  <div className="muted" style={{marginRight:'auto'}}>Purchase Panel</div>
+                  <input id="genN" className="chip" style={{padding:'8px 10px'}} type="number" min="1" max="12" defaultValue="2"/>
+                  <button className="btn" onClick={()=>{ const el=document.getElementById('genN'); generateCards(Number(el?.value)||2); }}>Generate n</button>
+                  {/* bulk shields for SELECTED AVAILABLE */}
+                  <button className="btn" onClick={()=>shieldSelectedAvailable(true)} disabled={selectedPool.size===0}>Shield selected</button>
+                  <button className="btn" onClick={()=>shieldSelectedAvailable(false)} disabled={selectedPool.size===0}>Unshield selected</button>
+                  <button className="btn primary" onClick={buySelected} disabled={selectedPool.size===0}>Buy selected</button>
                 </div>
-                <div className="muted" style={{marginTop:8}}>Tap Available cards to select them. Each costs 1 coin. You can set shields before buying.</div>
+                <div className="muted" style={{marginTop:8}}>Tap Available cards to select. Each costs 1 coin. You can set shields before buying.</div>
               </>)
           }
         </div>
 
-        {/* Right: Setup → OWNED (green) then AVAILABLE; Live → OWNED only */}
+        {/* Right: Setup → OWNED first, then AVAILABLE; Live → OWNED with LOCKS */}
         <div className="card">
           {phase==='setup' ? (
             <>
@@ -392,20 +407,20 @@ function App(){
               </div>
               {player.cards.length===0
                 ? <div className="muted" style={{marginTop:8}}>You don’t own any cards yet.</div>
-                : <div className="grid" style={{gridTemplateColumns:'1fr 1fr', gap:12, marginTop:10}}>
+                : <div className="grid cardsGrid" style={{gridTemplateColumns:'1fr 1fr', gap:12, marginTop:10}}>
                     {player.cards.map(c=>
                       <CardView
                         key={c.id}
                         card={c}
                         lastCalled={null}
                         onPause={()=>{}}
-                        onShieldToggle={toggleShieldOwned}
                         phase="setup"
                         selectable={false}
                         selected={false}
                         onSelectToggle={()=>{}}
                         owned={true}
-                        showShield={true}
+                        showShield={false}     // <<< no shields post-buy
+                        onShieldToggle={()=>{}}
                         showLock={false}
                       />
                     )}
@@ -418,20 +433,20 @@ function App(){
               </div>
               {available.length===0
                 ? <div className="muted" style={{marginTop:8}}>No available cards. Use “Generate n”.</div>
-                : <div className="grid" style={{gridTemplateColumns:'1fr 1fr', gap:12, marginTop:10}}>
+                : <div className="grid cardsGrid" style={{gridTemplateColumns:'1fr 1fr', gap:12, marginTop:10}}>
                     {available.map(c=>
                       <CardView
                         key={c.id}
                         card={c}
                         lastCalled={null}
                         onPause={()=>{}}
-                        onShieldToggle={toggleShieldAvailable}   // <— per-card shield on available
                         phase="setup"
                         selectable={true}
                         selected={selectedPool.has(c.id)}
-                        onSelectToggle={toggleSelectPool}
+                        onSelectToggle={id=>toggleSelectPool(id)}
                         owned={false}
-                        showShield={true}                        // <— show shields in pre-buy
+                        showShield={true}                 // <<< shield in pre-buy
+                        onShieldToggle={toggleShieldAvailable}
                         showLock={false}
                       />
                     )}
@@ -445,20 +460,20 @@ function App(){
               </div>
               {player.cards.length===0
                 ? <div className="muted" style={{marginTop:8}}>No cards owned.</div>
-                : <div className="grid" style={{gridTemplateColumns:'1fr 1fr', gap:12, marginTop:10}}>
+                : <div className="grid cardsGrid" style={{gridTemplateColumns:'1fr 1fr', gap:12, marginTop:10}}>
                     {player.cards.map(c=>
                       <CardView
                         key={c.id}
                         card={c}
                         lastCalled={called[called.length-1]}
                         onPause={pauseOwned}
-                        onShieldToggle={toggleShieldOwned}
                         phase="live"
                         selectable={false}
                         selected={false}
                         onSelectToggle={()=>{}}
                         owned={true}
-                        showShield={true}
+                        showShield={false}     // <<< removed post-buy
+                        onShieldToggle={()=>{}}
                         showLock={true}
                       />
                     )}
@@ -478,7 +493,7 @@ function App(){
       >
         • Tap the <b>Lock</b> button to lockin your card.
         {'\n'}• If a called number has a <b>bomb</b>, your card explodes <i>(unless shielded)</i>.
-        {'\n'}• <b>Shield</b>: choose before the round. Absorbs the first bomb on that card. You can set shields per-card or bulk for all a player's cards.
+        {'\n'}• <b>Shield</b>: choose on available cards <i>before buying</i>. Absorbs the first bomb on that card.
         {'\n'}• <b>Winner(s)</b>: non-exploded card(s) with the most daubs. Ties split the prize equally.
       </Modal>
 
@@ -514,5 +529,5 @@ function App(){
   );
 }
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
+const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(<App />);

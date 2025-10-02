@@ -496,9 +496,9 @@ function App(){
               }
 
               {/* Available pool */}
-             /* <— <div className="row" style={{justifyContent:'space-between', marginTop:16}}>
+              <— <div className="row" style={{justifyContent:'space-between', marginTop:16}}>
                 <div className="muted">Available Cards ({available.length}) · Selected: {selectedPool.size}</div>
-              </div>*/
+              </div>
               {available.length===0
                 ? <div className="muted" style={{marginTop:8}}>No available cards. Use “Generate n”.</div>
                 : <div className="grid cardsGrid" style={{gridTemplateColumns:'1fr 1fr', gap:12, marginTop:10}}>

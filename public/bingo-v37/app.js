@@ -96,7 +96,7 @@ const ICON_LOCK_OPEN  = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2
 const ICON_LOCK_CLOSED= 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="%231e293b"><path d="M7 10V8a5 5 0 1 1 10 0v2h2v12H5V10h2zm2 0h6V8a3 3 0 1 0-6 0v2z"/></svg>';
 
 // Explosion image (animated GIF)
-const EXPLOSION_SRC = '/bingo-v37/explosion.gif';
+const EXPLOSION_SRC = '/bingo-v37/explosion4.gif';
 
 function Cell({cell, highlight}){
   const cls=['cell']; if(cell.daubed) cls.push('daub'); else if(highlight) cls.push('hl');
@@ -220,6 +220,8 @@ function App(){
   const [alias, setAlias]     = useState('');
   const [askAlias, setAsk]    = useState(true);
   const [wallet, setWallet]   = useState(100);
+  const [resetKey, setResetKey] = useState(0);
+
 
   // Available (pre-buy) vs Owned (purchased)
   const freshAvail = () => Array.from({length:4},()=>makeCard(uid('pool'),''));
@@ -306,11 +308,7 @@ function App(){
           setSyncedWinner(null);
           setAsk(true);
           endPostedRef.current = false;
-          const [resetKey, setResetKey] = useState(0);
-            // wrap your root JSX:
-            <div key={resetKey} className="grid" style={{gap:14}}> … </div>
-            // and inside reset logic:
-            setResetKey(k => k + 1);
+		  setResetKey(k => k + 1);
         }
 
 
@@ -368,7 +366,7 @@ function App(){
   const lastCalled = called[called.length-1];
 
   return (
-    <div className="grid" style={{gap:14}}>
+    <div key={resetKey} className="grid" style={{gap:14}}>
       {/* Header */}
       <div className="row" style={{justifyContent:'space-between'}}>
         <div>

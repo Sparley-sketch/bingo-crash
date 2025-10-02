@@ -191,7 +191,7 @@ function FXStyles(){
 	.explosion-img{
 	  position:absolute; inset:0;
 	  width:100%; height:100%;
-	  object-fit: cover;          /* or 'contain' if you prefer full gif visible */
+	  object-fit: contain;          /* 'cover' for trimmed or 'contain' if you prefer full gif visible */
 	  z-index:5; pointer-events:none;
 	}
 	
@@ -246,7 +246,6 @@ function FXStyles(){
 		.card .gridCard{ padding:1px; }
       }
 	  /* keep the number perfectly centered even with an absolute bomb icon */
-		.cell { position:relative; display:flex; align-items:center; justify-content:center; }
 		.cell .num { display:flex; align-items:center; justify-content:center; width:100%; text-align:center; }
 
 		/* make sure explosion overlays above everything */
@@ -675,7 +674,7 @@ function App(){
         }}
       >
         <div className="row" style={{marginTop:8}}>
-          <input id="alias_input" className="chip" style={{padding:'10px 12px', width:'100%'}} placeholder="Your alias"/>
+          <input id="alias_input" className="chip aliasInput" style={{padding:'10px 12px', width:'100%'}} placeholder="Your alias"/>
         </div>
       </Modal>
     </div>

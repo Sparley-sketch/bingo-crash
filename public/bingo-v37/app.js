@@ -268,7 +268,8 @@ function CardView({
             <span className="badge" style={{background:'#22c55e30', color:'#16a34a', padding:'2px 6px', borderRadius:'8px'}}>shield active</span>
           )}
           {phase === 'live' && card.shieldUsed && (
-            <span className="badge" style={{background:'#f8717130', color:'#dc2626', padding:'2px 6px', borderRadius:'8px'}}>shield used</span>
+          <img src={SHIELD_SRC} className="shield-img" alt="Shield Active" />
+			    </img>
           )}
           {phase === 'live' && (
             card.exploded ? <span className="badge" style={{background:'#fee2e2', color:'#991b1b', padding:'2px 6px', borderRadius:'8px'}}>OUT</span> :

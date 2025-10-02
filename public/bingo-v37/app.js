@@ -306,13 +306,12 @@ function App(){
           setSyncedWinner(null);
           setAsk(true);
           endPostedRef.current = false;
-          
-          const [resetKey, setResetKey] = useState(0);
+        }
+        const [resetKey, setResetKey] = useState(0);
             // wrap your root JSX:
             <div key={resetKey} className="grid" style={{gap:14}}> … </div>
             // and inside reset logic:
             setResetKey(k => k + 1);
-        }
 
         // Apply new calls to owned cards (only if not ended for client)
         if (newCalls.length > lastCount) {

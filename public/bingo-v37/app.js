@@ -474,7 +474,7 @@ function App(){
             <>
               {/* Purchased / Owned */}
               {player.cards.length===0
-               // ? <div className="muted" style={{marginTop:8}}>You don’t own any cards yet.</div>
+                ? //<div className="muted" style={{marginTop:8}}>You don’t own any cards yet.</div>
                 : <div className="grid cardsGrid" style={{gridTemplateColumns:'1fr 1fr', gap:12, marginTop:10}}>
                     {player.cards.map(c=>
                       <CardView

@@ -89,6 +89,7 @@ const ICON_LOCK_CLOSED= 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2
 
 // Explosion image (animated GIF)
 const EXPLOSION_SRC = '/bingo-v37/explosion.gif';
+const SHIELD_ICON = '/bingo-v37/shield.png';
 
 function Cell({cell, highlight}){
   const cls=['cell']; if(cell.daubed) cls.push('daub'); else if(highlight) cls.push('hl');
@@ -136,6 +137,8 @@ function FXStyles(){
 }
 .shieldCtl{ font-size:12px; white-space:nowrap; }
 .shieldCtl input{ vertical-align:middle; }
+.shieldIcon{ height:16px; width:auto; display:inline-block; vertical-align:middle; }
+
 
 /* Grid of 5 columns */
 .gridCard{
@@ -182,6 +185,7 @@ function FXStyles(){
   .phase-live .bomb{ --bomb-font: clamp(7px, 2.3vw, 9.5px); }
   .priceTag{ font-size:11px; padding:2px 6px; }
   .shieldCtl{ font-size:11px; }
+  .shieldIcon{ height:14px; }
 }
 
 /* Small phones (401–480px) */
@@ -255,8 +259,8 @@ function CardView({
           )}
           {/* Purchased (not selectable) & still in setup -> show "Shield active" */}
           {phase === 'setup' && !selectable && card.wantsShield && (
-            <span className="badge" style={{background:'#22c55e30', color:'#16a34a', padding:'2px 6px', borderRadius:'8px'}}>shield active</span>
-          )}
+		  <img src={SHIELD_ICON} alt="Shield active" className="shieldIcon" />
+		)}
         </div>
 
         {/* RIGHT: daubs / badges / lock (game only) */}
@@ -264,12 +268,9 @@ function CardView({
           {phase === 'live' && (
             <span className="badge" style={{background:'#f1f5f9', padding:'2px 6px', borderRadius:'8px'}}>Daubs: <b>{card.daubs}</b></span>
           )} 
-          {phase === 'live' && card.wantsShield && !card.shieldUsed && (
-            <span className="badge" style={{background:'#22c55e30', color:'#16a34a', padding:'2px 6px', borderRadius:'8px'}}>shield active</span>
-          )}
-          {phase === 'live' && card.shieldUsed && (
-            <span className="badge" style={{background:'#f8717130', color:'#dc2626', padding:'2px 6px', borderRadius:'8px'}}>shield used</span>
-          )}
+			{phase === 'live' && card.wantsShield && !card.shieldUsed && (
+			  <img src={SHIELD_ICON} alt="Shield active" className="shieldIcon" />
+			)}
           {showLock && (
             <button className="btn gray"
                     onClick={(e)=>{ e.stopPropagation(); onPause(card.id); }}

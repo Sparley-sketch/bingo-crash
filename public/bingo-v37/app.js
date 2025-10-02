@@ -20,7 +20,6 @@ function boom(vol=0.85){ try{ const c=audioCtx(); if(!c) return; const t=c.curre
 }catch{} }
 
 // ---- Card helpers ----
-// 5x3 grid, 15 numbers (1..25) with 3 bombs at random positions.
 function makeCard(id,name){
   const nums = shuffle(Array.from({length:25},(_,i)=>i+1)).slice(0,15);
   const gridNums = [0,1,2].map(r => nums.slice(r*5, r*5+5));
@@ -84,8 +83,7 @@ function applyCallToCards(cards, n, audioOn, volume){
 }
 
 // Icons
-const ICON_LOCK_OPEN  = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="%231e293b"><path d="M7 10V7a5 5 0 1 1 10 0h-2a3 3 0 1 0-6 0v3h10v12H5V10h2z"/></svg>';
-const ICON_LOCK_CLOSED= 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="%231e293b"><path d="M7 10V8a5 5 0 1 1 10 0v2h2v12H5V10h2zm2 0h6V8a3 3 0 1 0-6 0v2z"/></svg>';
+const ICON_LOCK_BADGE  = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="%23f59e0b"><path d="M7 10V8a5 5 0 1 1 10 0v2h2v10H5V10h2zm2 0h6V8a3 3 0 1 0-6 0v2z"/></svg>';
 
 // Explosion image (animated GIF)
 const EXPLOSION_SRC = '/bingo-v37/explosion.gif';
@@ -116,7 +114,7 @@ function FXStyles(){
 .title{ font-size:22px; font-weight:800; margin:0 0 4px; }
 .muted{ color:#64748b; font-size:14px; }
 
-/* Outer grid: 2 columns on the right for cards */
+/* Outer grid */
 .cardsGrid{ display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:12px; }
 .twoCol{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 
@@ -128,6 +126,9 @@ function FXStyles(){
 }
 .ownedCard{ border:1.5px solid #22c55e !important; box-shadow:0 0 0 3px rgba(34,197,94,.12); }
 .burned{ background:#0b0b0b !important; border-color:#111 !important; filter:saturate(.2) contrast(.9); }
+
+/* Lock badge (orange) */
+.lockBadge{ position:absolute; left:8px; top:6px; z-index:3; width:16px; height:16px; }
 
 /* Header bits */
 .priceTag{
@@ -168,14 +169,12 @@ function FXStyles(){
 .aliasInput{ font-size:16px; }
 
 /* =================== Mobile responsiveness =================== */
-/* iPhone 12 Pro and similar (≤ 390px wide): shrink cards more aggressively */
 @media (max-width: 400px){
-  .twoCol{ grid-template-columns:1fr; }     /* left panel stacks above */
+  .twoCol{ grid-template-columns:1fr; }
   .cardsGrid{ grid-template-columns: repeat(2, minmax(0,1fr)); gap:8px; }
   .card{ padding:8px; border-radius:12px; }
   .gridCard{ --cell-gap:4px; }
   .cell{ --cell-radius:7px; }
-  /* numbers & bombs respond to viewport so 2 columns always fit */
   .cell .num{ --cell-font: clamp(9px, 3.1vw, 12px); }
   .bomb{ --bomb-font: clamp(7.5px, 2.5vw, 10px); top:3px; right:3px; }
   .phase-live .cell .num{ --cell-font: clamp(9px, 3.0vw, 12px); }
@@ -184,7 +183,6 @@ function FXStyles(){
   .shieldCtl{ font-size:11px; }
 }
 
-/* Small phones (401–480px) */
 @media (min-width: 401px) and (max-width: 480px){
   .twoCol{ grid-template-columns:1fr 1fr; }
   .cardsGrid{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
@@ -197,7 +195,6 @@ function FXStyles(){
   .phase-live .bomb{ --bomb-font: clamp(8px, 2.1vw, 10.5px); }
 }
 
-/* Larger phones & small tablets */
 @media (min-width: 481px) and (max-width: 820px){
   .twoCol{ grid-template-columns:1fr 1fr; }
   .cardsGrid{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
@@ -212,29 +209,44 @@ function FXStyles(){
 
 function CardView({
   card, lastCalled,
-  onPause,
+  onTapLive,             // NEW: tap action in live phase
   phase,
   selectable, selected, onSelectToggle,
   owned = false,
   showShield = false,       // pre-buy only (available pool)
   onShieldToggle = () => {},
-  showLock = false          // live only
 }){
   const wrapperCls=['card'];
   if(selectable && selected) wrapperCls.push('isSelected');
   if(owned) wrapperCls.push('ownedCard');
   if(card.exploded) wrapperCls.push('burned');
 
+  const liveTap = (e)=>{
+    if(phase!=='live') return;
+    // Only lock if currently live (not paused/exploded)
+    if(!card.paused && !card.exploded){
+      e.stopPropagation();
+      onTapLive(card.id);
+    }
+  };
+
   return (
     <div
       className={wrapperCls.join(' ')}
-      onClick={() => { if(selectable) onSelectToggle(card.id); }}
-      style={selectable ? { cursor:'pointer', outline:selected?'3px solid #2563eb40':'none', position:'relative' } : {position:'relative'}}
+      onClick={phase==='live' ? liveTap : (selectable ? ()=>onSelectToggle(card.id) : undefined)}
+      style={(phase==='live' && !card.paused && !card.exploded) || selectable
+              ? { cursor:'pointer', position:'relative' }
+              : { position:'relative' }}
     >
       <FXStyles />
 
       {/* Explosion GIF overlay */}
       {card.justExploded && <img src={EXPLOSION_SRC} className="explosion-img" alt="boom" />}
+
+      {/* Orange lock badge when locked */}
+      {phase==='live' && card.paused && !card.exploded && (
+        <img className="lockBadge" src={ICON_LOCK_BADGE} alt="locked" />
+      )}
 
       <div className="row" style={{justifyContent:'space-between', alignItems:'center'}}>
         {/* LEFT: price + shield (pre-buy only) */}
@@ -259,7 +271,7 @@ function CardView({
           )}
         </div>
 
-        {/* RIGHT: daubs / badges / lock (game only) */}
+        {/* RIGHT: daubs / badges (game only) */}
         <div className="row" style={{gap:8, alignItems:'center'}}>
           {phase === 'live' && (
             <span className="badge" style={{background:'#f1f5f9', padding:'2px 6px', borderRadius:'8px'}}>Daubs: <b>{card.daubs}</b></span>
@@ -271,19 +283,9 @@ function CardView({
             <span className="badge" style={{background:'#f8717130', color:'#dc2626', padding:'2px 6px', borderRadius:'8px'}}>shield used</span>
           )}
           {phase === 'live' && (
-            card.exploded ? <span className="badge" style={{background:'#fee2e2', color:'#991b1b', padding:'2px 6px', borderRadius:'8px'}}>EXPLODED</span> :
-            card.paused   ? <span className="badge" style={{background:'#f1f5f9', color:'#0f172a', padding:'2px 6px', borderRadius:'8px'}}>LOCKED</span> :
+            card.exploded ? <span className="badge" style={{background:'#fee2e2', color:'#991b1b', padding:'2px 6px', borderRadius:'8px'}}>OUT</span> :
+            card.paused   ? <span className="badge" style={{background:'#fef3c7', color:'#b45309', padding:'2px 6px', borderRadius:'8px'}}>LOCKED</span> :
                             <span className="badge" style={{background:'#dcfce7', color:'#14532d', padding:'2px 6px', borderRadius:'8px'}}>LIVE</span>
-          )}
-          {showLock && (
-            <button className="btn gray"
-                    onClick={(e)=>{ e.stopPropagation(); onPause(card.id); }}
-                    disabled={card.paused || card.exploded}>
-              <span className="row" style={{gap:6, alignItems:'center'}}>
-                <img src={card.paused ? ICON_LOCK_CLOSED : ICON_LOCK_OPEN} alt="" />
-                {card.paused || card.exploded ? 'Locked' : 'Lock'}
-              </span>
-            </button>
           )}
         </div>
       </div>
@@ -358,7 +360,6 @@ function App(){
     if (wallet < cost) { alert(`Not enough coins. Need ${cost}.`); return; }
     setWallet(w=>w - cost);
 
-    // Move selected available -> owned preserving wantsShield; refresh ids
     const ownedAdd = picks.map(c => ({ ...c, id: uid('c') }));
     setPlayer(p=>({...p, cards:[...p.cards, ...ownedAdd]}));
     setAvailable(a=>a.filter(c=>!selectedPool.has(c.id)));
@@ -368,13 +369,15 @@ function App(){
   function toggleShieldAvailable(cardId,on){
     setAvailable(a=>a.map(c=>c.id===cardId?({...c, wantsShield:on}):c));
   }
-  // bulk shields on SELECTED available cards
   function shieldSelectedAvailable(on){
     setAvailable(a=>a.map(c=> selectedPool.has(c.id) ? ({...c, wantsShield:on}) : c ));
   }
 
   // Owned management
-  function pauseOwned(cardId){ setPlayer(p=>({...p, cards:p.cards.map(c=>(c.id===cardId && !c.paused && !c.exploded)?({...c, paused:true}):c)})); }
+  function lockOwned(cardId){
+    // Tap-to-lock only converts live -> locked (ignores already paused or exploded)
+    setPlayer(p=>({...p, cards:p.cards.map(c=>(c.id===cardId && !c.paused && !c.exploded)?({...c, paused:true}):c)}));
+  }
 
   // Poll state + transitions + global winner sync + stop caller on game over
   useEffect(()=>{
@@ -398,7 +401,7 @@ function App(){
         const newCalls = Array.isArray(s.called) ? s.called : [];
         setRoundId(s.id || null);
 
-        // RESET TO SETUP: clear purchases & selections, regenerate Available and force paint
+        // RESET TO SETUP: clear purchases & selections
         if ((lastPhase !== 'setup' && newPhase === 'setup') || (newCalls.length < lastCount)) {
           setPlayer({ id: uid('p'), cards: [] });
           setAvailable(freshAvail());
@@ -407,7 +410,7 @@ function App(){
           setSyncedWinner(null);
           setAsk(true);
           endPostedRef.current = false;
-          setResetKey(k => k + 1);     // <- forces a repaint
+          setResetKey(k => k + 1);
         }
 
         // Apply new calls to owned cards
@@ -461,6 +464,17 @@ function App(){
 
   const lastCalled = called[called.length-1];
 
+  // Sort owned cards in live phase: Live → Locked → Out
+  function sortOwnedForLive(cards){
+    return cards.slice().sort((a,b)=>{
+      const rank = (c)=> c.exploded ? 2 : (c.paused ? 1 : 0);
+      const r = rank(a) - rank(b);
+      if (r !== 0) return r;
+      // tie-break by daubs desc so most interesting first
+      return (b.daubs||0) - (a.daubs||0);
+    });
+  }
+
   return (
     <div key={resetKey} className={`grid ${phase === 'live' ? 'phase-live' : 'phase-setup'}`} style={{gap:14}} >
       {/* Header */}
@@ -493,7 +507,6 @@ function App(){
                   <div className="muted" style={{marginRight:'auto'}}>Purchase Panel</div>
                   <input id="genN" className="chip" style={{padding:'8px 10px'}} type="number" min="1" max="12" defaultValue="2"/>
                   <button className="btn" onClick={()=>{ const el=document.getElementById('genN'); generateCards(Number(el?.value)||2); }}>Generate n</button>
-                  {/* bulk shields for SELECTED AVAILABLE */}
                   <button className="btn" onClick={()=>shieldSelectedAvailable(true)} disabled={selectedPool.size===0}>Shield selected</button>
                   <button className="btn" onClick={()=>shieldSelectedAvailable(false)} disabled={selectedPool.size===0}>Unshield selected</button>
                   <button className="btn primary" onClick={buySelected} disabled={selectedPool.size===0}>Buy selected</button>
@@ -502,11 +515,10 @@ function App(){
           }
         </div>
 
-        {/* Right: Setup → OWNED first, then AVAILABLE; Live → OWNED with LOCKS */}
+        {/* Right: Setup → OWNED first, then AVAILABLE; Live → OWNED (tap-to-lock) */}
         <div className="card">
           {phase==='setup' ? (
             <>
-              {/* Purchased / Owned */}
               {player.cards.length===0
                 ? <div className="muted" style={{marginTop:8}}>You don’t own any cards yet.</div>
                 : <div className="cardsGrid" style={{marginTop:10}}>
@@ -515,7 +527,7 @@ function App(){
                         key={c.id}
                         card={c}
                         lastCalled={null}
-                        onPause={()=>{}}
+                        onTapLive={()=>{}}
                         phase="setup"
                         selectable={false}
                         selected={false}
@@ -523,13 +535,11 @@ function App(){
                         owned={true}
                         showShield={false}
                         onShieldToggle={()=>{}}
-                        showLock={false}
                       />
                     )}
                   </div>
               }
 
-              {/* Available pool */}
               <div className="row" style={{justifyContent:'space-between', marginTop:16}}>
                 <div className="muted">Available Cards ({available.length}) · Selected: {selectedPool.size}</div>
               </div>
@@ -541,7 +551,7 @@ function App(){
                         key={c.id}
                         card={c}
                         lastCalled={null}
-                        onPause={()=>{}}
+                        onTapLive={()=>{}}
                         phase="setup"
                         selectable={true}
                         selected={selectedPool.has(c.id)}
@@ -549,9 +559,8 @@ function App(){
                         owned={false}
                         showShield={true}
                         onShieldToggle={toggleShieldAvailable}
-                        showLock={false}
                       />
-                    )}
+                    ))}
                   </div>
               }
             </>
@@ -559,16 +568,17 @@ function App(){
             <>
               <div className="row" style={{justifyContent:'space-between'}}>
                 <div className="muted">My Cards ({player.cards.length})</div>
+                <div className="muted">Tip: tap a live card to <b>Lock</b>.</div>
               </div>
               {player.cards.length===0
                 ? <div className="muted" style={{marginTop:8}}>No cards owned.</div>
                 : <div className="cardsGrid" style={{marginTop:10}}>
-                    {player.cards.map(c=>
+                    {sortOwnedForLive(player.cards).map(c=>
                       <CardView
                         key={c.id}
                         card={c}
                         lastCalled={called[called.length-1]}
-                        onPause={pauseOwned}
+                        onTapLive={lockOwned}
                         phase="live"
                         selectable={false}
                         selected={false}
@@ -576,7 +586,6 @@ function App(){
                         owned={true}
                         showShield={false}
                         onShieldToggle={()=>{}}
-                        showLock={true}
                       />
                     )}
                   </div>
@@ -593,7 +602,7 @@ function App(){
         title="How to Play"
         primaryText="Got it, start"
       >
-        • Tap the <b>Lock</b> button to lockin your card.
+        • Tap a <b>live card</b> to <b>Lock</b> it.
         {'\n'}• If a called number has a <b>bomb</b>, your card explodes <i>(unless shielded)</i>.
         {'\n'}• <b>Shield</b>: choose on available cards <i>before buying</i>. Absorbs the first bomb on that card.
         {'\n'}• <b>Winner(s)</b>: non-exploded card(s) with the most daubs. Ties split the prize equally.

@@ -255,7 +255,7 @@ function CardView({
           )}
           {/* Purchased (not selectable) & still in setup -> show "Shield active" */}
           {phase === 'setup' && !selectable && card.wantsShield && (
-            SHIELD_SRC = '/bingo-v37/shield.png';
+            <span className="badge" style={{background:'#22c55e30', color:'#16a34a', padding:'2px 6px', borderRadius:'8px'}}>shield active</span>
           )}
         </div>
 

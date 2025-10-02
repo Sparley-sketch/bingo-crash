@@ -95,7 +95,7 @@ function applyCallToCards(cards, n, audioOn, volume){
 const ICON_LOCK_OPEN  = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="%231e293b"><path d="M7 10V7a5 5 0 1 1 10 0h-2a3 3 0 1 0-6 0v3h10v12H5V10h2z"/></svg>';
 const ICON_LOCK_CLOSED= 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="%231e293b"><path d="M7 10V8a5 5 0 1 1 10 0v2h2v12H5V10h2zm2 0h6V8a3 3 0 1 0-6 0v2z"/></svg>';
 
-// Explosion image (animated GIF) — replace with your slower/faster GIF if desired
+// Explosion image (animated GIF)
 const EXPLOSION_SRC = '/bingo-v37/explosion.gif';
 
 function Cell({cell, highlight}){
@@ -107,187 +107,103 @@ function Cell({cell, highlight}){
     </div>
   );
 }
+
 function FXStyles(){
   return (
     <style>{`
+/* ========== Layout primitives ========== */
+.grid{ display:grid; }
+.row{ display:flex; align-items:center; gap:12px; flex-wrap:nowrap; }
+.list .chip{ margin:2px 4px 0 0; }
 
-		/* price + shield in one line, no overlap */
-		.priceTag{
-		  display: inline-flex;
-		  align-items: center;
-		  padding: 2px 8px;
-		  font-size: 12px;
-		  line-height: 1;
-		  border-radius: 999px;
-		  background: #f1f5f9;
-		  border: 1px solid #e2e8f0;
-		  white-space: nowrap;
-		}
+.btn{ border:1px solid #e2e8f0; background:#f8fafc; color:#0f172a; padding:6px 10px; border-radius:8px; cursor:pointer; }
+.btn.primary{ background:#3b82f6; border-color:#3b82f6; color:#fff; }
+.btn.gray{ background:#eef2f7; }
+.btn:disabled{ opacity:.5; cursor:not-allowed; }
+.chip{ background:#f1f5f9; border:1px solid #e2e8f0; padding:6px 10px; border-radius:999px; }
+.title{ font-size:22px; font-weight:800; margin:0 0 4px; }
+.muted{ color:#64748b; font-size:14px; }
 
-	.shieldCtl{ font-size: 12px; white-space: nowrap; }
-	.shieldCtl input{ vertical-align: middle; }
-	
-	/* row helpers */
-	.row{ display:flex; align-items:center; gap:12px; flex-wrap: nowrap; }
-	.badge{ font-size:12px; padding:2px 6px; border-radius:6px; background:#f1f5f9; }
-	.btn.gray{ font-size:12px; padding:4px 8px; border-radius:6px; }
+/* Cards container (right panel uses 2 columns) */
+.cardsGrid{ display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:12px; }
+.twoCol{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 
-		/* mobile: keep them on one line or wrap nicely */
-		@media (max-width:640px){
-		  .priceTag{ font-size:11px; padding:2px 6px; }
-		  .shieldCtl{ font-size:11px; }
-		}
+/* ========== Card & Grid (mobile safe) ========== */
+.card{
+  position:relative; overflow:hidden; padding:12px; border-radius:16px; background:#fff;
+  border:1px solid #e2e8f0; box-shadow:0 4px 18px rgba(15,23,42,.04);
+  min-width:0; width:100%;
+}
+.ownedCard{ border:1.5px solid #22c55e !important; box-shadow:0 0 0 3px rgba(34,197,94,.12); }
+.burned{ background:#0b0b0b !important; border-color:#111 !important; filter:saturate(.2) contrast(.9); }
 
-      .ownedCard{ border:1.5px solid #22c55e !important; box-shadow:0 0 0 3px rgba(34,197,94,.12); }
-      .burned{ background:#0b0b0b !important; border-color:#111 !important; filter:saturate(.2) contrast(.9); }
-	
+/* Header bits */
+.priceTag{
+  display:inline-flex; align-items:center; padding:2px 8px; font-size:12px; line-height:1;
+  border-radius:999px; background:#f1f5f9; border:1px solid #e2e8f0; color:#0f172a; white-space:nowrap;
+}
+.shieldCtl{ font-size:12px; white-space:nowrap; }
+.shieldCtl input{ vertical-align:middle; }
 
-      /* Base */
-	/* 5 equal columns that always fill the card width */
-	.gridCard{
-	  display: grid;
-	  grid-template-columns: repeat(5, minmax(0,1fr));
-	  gap: var(--cell-gap, 8px);
-	  width: 100%;
-	  min-width: 0;     /* prevents overflow squeezing */
-	}
-	
-	/* square cells that can shrink safely */
-	.cell{
-	  position: relative;
-	  display: grid;
-	  place-items: center;          /* center the number */
-	  aspect-ratio: 1 / 1;
-	  border: 1px solid #e2e8f0;
-	  border-radius: var(--cell-radius, 10px);
-	  background: #fff;
-	  min-width: 0;                 /* critical on some Android WebViews */
-	  box-sizing: border-box;
-	  padding: 0;
-	}
-	
-	/* number stays centered and never wraps */
-	.cell .num{
-	  display: block;
-	  width: 100%;
-	  text-align: center;
-	  font-weight: 700;
-	  font-size: var(--cell-font, 16px);
-	  line-height: 1;
-	  white-space: nowrap;          /* stops wrapping/stacking */
-	  overflow: hidden;
-	  text-overflow: clip;
-	  z-index: 1;
-	}
-	
-    .cell.daub { background:#dcfce7; border-color:#86efac; }
-	.cell.hl   { background:#fef9c3; border-color:#fde047; }
-	
-	/* bomb pinned in a corner and small */
-	.bomb{
-	  position: absolute;
-	  top: 6px; right: 6px;
-	  font-size: var(--bomb-font, 12px);
-	  line-height: 1;
-	  z-index: 2;
-	  pointer-events: none;
-	}
-	
-	/* phase sizing (desktop/base) */
-	.phase-live .cell .num{ --cell-font: 15px; }
-	.phase-live .bomb     { --bomb-font: 11px; }
+/* Grid of 5 columns */
+.gridCard{
+  display:grid; grid-template-columns:repeat(5, minmax(0,1fr));
+  gap:var(--cell-gap, 8px); width:100%; min-width:0;
+}
+.cell{
+  position:relative; display:grid; place-items:center;
+  aspect-ratio:1 / 1; border:1px solid #e2e8f0; border-radius:var(--cell-radius,10px);
+  background:#fff; min-width:0; box-sizing:border-box; padding:0;
+}
+.cell .num{
+  display:block; width:100%; text-align:center; font-weight:700;
+  font-size:var(--cell-font,16px); line-height:1; white-space:nowrap; overflow:hidden;
+}
+.cell.daub{ background:#dcfce7; border-color:#86efac; }
+.cell.hl{ background:#fef9c3; border-color:#fde047; }
+.bomb{
+  position:absolute; top:6px; right:6px; font-size:var(--bomb-font,12px); line-height:1; pointer-events:none; z-index:2;
+}
 
-	
-	/* Make the card a container so we can scale by card width (not the whole viewport) */
-	.card{
-	  position: relative;
-	  overflow: hidden;
-	  padding: 12px;
-	  border-radius: 16px;
-	  background: #fff;
-	  /* make sure cards never shrink below a sane width on mobile */
-	  min-width: 0;
-	  width: 100%;
-	}
+/* Explosion overlay */
+.explosion-img{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; z-index:5; pointer-events:none; }
 
-	/* Explosion gif covers the card (no cropping -> use contain; change to cover if you prefer) */
-	.explosion-img{
-	  position: absolute; inset: 0;
-	  width: 100%; height: 100%;
-	  object-fit: contain;
-	  z-index: 5; pointer-events: none;
-	}
-	
-	.priceTag{  display:inline-flex;  align-items:center;  padding:2px 8px;  font-size:12px;  line-height:1;  border-radius:999px;  background:#f1f5f9;  border:1px solid #e2e8f0;  color:#0f172a;}
-	.shieldCtl{ font-size:12px; }
+/* Phase sizing (desktop/base) */
+.phase-live .cell .num{ --cell-font:15px; }
+.phase-live .bomb{ --bomb-font:11px; }
 
-	/* iOS anti-zoom for alias input */
-	.aliasInput{ font-size:16px; }	
-	
+/* iOS anti-zoom for alias box */
+.aliasInput{ font-size:16px; }
 
-	@container (max-width: 360px){
-	  .gridCard{ --cell-gap: 5px; }
-	  .cell{ --cell-radius: 8px; }
-	  /* 1cqw = 1% of card width; these values fit iPhone mini → Pro Max */
-	  .cell .num { --cell-font: clamp(11px, 9cqw, 14px); }
-	  .bomb      { --bomb-font: clamp(9px, 7cqw, 12px); top: 3px; right: 3px; }
-	  .phase-live .cell .num { --cell-font: clamp(10px, 8cqw, 13px); }
-	  .phase-live .bomb      { --bomb-font: clamp(8px, 6.5cqw, 11px); }
-	  .card{ padding: 10px; }
-	}
+/* ========== Mobile responsiveness (no container queries) ========== */
+@media (max-width: 420px){
+  .twoCol{ grid-template-columns:1fr; }     /* left panel on its own row */
+  .cardsGrid{ grid-template-columns: repeat(2, minmax(0,1fr)); gap:10px; }
+  .gridCard{ --cell-gap:6px; }
+  .cell{ --cell-radius:8px; }
+  .cell .num{ --cell-font: clamp(11px, 3.9vw, 14px); }
+  .bomb{ --bomb-font: clamp(9px, 3.0vw, 11px); top:4px; right:4px; }
+  .phase-live .cell .num{ --cell-font: clamp(10px, 3.6vw, 13px); }
+  .phase-live .bomb{ --bomb-font: clamp(8px, 2.7vw, 10px); }
+  .priceTag{ font-size:11px; padding:2px 6px; }
+  .shieldCtl{ font-size:11px; }
+}
 
-	/* slightly larger phones */
-	@container (min-width: 360px) and (max-width: 460px){
-	  .gridCard{ --cell-gap: 6px; }
-	  .cell .num { --cell-font: clamp(12px, 8.2cqw, 15px); }
-	  .bomb      { --bomb-font: clamp(10px, 6.8cqw, 12px); }
-	  .phase-live .cell .num { --cell-font: clamp(11px, 7.6cqw, 14px); }
-	}
+@media (min-width: 421px) and (max-width: 640px){
+  .twoCol{ grid-template-columns:1fr 1fr; }
+  .cardsGrid{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .gridCard{ --cell-gap:7px; }
+  .cell .num{ --cell-font: clamp(12px, 2.8vw, 16px); }
+  .bomb{ --bomb-font: clamp(10px, 2.1vw, 12px); }
+}
 
-      /* Mobile layout tweaks */
-		@media (min-width: 460px) and (max-width: 640px){
-
-		/* tigher gaps and corners on small screens */
-		.gridCard{ --cell-gap: 6px; }
-		.cell{ --cell-radius: 8px; }
-        .twoCol   { grid-template-columns: 1fr !important; }
-        .cardsGrid{ grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
-        .topBar   { display:flex; gap:6px; flex-wrap:wrap; }
-		
-		/* scale by viewport width as a safe fallback (works everywhere) */
-		/* These clamp ranges keep 5 columns readable on iPhone SE → Pro Max */
-		.cell .num{ --cell-font: clamp(11px, 3.6vw, 14px); }
-		.bomb     { --bomb-font: clamp(9px, 2.8vw, 11px); top: 4px; right: 4px; }
-		
-		.phase-live .cell .num{ --cell-font: clamp(10px, 3.3vw, 13px); }
-		.phase-live .bomb     { --bomb-font: clamp(8px, 2.6vw, 10px); }
-		.priceTag{ font-size:11px; padding:2px 6px; }
-		.shieldCtl{ font-size:11px; }
-		}	
-        .badge    { font-size:10px; padding:2px 6px; }
-        .btn      { font-size:12px; padding:6px 8px; }
-        .chip     { font-size:12px; }
-        .title    { font-size:18px; }
-
-		/* iOS anti-zoom for alias input */
-		.aliasInput{ font-size:16px; }	
-
-		.card	  { padding:10px; }
-		.card .gridCard{ padding:1px; }
-      }
-	  /* keep the number perfectly centered even with an absolute bomb icon */
-		.cell .num { display:flex; align-items:center; justify-content:center; width:100%; text-align:center; }
-
-		/* make sure explosion overlays above everything */
-		.explosion-img{ z-index: 5; pointer-events:none; }
-
-	@media (min-width: 641px) and (max-width: 820px){
-	  .gridCard{ --cell-gap: 7px; }
-	  .cell .num{ --cell-font: clamp(12px, 2.2vw, 16px); }
-	  .bomb     { --bomb-font: clamp(10px, 1.7vw, 12px); }
-	}
-
-    `}</style>
+/* Slightly larger tablets */
+@media (min-width: 641px) and (max-width: 820px){
+  .gridCard{ --cell-gap: 7px; }
+  .cell .num{ --cell-font: clamp(12px, 2.2vw, 16px); }
+  .bomb     { --bomb-font: clamp(10px, 1.7vw, 12px); }
+}
+`}</style>
   );
 }
 
@@ -297,7 +213,7 @@ function CardView({
   phase,
   selectable, selected, onSelectToggle,
   owned = false,
-  showShield = false,       // pre-buy only
+  showShield = false,       // pre-buy only (available pool)
   onShieldToggle = () => {},
   showLock = false          // live only
 }){
@@ -317,52 +233,57 @@ function CardView({
       {/* Explosion GIF overlay */}
       {card.justExploded && <img src={EXPLOSION_SRC} className="explosion-img" alt="boom" />}
 
-<div className="row" style={{justifyContent:'space-between', alignItems:'center'}}>
-  {/* LEFT: price + shield (pre-buy only) */}
- <div className="row" style={{gap:8}}>
-  <span className="priceTag">1 coin</span>
-  <label className="row shieldCtl" style={{gap:6}}
-         onClick={(e)=>e.stopPropagation()}>
-    <input type="checkbox"
-           checked={!!card.wantsShield}
-           onChange={(e)=>onShieldToggle(card.id, e.target.checked)} />
-    Shield
-  </label>
-    )}
-    {/* ✅ Purchased (not selectable) & still in setup -> show "Shield active" */}
-    {phase === 'setup' && !selectable && card.wantsShield && (
-      <span className="badge" style={{background:'#22c55e30', color:'#16a34a'}}>shield active</span>
-    )}
-  </div>
+      <div className="row" style={{justifyContent:'space-between', alignItems:'center'}}>
+        {/* LEFT: price + shield (pre-buy only) */}
+        <div className="row" style={{gap:8}}>
+          {phase === 'setup' && selectable && (
+            <>
+              <span className="priceTag">1 coin</span>
+              <label className="row shieldCtl" style={{gap:6}}
+                     onClick={(e)=>e.stopPropagation()}>
+                <input
+                  type="checkbox"
+                  checked={!!card.wantsShield}
+                  onChange={(e)=>onShieldToggle(card.id, e.target.checked)}
+                />
+                Shield
+              </label>
+            </>
+          )}
+          {/* Purchased (not selectable) & still in setup -> show "Shield active" */}
+          {phase === 'setup' && !selectable && card.wantsShield && (
+            <span className="badge" style={{background:'#22c55e30', color:'#16a34a'}}>shield active</span>
+          )}
+        </div>
 
-  {/* RIGHT: daubs / badges / lock (game only) */}
-  <div className="row" style={{gap:8, alignItems:'center'}}>
-    {phase === 'live' && (
-      <span className="badge">Daubs: <b>{card.daubs}</b></span>
-    )}
-    {phase === 'live' && card.wantsShield && !card.shieldUsed && (
-      <span className="badge" style={{background:'#22c55e30', color:'#16a34a'}}>shield active</span>
-    )}
-    {phase === 'live' && card.shieldUsed && (
-      <span className="badge" style={{background:'#f8717130', color:'#dc2626'}}>shield used</span>
-    )}
-    {phase === 'live' && (
-      card.exploded ? <span className="badge boom">EXPLODED</span> :
-      card.paused   ? <span className="badge lock">LOCKED</span> :
-                      <span className="badge live">LIVE</span>
-    )}
-    {showLock && (
-      <button className="btn gray"
-              onClick={(e)=>{ e.stopPropagation(); onPause(card.id); }}
-              disabled={card.paused || card.exploded}>
-        <span className="row" style={{gap:6, alignItems:'center'}}>
-          <img src={card.paused ? ICON_LOCK_CLOSED : ICON_LOCK_OPEN} alt="" />
-          {card.paused || card.exploded ? 'Locked' : 'Lock'}
-        </span>
-      </button>
-    )}
-  </div>
-</div>
+        {/* RIGHT: daubs / badges / lock (game only) */}
+        <div className="row" style={{gap:8, alignItems:'center'}}>
+          {phase === 'live' && (
+            <span className="badge">Daubs: <b>{card.daubs}</b></span>
+          )}
+          {phase === 'live' && card.wantsShield && !card.shieldUsed && (
+            <span className="badge" style={{background:'#22c55e30', color:'#16a34a'}}>shield active</span>
+          )}
+          {phase === 'live' && card.shieldUsed && (
+            <span className="badge" style={{background:'#f8717130', color:'#dc2626'}}>shield used</span>
+          )}
+          {phase === 'live' && (
+            card.exploded ? <span className="badge boom">EXPLODED</span> :
+            card.paused   ? <span className="badge lock">LOCKED</span> :
+                            <span className="badge live">LIVE</span>
+          )}
+          {showLock && (
+            <button className="btn gray"
+                    onClick={(e)=>{ e.stopPropagation(); onPause(card.id); }}
+                    disabled={card.paused || card.exploded}>
+              <span className="row" style={{gap:6, alignItems:'center'}}>
+                <img src={card.paused ? ICON_LOCK_CLOSED : ICON_LOCK_OPEN} alt="" />
+                {card.paused || card.exploded ? 'Locked' : 'Lock'}
+              </span>
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* Grid */}
       <div className="gridCard" style={{marginTop:10}}>
@@ -475,16 +396,16 @@ function App(){
         setRoundId(s.id || null);
 
         // RESET TO SETUP: clear purchases & selections, regenerate Available and force paint
-		if ((lastPhase !== 'setup' && newPhase === 'setup') || (newCalls.length < lastCount)) {
-		  setPlayer({ id: uid('p'), cards: [] });
-		  setAvailable(freshAvail());
-		  setSelectedPool(new Set());
-		  setShowHowTo(true);
-		  setSyncedWinner(null);
-		  setAsk(true);
-		  endPostedRef.current = false;
-		  setResetKey(k => k + 1);     // <- forces a repaint
-		}
+        if ((lastPhase !== 'setup' && newPhase === 'setup') || (newCalls.length < lastCount)) {
+          setPlayer({ id: uid('p'), cards: [] });
+          setAvailable(freshAvail());
+          setSelectedPool(new Set());
+          setShowHowTo(true);
+          setSyncedWinner(null);
+          setAsk(true);
+          endPostedRef.current = false;
+          setResetKey(k => k + 1);     // <- forces a repaint
+        }
 
         // Apply new calls to owned cards
         if (newCalls.length > lastCount) {
@@ -518,9 +439,7 @@ function App(){
         if (s.id) {
           fetch(`/api/round/winner?round_id=${encodeURIComponent(s.id)}&ts=${Date.now()}`, { cache:'no-store' })
             .then(r=>r.json())
-            .then(w=>{
-              if (w?.alias) setSyncedWinner({ alias:w.alias, daubs:w.daubs });
-            })
+            .then(w=>{ if (w?.alias) setSyncedWinner({ alias:w.alias, daubs:w.daubs }); })
             .catch(()=>{});
         }
 
@@ -540,7 +459,7 @@ function App(){
   const lastCalled = called[called.length-1];
 
   return (
-			<div key={resetKey} className={`grid ${phase === 'live' ? 'phase-live' : 'phase-setup'}`} style={{gap:14}} >
+    <div key={resetKey} className={`grid ${phase === 'live' ? 'phase-live' : 'phase-setup'}`} style={{gap:14}} >
       {/* Header */}
       <div className="row" style={{justifyContent:'space-between'}}>
         <div>
@@ -556,7 +475,7 @@ function App(){
       </div>
 
       {/* Body */}
-      <div className="grid twoCol" style={{gridTemplateColumns:'1fr 1fr', gap:12}}>
+      <div className="grid twoCol">
         {/* Left: Purchase Panel (setup) / Caller (live) */}
         <div className="card">
           {phase==='live'
@@ -567,7 +486,7 @@ function App(){
                 <div className="list" style={{marginTop:8}}>{called.map(n=><span key={n} className="chip">{n}</span>)}</div>
               </>)
             : (<>
-                <div className="topBar">
+                <div className="row" style={{flexWrap:'wrap', gap:8}}>
                   <div className="muted" style={{marginRight:'auto'}}>Purchase Panel</div>
                   <input id="genN" className="chip" style={{padding:'8px 10px'}} type="number" min="1" max="12" defaultValue="2"/>
                   <button className="btn" onClick={()=>{ const el=document.getElementById('genN'); generateCards(Number(el?.value)||2); }}>Generate n</button>
@@ -576,7 +495,6 @@ function App(){
                   <button className="btn" onClick={()=>shieldSelectedAvailable(false)} disabled={selectedPool.size===0}>Unshield selected</button>
                   <button className="btn primary" onClick={buySelected} disabled={selectedPool.size===0}>Buy selected</button>
                 </div>
-                <div className="muted" style={{marginTop:8}}>Tap Available cards to select. Each costs 1 coin. You can set shields before buying.</div>
               </>)
           }
         </div>
@@ -588,7 +506,7 @@ function App(){
               {/* Purchased / Owned */}
               {player.cards.length===0
                 ? <div className="muted" style={{marginTop:8}}>You don’t own any cards yet.</div>
-                : <div className="grid cardsGrid" style={{gridTemplateColumns:'1fr 1fr', gap:12, marginTop:10}}>
+                : <div className="cardsGrid" style={{marginTop:10}}>
                     {player.cards.map(c=>
                       <CardView
                         key={c.id}
@@ -614,7 +532,7 @@ function App(){
               </div>
               {available.length===0
                 ? <div className="muted" style={{marginTop:8}}>No available cards. Use “Generate n”.</div>
-                : <div className="grid cardsGrid" style={{gridTemplateColumns:'1fr 1fr', gap:12, marginTop:10}}>
+                : <div className="cardsGrid" style={{marginTop:10}}>
                     {available.map(c=>
                       <CardView
                         key={c.id}
@@ -641,7 +559,7 @@ function App(){
               </div>
               {player.cards.length===0
                 ? <div className="muted" style={{marginTop:8}}>No cards owned.</div>
-                : <div className="grid cardsGrid" style={{gridTemplateColumns:'1fr 1fr', gap:12, marginTop:10}}>
+                : <div className="cardsGrid" style={{marginTop:10}}>
                     {player.cards.map(c=>
                       <CardView
                         key={c.id}
@@ -679,16 +597,15 @@ function App(){
       </Modal>
 
       {/* Winner modal (synced across players) */}
-		<Modal
-		  open={!!syncedWinner}
-		  onClose={()=>location.reload()}
-		  title="Game Over"
-		  primaryText="OK"
-		  onPrimary={()=>location.reload()}
-		>
-		  {syncedWinner ? <>Winner: <b>{syncedWinner.alias}</b> with <b>{syncedWinner.daubs}</b> daubs.</> : '—'}
-		</Modal>
-
+      <Modal
+        open={!!syncedWinner}
+        onClose={()=>location.reload()}
+        title="Game Over"
+        primaryText="OK"
+        onPrimary={()=>location.reload()}
+      >
+        {syncedWinner ? <>Winner: <b>{syncedWinner.alias}</b> with <b>{syncedWinner.daubs}</b> daubs.</> : '—'}
+      </Modal>
 
       {/* Alias prompt */}
       <Modal
@@ -706,9 +623,9 @@ function App(){
       >
         <div className="row" style={{marginTop:8}}>
           <input id="alias_input"
-       className="chip aliasInput"
-       style={{padding:'10px 12px', width:'100%'}}
-       placeholder="Your alias"/>
+                 className="chip aliasInput"
+                 style={{padding:'10px 12px', width:'100%'}}
+                 placeholder="Your alias"/>
         </div>
       </Modal>
     </div>

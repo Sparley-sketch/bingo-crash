@@ -107,9 +107,6 @@ function Cell({cell, highlight}){
     </div>
   );
 }
-
-}
-
 function FXStyles(){
   return (
     <style>{`

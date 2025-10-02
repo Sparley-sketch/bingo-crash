@@ -110,7 +110,19 @@ function Cell({cell, highlight}){
 function FXStyles(){
   return (
     <style>{`
-      .priceTag{position:absolute;left:8px;top:8px;font-size:11px;padding:2px 6px;border-radius:999px;background:#f1f5f9;border:1px solid #e2e8f0}
+      /* inline chip, no absolute positioning */
+		.priceTag{ display:inline-flex;  align-items:center;  padding:2px 8px;  font-size:12px;  line-height:1;  border-radius:999px;  background:#f1f5f9;  border:1px solid #e2e8f0;  color:#0f172a;}
+
+		.shieldCtl input{
+		  vertical-align:middle;
+		}
+
+		/* mobile: keep them on one line or wrap nicely */
+		@media (max-width:640px){
+		  .priceTag{ font-size:11px; padding:2px 6px; }
+		  .shieldCtl{ font-size:11px; }
+		}
+
       .ownedCard{ border:1.5px solid #22c55e !important; box-shadow:0 0 0 3px rgba(34,197,94,.12); }
       .burned{ background:#0b0b0b !important; border-color:#111 !important; filter:saturate(.2) contrast(.9); }
       .explosion-img{ position:absolute; inset:auto; left:50%; top:50%; transform:translate(-50%,-50%); width:140%; pointer-events:none; }
@@ -171,44 +183,14 @@ function CardView({
       {/* Explosion GIF overlay */}
       {card.justExploded && <img src={EXPLOSION_SRC} className="explosion-img" alt="boom" />}
 
-     {/* price only in pre-buy (available cards) */}
-{phase === 'setup' && selectable && <div className="priceTag">1 coin</div>}
-
-<div className="row" style={{justifyContent:'space-between'}}>
-  {/* left empty on purpose */}
-
-  {/* right: Daubs / Shield / Status / Controls */}
+<div className="row" style={{justifyContent:'space-between', alignItems:'center'}}>
+  {/* LEFT: price + shield (pre-buy only) */}
   <div className="row" style={{gap:8, alignItems:'center'}}>
-
-    {/* Daubs — ONLY during game */}
-    {phase === 'live' && (
-      <span className="badge">Daubs: <b>{card.daubs}</b></span>
+    {phase === 'setup' && selectable && (
+      <span className="priceTag">1 coin</span>
     )}
-
-    {/* Shield badges:
-         - pre-game on purchased (setup + !selectable) => "shield active"
-         - during game => "shield active" / "shield used"
-    */}
-    {phase === 'setup' && !selectable && card.wantsShield && (
-      <span className="badge" style={{background:'#22c55e30', color:'#16a34a'}}>shield active</span>
-    )}
-    {phase === 'live' && card.wantsShield && !card.shieldUsed && (
-      <span className="badge" style={{background:'#22c55e30', color:'#16a34a'}}>shield active</span>
-    )}
-    {phase === 'live' && card.shieldUsed && (
-      <span className="badge" style={{background:'#f8717130', color:'#dc2626'}}>shield used</span>
-    )}
-
-    {/* Status — ONLY during game */}
-    {phase === 'live' && (
-      card.exploded ? <span className="badge boom">EXPLODED</span> :
-      card.paused   ? <span className="badge lock">LOCKED</span> :
-                      <span className="badge live">LIVE</span>
-    )}
-
-    {/* Shield checkbox — ONLY on AVAILABLE (pre-buy) */}
     {showShield && (
-      <label className="row" style={{gap:6, fontSize:12, color:'#475569'}}
+      <label className="row shieldCtl" style={{gap:6, fontSize:12, color:'#475569'}}
              onClick={(e)=>e.stopPropagation()}>
         <input
           type="checkbox"
@@ -218,8 +200,24 @@ function CardView({
         Shield
       </label>
     )}
+  </div>
 
-    {/* Lock — ONLY during game (owned cards) */}
+  {/* RIGHT: daubs / badges / lock (game only) */}
+  <div className="row" style={{gap:8, alignItems:'center'}}>
+    {phase === 'live' && (
+      <span className="badge">Daubs: <b>{card.daubs}</b></span>
+    )}
+    {phase === 'live' && card.wantsShield && !card.shieldUsed && (
+      <span className="badge" style={{background:'#22c55e30', color:'#16a34a'}}>shield active</span>
+    )}
+    {phase === 'live' && card.shieldUsed && (
+      <span className="badge" style={{background:'#f8717130', color:'#dc2626'}}>shield used</span>
+    )}
+    {phase === 'live' && (
+      card.exploded ? <span className="badge boom">EXPLODED</span> :
+      card.paused   ? <span className="badge lock">LOCKED</span> :
+                      <span className="badge live">LIVE</span>
+    )}
     {showLock && (
       <button className="btn gray"
               onClick={(e)=>{ e.stopPropagation(); onPause(card.id); }}
@@ -232,6 +230,7 @@ function CardView({
     )}
   </div>
 </div>
+
 
 
       {/* Grid */}

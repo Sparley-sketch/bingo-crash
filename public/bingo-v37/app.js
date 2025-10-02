@@ -1,5 +1,3 @@
-<!-- app.js -->
-<script type="text/babel">
 // Bingo + Crash — Multiplayer client (light theme)
 // React (UMD) + Babel — no build step
 
@@ -85,12 +83,9 @@ function applyCallToCards(cards, n, audioOn, volume){
   return next;
 }
 
-// Icons (orange fill)
-const ORANGE = '%23f59e0b';
-const ICON_LOCK_OPEN  =
-  `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill=${ORANGE}><path d="M7 10V7a5 5 0 1 1 10 0h-2a3 3 0 1 0-6 0v3h10v12H5V10h2z"/></svg>`;
-const ICON_LOCK_CLOSED=
-  `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill=${ORANGE}><path d="M7 10V8a5 5 0 1 1 10 0v2h2v12H5V10h2zm2 0h6V8a3 3 0 1 0-6 0v2z"/></svg>`;
+// Icons
+const ICON_LOCK_OPEN  = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="%231e293b"><path d="M7 10V7a5 5 0 1 1 10 0h-2a3 3 0 1 0-6 0v3h10v12H5V10h2z"/></svg>';
+const ICON_LOCK_CLOSED= 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="%231e293b"><path d="M7 10V8a5 5 0 1 1 10 0v2h2v12H5V10h2zm2 0h6V8a3 3 0 1 0-6 0v2z"/></svg>';
 
 // Explosion image (animated GIF)
 const EXPLOSION_SRC = '/bingo-v37/explosion.gif';
@@ -173,12 +168,14 @@ function FXStyles(){
 .aliasInput{ font-size:16px; }
 
 /* =================== Mobile responsiveness =================== */
+/* iPhone 12 Pro and similar (≤ 390px wide): shrink cards more aggressively */
 @media (max-width: 400px){
-  .twoCol{ grid-template-columns:1fr; }
+  .twoCol{ grid-template-columns:1fr; }     /* left panel stacks above */
   .cardsGrid{ grid-template-columns: repeat(2, minmax(0,1fr)); gap:8px; }
   .card{ padding:8px; border-radius:12px; }
   .gridCard{ --cell-gap:4px; }
   .cell{ --cell-radius:7px; }
+  /* numbers & bombs respond to viewport so 2 columns always fit */
   .cell .num{ --cell-font: clamp(9px, 3.1vw, 12px); }
   .bomb{ --bomb-font: clamp(7.5px, 2.5vw, 10px); top:3px; right:3px; }
   .phase-live .cell .num{ --cell-font: clamp(9px, 3.0vw, 12px); }
@@ -186,6 +183,8 @@ function FXStyles(){
   .priceTag{ font-size:11px; padding:2px 6px; }
   .shieldCtl{ font-size:11px; }
 }
+
+/* Small phones (401–480px) */
 @media (min-width: 401px) and (max-width: 480px){
   .twoCol{ grid-template-columns:1fr 1fr; }
   .cardsGrid{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
@@ -197,6 +196,8 @@ function FXStyles(){
   .phase-live .cell .num{ --cell-font: clamp(10px, 2.8vw, 13px); }
   .phase-live .bomb{ --bomb-font: clamp(8px, 2.1vw, 10.5px); }
 }
+
+/* Larger phones & small tablets */
 @media (min-width: 481px) and (max-width: 820px){
   .twoCol{ grid-template-columns:1fr 1fr; }
   .cardsGrid{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
@@ -258,7 +259,7 @@ function CardView({
           )}
         </div>
 
-        {/* RIGHT: during game we keep it clean — just the Lock + optional daubs/shield chips */}
+        {/* RIGHT: daubs / badges / lock (game only) */}
         <div className="row" style={{gap:8, alignItems:'center'}}>
           {phase === 'live' && (
             <span className="badge" style={{background:'#f1f5f9', padding:'2px 6px', borderRadius:'8px'}}>Daubs: <b>{card.daubs}</b></span>
@@ -268,6 +269,11 @@ function CardView({
           )}
           {phase === 'live' && card.shieldUsed && (
             <span className="badge" style={{background:'#f8717130', color:'#dc2626', padding:'2px 6px', borderRadius:'8px'}}>shield used</span>
+          )}
+          {phase === 'live' && (
+            card.exploded ? <span className="badge" style={{background:'#fee2e2', color:'#991b1b', padding:'2px 6px', borderRadius:'8px'}}>EXPLODED</span> :
+            card.paused   ? <span className="badge" style={{background:'#f1f5f9', color:'#0f172a', padding:'2px 6px', borderRadius:'8px'}}>LOCKED</span> :
+                            <span className="badge" style={{background:'#dcfce7', color:'#14532d', padding:'2px 6px', borderRadius:'8px'}}>LIVE</span>
           )}
           {showLock && (
             <button className="btn gray"
@@ -392,7 +398,7 @@ function App(){
         const newCalls = Array.isArray(s.called) ? s.called : [];
         setRoundId(s.id || null);
 
-        // RESET TO SETUP
+        // RESET TO SETUP: clear purchases & selections, regenerate Available and force paint
         if ((lastPhase !== 'setup' && newPhase === 'setup') || (newCalls.length < lastCount)) {
           setPlayer({ id: uid('p'), cards: [] });
           setAvailable(freshAvail());
@@ -401,7 +407,7 @@ function App(){
           setSyncedWinner(null);
           setAsk(true);
           endPostedRef.current = false;
-          setResetKey(k => k + 1);
+          setResetKey(k => k + 1);     // <- forces a repaint
         }
 
         // Apply new calls to owned cards
@@ -427,11 +433,12 @@ function App(){
                 body: JSON.stringify({ round_id: s.id, alias, daubs: best })
               }).catch(()=>{});
             }
+            // Stop further calls globally
             maybeEndRoundOnServer(s.id);
           }
         }
 
-        // Poll current winner
+        // Poll current winner (same for everyone)
         if (s.id) {
           fetch(`/api/round/winner?round_id=${encodeURIComponent(s.id)}&ts=${Date.now()}`, { cache:'no-store' })
             .then(r=>r.json())
@@ -486,6 +493,7 @@ function App(){
                   <div className="muted" style={{marginRight:'auto'}}>Purchase Panel</div>
                   <input id="genN" className="chip" style={{padding:'8px 10px'}} type="number" min="1" max="12" defaultValue="2"/>
                   <button className="btn" onClick={()=>{ const el=document.getElementById('genN'); generateCards(Number(el?.value)||2); }}>Generate n</button>
+                  {/* bulk shields for SELECTED AVAILABLE */}
                   <button className="btn" onClick={()=>shieldSelectedAvailable(true)} disabled={selectedPool.size===0}>Shield selected</button>
                   <button className="btn" onClick={()=>shieldSelectedAvailable(false)} disabled={selectedPool.size===0}>Unshield selected</button>
                   <button className="btn primary" onClick={buySelected} disabled={selectedPool.size===0}>Buy selected</button>
@@ -494,7 +502,7 @@ function App(){
           }
         </div>
 
-        {/* Right: Setup → OWNED then AVAILABLE; Live → OWNED with Lock buttons only (no status chips) */}
+        {/* Right: Setup → OWNED first, then AVAILABLE; Live → OWNED with LOCKS */}
         <div className="card">
           {phase==='setup' ? (
             <>
@@ -629,4 +637,3 @@ function App(){
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(<App />);
-</script>

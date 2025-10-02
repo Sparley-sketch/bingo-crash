@@ -110,10 +110,10 @@ function Cell({cell, highlight}){
 function FXStyles(){
   return (
     <style>{`
-      /* inline chip, no absolute positioning */
+		/* inline chip, no absolute positioning */
 		.priceTag{  display:inline-flex;  align-items:center;  padding:2px 8px;  font-size:12px;  line-height:1;  border-radius:999px;  background:#f1f5f9;  border:1px solid #e2e8f0;  color:#0f172a;}
 
-	.shieldCtl input{ vertical-align:middle; }
+		.shieldCtl input{ vertical-align:middle; }
 
 
 		/* mobile: keep them on one line or wrap nicely */
@@ -131,11 +131,16 @@ function FXStyles(){
 
       /* Base */
       .gridCard { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:8px; }
-      .cell{ position:relative; display:flex; align-items:center; justify-content:center; box-sizing:border-box;line-height:1;}
-	  .cell .num{  display:flex;  align-items:center;  justify-content:center;  width:100%;  text-align:center;  font-weight:700;  font-size:16px;  /* base size */  z-index:1;  pointer-events:none;}
+	  .cell{  position:relative;  display:grid; /* <— grid centers more reliably than flex for text */  place-items:center; /* center both axis */  box-sizing:border-box;  line-height:1;  padding:0; /* ensure no inherited padding */}
+	  .cell .num{  display:block;  width:100%;  text-align:center;  font-weight:700;  font-size:16px;         /* base size */}
       .cell.daub { background:#dcfce7; border-color:#86efac; }
       .cell.hl   { background:#fef9c3; border-color:#fde047; }
-      .bomb{  position:absolute;  right:6px;  top:6px;  font-size:14px;          /* base size */  line-height:1;  z-index:2;  pointer-events:none;}
+      .bomb{  position:absolute;  top:6px; right:6px;  font-size:12px;  line-height:1;  pointer-events:none;  z-index:2;}
+	  .phase-live .cell .num{ font-size:15px; }
+      .card{ position:relative; overflow:hidden; }   /* make card a clipping container */
+	  .explosion-img{  position:absolute;  inset:0; /* top/right/bottom/left = 0 */  width:100%;  height:100%;  object-fit:cover; /* or 'contain' if you prefer full image visible */  z-index:5;  pointer-events:none;}
+	  .priceTag{  display:inline-flex;  align-items:center;  padding:2px 8px;  font-size:12px;  line-height:1;  border-radius:999px;  background:#f1f5f9;  border:1px solid #e2e8f0;  color:#0f172a;}
+	  .shieldCtl{ font-size:12px; }
 
       /* Mobile layout tweaks */
       @media (max-width: 640px){
@@ -143,17 +148,19 @@ function FXStyles(){
         .cardsGrid{ grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
         .topBar   { display:flex; gap:6px; flex-wrap:wrap; }
         .gridCard { gap:6px; }
-        .cell     { min-width:34px; min-height:34px; }
-		.cell .num{ font-size:14px; }         /* setup on mobile */
-    	.bomb     { font-size:12px; right:4px; top:4px; }
-		.phase-live .cell .num{ font-size:13px; }  /* 1 step down during game */
-		.phase-live .bomb{ font-size:11px; right:3px; top:3px; }		
-	    .priceTag{ font-size:11px; padding:2px 6px; }
-	    .shieldCtl{ font-size:11px; }		
+        .cell{ min-width:36px; min-height:36px; }
+   	    .cell .num{ font-size:14px; }
+    	.bomb{ font-size:11px; top:4px; right:4px; }
+	    .phase-live .cell .num{ font-size:13px; }
+		.phase-live .bomb{ font-size:9px; right:3px; top:3px; }		
+		.priceTag{ font-size:11px; padding:2px 6px; }
+		.shieldCtl{ font-size:11px; }
+		}	
         .badge    { font-size:10px; padding:2px 6px; }
         .btn      { font-size:12px; padding:6px 8px; }
         .chip     { font-size:12px; }
         .title    { font-size:18px; }
+        .aliasInput{ font-size:16px; }     /* prevents iOS zoom */		
       }
 	  /* keep the number perfectly centered even with an absolute bomb icon */
 		.cell { position:relative; display:flex; align-items:center; justify-content:center; }
@@ -466,9 +473,6 @@ function App(){
           {phase==='setup' ? (
             <>
               {/* Purchased / Owned */}
-              <div className="row" style={{justifyContent:'space-between'}}>
-                <div className="muted">Your Purchased Cards ({player.cards.length})</div>
-              </div>
               {player.cards.length===0
                 ? <div className="muted" style={{marginTop:8}}>You don’t own any cards yet.</div>
                 : <div className="grid cardsGrid" style={{gridTemplateColumns:'1fr 1fr', gap:12, marginTop:10}}>

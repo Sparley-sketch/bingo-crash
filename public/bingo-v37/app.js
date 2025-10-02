@@ -134,6 +134,13 @@ function CardView({
                : card.paused   ? <span className="badge lock">LOCKED</span>
                                : <span className="badge live">LIVE</span>;
 
+ {card.wantsShield && !card.shieldUsed && (
+    <span className="badge" style={{background:'#22c55e30', color:'#16a34a'}}>shield active</span>
+  )}
+  {card.shieldUsed && (
+    <span className="badge" style={{background:'#f8717130', color:'#dc2626'}}>shield used</span>
+  )}
+
   const wrapperCls=['card']; 
   if(selectable && selected) wrapperCls.push('isSelected');
   if(owned) wrapperCls.push('ownedCard');
@@ -153,7 +160,6 @@ function CardView({
       <div className="row" style={{justifyContent:'space-between'}}>
         <div className="row" style={{gap:8, alignItems:'center'}}>
           <div className="row" style={{gap:8}}>
-            <div style={{fontWeight:700}}>Card</div>
             {status}
             <span className="badge">Daubs: <b>{card.daubs}</b></span>
           </div>
@@ -300,6 +306,12 @@ function App(){
           setSyncedWinner(null);
           setAsk(true);
           endPostedRef.current = false;
+          
+          const [resetKey, setResetKey] = useState(0);
+            // wrap your root JSX:
+            <div key={resetKey} className="grid" style={{gap:14}}> … </div>
+            // and inside reset logic:
+            setResetKey(k => k + 1);
         }
 
         // Apply new calls to owned cards (only if not ended for client)

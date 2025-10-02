@@ -110,11 +110,27 @@ function Cell({cell, highlight}){
 function FXStyles(){
   return (
     <style>{`
-		/* inline chip, no absolute positioning */
-		.priceTag{  display:inline-flex;  align-items:center;  padding:2px 8px;  font-size:12px;  line-height:1;  border-radius:999px;  background:#f1f5f9;  border:1px solid #e2e8f0;  color:#0f172a;}
 
-		.shieldCtl input{ vertical-align:middle; }
+		/* price + shield in one line, no overlap */
+		.priceTag{
+		  display: inline-flex;
+		  align-items: center;
+		  padding: 2px 8px;
+		  font-size: 12px;
+		  line-height: 1;
+		  border-radius: 999px;
+		  background: #f1f5f9;
+		  border: 1px solid #e2e8f0;
+		  white-space: nowrap;
+		}
 
+	.shieldCtl{ font-size: 12px; white-space: nowrap; }
+	.shieldCtl input{ vertical-align: middle; }
+	
+	/* row helpers */
+	.row{ display:flex; align-items:center; gap:12px; flex-wrap: nowrap; }
+	.badge{ font-size:12px; padding:2px 6px; border-radius:6px; background:#f1f5f9; }
+	.btn.gray{ font-size:12px; padding:4px 8px; border-radius:6px; }
 
 		/* mobile: keep them on one line or wrap nicely */
 		@media (max-width:640px){
@@ -127,29 +143,30 @@ function FXStyles(){
 	
 
       /* Base */
-	/* Grid: always 5 equal columns, no min-width traps */
+	/* 5 equal columns that always fill the card width */
 	.gridCard{
 	  display: grid;
 	  grid-template-columns: repeat(5, minmax(0,1fr));
 	  gap: var(--cell-gap, 8px);
 	  width: 100%;
+	  min-width: 0;     /* prevents overflow squeezing */
 	}
 	
-	/* Cells are perfect squares that can shrink safely */
+	/* square cells that can shrink safely */
 	.cell{
 	  position: relative;
 	  display: grid;
-	  place-items: center;           /* number centered both axes */
+	  place-items: center;          /* center the number */
 	  aspect-ratio: 1 / 1;
 	  border: 1px solid #e2e8f0;
 	  border-radius: var(--cell-radius, 10px);
 	  background: #fff;
+	  min-width: 0;                 /* critical on some Android WebViews */
 	  box-sizing: border-box;
-	  min-width: 0;                  /* 👈 prevents overflow on narrow cards */
 	  padding: 0;
 	}
 	
-	/* Number never drifts */
+	/* number stays centered and never wraps */
 	.cell .num{
 	  display: block;
 	  width: 100%;
@@ -157,26 +174,29 @@ function FXStyles(){
 	  font-weight: 700;
 	  font-size: var(--cell-font, 16px);
 	  line-height: 1;
+	  white-space: nowrap;          /* stops wrapping/stacking */
+	  overflow: hidden;
+	  text-overflow: clip;
 	  z-index: 1;
-	  pointer-events: none;
 	}
 	
     .cell.daub { background:#dcfce7; border-color:#86efac; }
 	.cell.hl   { background:#fef9c3; border-color:#fde047; }
 	
-	/* Bomb pinned and small */
+	/* bomb pinned in a corner and small */
 	.bomb{
 	  position: absolute;
 	  top: 6px; right: 6px;
 	  font-size: var(--bomb-font, 12px);
 	  line-height: 1;
-	  pointer-events: none;
 	  z-index: 2;
+	  pointer-events: none;
 	}
 	
-	/* Game phase: nudge down slightly so live cells never crowd */
+	/* phase sizing (desktop/base) */
 	.phase-live .cell .num{ --cell-font: 15px; }
 	.phase-live .bomb     { --bomb-font: 11px; }
+
 	
 	/* Make the card a container so we can scale by card width (not the whole viewport) */
 	.card{
@@ -184,19 +204,25 @@ function FXStyles(){
 	  overflow: hidden;
 	  padding: 12px;
 	  border-radius: 16px;
-	  container-type: inline-size;   /* 👈 enables cqw units */
+	  background: #fff;
+	  /* make sure cards never shrink below a sane width on mobile */
+	  min-width: 0;
+	  width: 100%;
 	}
 
-	  /* Explosion: stretch to card size */
+	/* Explosion gif covers the card (no cropping -> use contain; change to cover if you prefer) */
 	.explosion-img{
-	  position:absolute; inset:0;
-	  width:100%; height:100%;
-	  object-fit: contain;          /* 'cover' for trimmed or 'contain' if you prefer full gif visible */
-	  z-index:5; pointer-events:none;
+	  position: absolute; inset: 0;
+	  width: 100%; height: 100%;
+	  object-fit: contain;
+	  z-index: 5; pointer-events: none;
 	}
 	
 	.priceTag{  display:inline-flex;  align-items:center;  padding:2px 8px;  font-size:12px;  line-height:1;  border-radius:999px;  background:#f1f5f9;  border:1px solid #e2e8f0;  color:#0f172a;}
 	.shieldCtl{ font-size:12px; }
+
+	/* iOS anti-zoom for alias input */
+	.aliasInput{ font-size:16px; }	
 	
 
 	@container (max-width: 360px){
@@ -220,20 +246,21 @@ function FXStyles(){
 
       /* Mobile layout tweaks */
 		@media (min-width: 460px) and (max-width: 640px){
-		/* tighter gaps & corners on small screens */
+
+		/* tigher gaps and corners on small screens */
 		.gridCard{ --cell-gap: 6px; }
 		.cell{ --cell-radius: 8px; }
         .twoCol   { grid-template-columns: 1fr !important; }
         .cardsGrid{ grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
         .topBar   { display:flex; gap:6px; flex-wrap:wrap; }
 		
-		/* responsive font sizes using clamp() */
-		.cell .num{ --cell-font: clamp(11px, 3.4vw, 13px); }
-		.bomb      { --bomb-font: clamp(9px, 2.8vw, 11px); top:3px; right:3px; }
+		/* scale by viewport width as a safe fallback (works everywhere) */
+		/* These clamp ranges keep 5 columns readable on iPhone SE → Pro Max */
+		.cell .num{ --cell-font: clamp(11px, 3.6vw, 14px); }
+		.bomb     { --bomb-font: clamp(9px, 2.8vw, 11px); top: 4px; right: 4px; }
 		
-		/* during live, step down one notch again */
-		.phase-live .cell .num{ --cell-font: clamp(10px, 3.2vw, 12px); }
-		.phase-live .bomb      { --bomb-font: clamp(8px, 2.6vw, 10px); }
+		.phase-live .cell .num{ --cell-font: clamp(10px, 3.3vw, 13px); }
+		.phase-live .bomb     { --bomb-font: clamp(8px, 2.6vw, 10px); }
 		.priceTag{ font-size:11px; padding:2px 6px; }
 		.shieldCtl{ font-size:11px; }
 		}	
@@ -241,7 +268,10 @@ function FXStyles(){
         .btn      { font-size:12px; padding:6px 8px; }
         .chip     { font-size:12px; }
         .title    { font-size:18px; }
-        .aliasInput{ font-size:16px; }     /* prevents iOS zoom */		
+
+		/* iOS anti-zoom for alias input */
+		.aliasInput{ font-size:16px; }	
+
 		.card	  { padding:10px; }
 		.card .gridCard{ padding:1px; }
       }
@@ -250,6 +280,12 @@ function FXStyles(){
 
 		/* make sure explosion overlays above everything */
 		.explosion-img{ z-index: 5; pointer-events:none; }
+
+	@media (min-width: 641px) and (max-width: 820px){
+	  .gridCard{ --cell-gap: 7px; }
+	  .cell .num{ --cell-font: clamp(12px, 2.2vw, 16px); }
+	  .bomb     { --bomb-font: clamp(10px, 1.7vw, 12px); }
+	}
 
     `}</style>
   );
@@ -283,20 +319,15 @@ function CardView({
 
 <div className="row" style={{justifyContent:'space-between', alignItems:'center'}}>
   {/* LEFT: price + shield (pre-buy only) */}
-  <div className="row" style={{gap:8, alignItems:'center'}}>
-    {phase === 'setup' && selectable && (
-      <span className="priceTag">1 coin</span>
-    )}
-    {showShield && (
-      <label className="row shieldCtl" style={{gap:6, fontSize:12, color:'#475569'}}
-             onClick={(e)=>e.stopPropagation()}>
-        <input
-          type="checkbox"
-          checked={!!card.wantsShield}
-          onChange={e=>onShieldToggle(card.id, e.target.checked)}
-        />
-        Shield
-      </label>
+ <div className="row" style={{gap:8}}>
+  <span className="priceTag">1 coin</span>
+  <label className="row shieldCtl" style={{gap:6}}
+         onClick={(e)=>e.stopPropagation()}>
+    <input type="checkbox"
+           checked={!!card.wantsShield}
+           onChange={(e)=>onShieldToggle(card.id, e.target.checked)} />
+    Shield
+  </label>
     )}
     {/* ✅ Purchased (not selectable) & still in setup -> show "Shield active" */}
     {phase === 'setup' && !selectable && card.wantsShield && (
@@ -674,7 +705,10 @@ function App(){
         }}
       >
         <div className="row" style={{marginTop:8}}>
-          <input id="alias_input" className="chip aliasInput" style={{padding:'10px 12px', width:'100%'}} placeholder="Your alias"/>
+          <input id="alias_input"
+       className="chip aliasInput"
+       style={{padding:'10px 12px', width:'100%'}}
+       placeholder="Your alias"/>
         </div>
       </Modal>
     </div>

@@ -20,6 +20,7 @@ function boom(vol=0.85){ try{ const c=audioCtx(); if(!c) return; const t=c.curre
 }catch{} }
 
 // ---- Card helpers ----
+// 5x3 grid, 15 numbers (1..25) with 3 bombs at random positions.
 function makeCard(id,name){
   const nums = shuffle(Array.from({length:25},(_,i)=>i+1)).slice(0,15);
   const gridNums = [0,1,2].map(r => nums.slice(r*5, r*5+5));
@@ -78,21 +79,31 @@ function applyCallToCards(cards, n, audioOn, volume){
     vibrate([80,40,120]);
     if(audioOn) boom(volume);
   }
-  // clear FX flags shortly after
   setTimeout(()=>{ next.forEach(c=>{ c.justExploded=false; c.justSaved=false; }); }, 900);
   return next;
 }
 
 // Icons
-const ICON_LOCK_BADGE  = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="%23f59e0b"><path d="M7 10V8a5 5 0 1 1 10 0v2h2v10H5V10h2zm2 0h6V8a3 3 0 1 0-6 0v2z"/></svg>';
+const ICON_LOCK_OPEN  = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="%231e293b"><path d="M7 10V7a5 5 0 1 1 10 0h-2a3 3 0 1 0-6 0v3h10v12H5V10h2z"/></svg>';
+const ICON_LOCK_CLOSED= 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="%231e293b"><path d="M7 10V8a5 5 0 1 1 10 0v2h2v12H5V10h2zm2 0h6V8a3 3 0 1 0-6 0v2z"/></svg>';
 
-// Explosion image (animated GIF) — place the file here or update path
+// Explosion image (animated GIF)
 const EXPLOSION_SRC = '/bingo-v37/explosion.gif';
 
-// ---------- Styles (scoped) ----------
+function Cell({cell, highlight}){
+  const cls=['cell']; if(cell.daubed) cls.push('daub'); else if(highlight) cls.push('hl');
+  return (
+    <div className={cls.join(' ')}>
+      <span className="num">{cell.n}</span>
+      {cell.bomb && <div className="bomb">💣</div>}
+    </div>
+  );
+}
+
 function FXStyles(){
   return (
     <style>{`
+/* ========== Layout primitives ========== */
 .grid{ display:grid; }
 .row{ display:flex; align-items:center; gap:12px; flex-wrap:nowrap; }
 .list .chip{ margin:2px 4px 0 0; }
@@ -105,10 +116,11 @@ function FXStyles(){
 .title{ font-size:22px; font-weight:800; margin:0 0 4px; }
 .muted{ color:#64748b; font-size:14px; }
 
+/* Outer grid: 2 columns on the right for cards */
 .cardsGrid{ display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:12px; }
 .twoCol{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 
-/* Card */
+/* ========== Card & Grid (mobile-safe, responsive) ========== */
 .card{
   position:relative; overflow:hidden; padding:12px; border-radius:16px; background:#fff;
   border:1px solid #e2e8f0; box-shadow:0 4px 18px rgba(15,23,42,.04);
@@ -117,8 +129,7 @@ function FXStyles(){
 .ownedCard{ border:1.5px solid #22c55e !important; box-shadow:0 0 0 3px rgba(34,197,94,.12); }
 .burned{ background:#0b0b0b !important; border-color:#111 !important; filter:saturate(.2) contrast(.9); }
 
-.lockBadge{ position:absolute; left:8px; top:6px; z-index:3; width:16px; height:16px; }
-
+/* Header bits */
 .priceTag{
   display:inline-flex; align-items:center; padding:2px 8px; font-size:12px; line-height:1;
   border-radius:999px; background:#f1f5f9; border:1px solid #e2e8f0; color:#0f172a; white-space:nowrap;
@@ -126,7 +137,7 @@ function FXStyles(){
 .shieldCtl{ font-size:12px; white-space:nowrap; }
 .shieldCtl input{ vertical-align:middle; }
 
-/* 5x3 grid */
+/* Grid of 5 columns */
 .gridCard{
   display:grid; grid-template-columns:repeat(5, minmax(0,1fr));
   gap:var(--cell-gap, 8px); width:100%; min-width:0;
@@ -145,20 +156,26 @@ function FXStyles(){
 .bomb{
   position:absolute; top:6px; right:6px; font-size:var(--bomb-font,12px); line-height:1; pointer-events:none; z-index:2;
 }
+
+/* Explosion overlay */
 .explosion-img{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; z-index:5; pointer-events:none; }
 
+/* Phase sizing (desktop/base) */
 .phase-live .cell .num{ --cell-font:15px; }
 .phase-live .bomb{ --bomb-font:11px; }
 
+/* iOS anti-zoom for alias box */
 .aliasInput{ font-size:16px; }
 
-/* Mobile */
+/* =================== Mobile responsiveness =================== */
+/* iPhone 12 Pro and similar (≤ 390px wide): shrink cards more aggressively */
 @media (max-width: 400px){
-  .twoCol{ grid-template-columns:1fr; }
+  .twoCol{ grid-template-columns:1fr; }     /* left panel stacks above */
   .cardsGrid{ grid-template-columns: repeat(2, minmax(0,1fr)); gap:8px; }
   .card{ padding:8px; border-radius:12px; }
   .gridCard{ --cell-gap:4px; }
   .cell{ --cell-radius:7px; }
+  /* numbers & bombs respond to viewport so 2 columns always fit */
   .cell .num{ --cell-font: clamp(9px, 3.1vw, 12px); }
   .bomb{ --bomb-font: clamp(7.5px, 2.5vw, 10px); top:3px; right:3px; }
   .phase-live .cell .num{ --cell-font: clamp(9px, 3.0vw, 12px); }
@@ -167,6 +184,7 @@ function FXStyles(){
   .shieldCtl{ font-size:11px; }
 }
 
+/* Small phones (401–480px) */
 @media (min-width: 401px) and (max-width: 480px){
   .twoCol{ grid-template-columns:1fr 1fr; }
   .cardsGrid{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
@@ -179,6 +197,7 @@ function FXStyles(){
   .phase-live .bomb{ --bomb-font: clamp(8px, 2.1vw, 10.5px); }
 }
 
+/* Larger phones & small tablets */
 @media (min-width: 481px) and (max-width: 820px){
   .twoCol{ grid-template-columns:1fr 1fr; }
   .cardsGrid{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
@@ -191,57 +210,34 @@ function FXStyles(){
   );
 }
 
-// ---------- UI bits ----------
-function Cell({cell, highlight}){
-  const cls=['cell']; if(cell.daubed) cls.push('daub'); else if(highlight) cls.push('hl');
-  return (
-    <div className={cls.join(' ')}>
-      <span className="num">{cell.n}</span>
-      {cell.bomb && <div className="bomb">💣</div>}
-    </div>
-  );
-}
-
 function CardView({
   card, lastCalled,
-  onTapLive,
+  onPause,
   phase,
   selectable, selected, onSelectToggle,
   owned = false,
-  showShield = false,
+  showShield = false,       // pre-buy only (available pool)
   onShieldToggle = () => {},
+  showLock = false          // live only
 }){
   const wrapperCls=['card'];
   if(selectable && selected) wrapperCls.push('isSelected');
   if(owned) wrapperCls.push('ownedCard');
   if(card.exploded) wrapperCls.push('burned');
 
-  const liveTap = (e)=>{
-    if(phase!=='live') return;
-    if(!card.paused && !card.exploded){
-      e.stopPropagation();
-      onTapLive(card.id);
-    }
-  };
-
   return (
     <div
       className={wrapperCls.join(' ')}
-      onClick={phase==='live' ? liveTap : (selectable ? ()=>onSelectToggle(card.id) : undefined)}
-      style={(phase==='live' && !card.paused && !card.exploded) || selectable
-              ? { cursor:'pointer', position:'relative' }
-              : { position:'relative' }}
+      onClick={() => { if(selectable) onSelectToggle(card.id); }}
+      style={selectable ? { cursor:'pointer', outline:selected?'3px solid #2563eb40':'none', position:'relative' } : {position:'relative'}}
     >
-      {/* styles once at top */}
       <FXStyles />
 
+      {/* Explosion GIF overlay */}
       {card.justExploded && <img src={EXPLOSION_SRC} className="explosion-img" alt="boom" />}
 
-      {phase==='live' && card.paused && !card.exploded && (
-        <img className="lockBadge" src={ICON_LOCK_BADGE} alt="locked" />
-      )}
-
       <div className="row" style={{justifyContent:'space-between', alignItems:'center'}}>
+        {/* LEFT: price + shield (pre-buy only) */}
         <div className="row" style={{gap:8}}>
           {phase === 'setup' && selectable && (
             <>
@@ -257,11 +253,13 @@ function CardView({
               </label>
             </>
           )}
+          {/* Purchased (not selectable) & still in setup -> show "Shield active" */}
           {phase === 'setup' && !selectable && card.wantsShield && (
             <span className="badge" style={{background:'#22c55e30', color:'#16a34a', padding:'2px 6px', borderRadius:'8px'}}>shield active</span>
           )}
         </div>
 
+        {/* RIGHT: daubs / badges / lock (game only) */}
         <div className="row" style={{gap:8, alignItems:'center'}}>
           {phase === 'live' && (
             <span className="badge" style={{background:'#f1f5f9', padding:'2px 6px', borderRadius:'8px'}}>Daubs: <b>{card.daubs}</b></span>
@@ -273,13 +271,24 @@ function CardView({
             <span className="badge" style={{background:'#f8717130', color:'#dc2626', padding:'2px 6px', borderRadius:'8px'}}>shield used</span>
           )}
           {phase === 'live' && (
-            card.exploded ? <span className="badge" style={{background:'#fee2e2', color:'#991b1b', padding:'2px 6px', borderRadius:'8px'}}>OUT</span> :
-            card.paused   ? <span className="badge" style={{background:'#fef3c7', color:'#b45309', padding:'2px 6px', borderRadius:'8px'}}>LOCKED</span> :
+            card.exploded ? <span className="badge" style={{background:'#fee2e2', color:'#991b1b', padding:'2px 6px', borderRadius:'8px'}}>EXPLODED</span> :
+            card.paused   ? <span className="badge" style={{background:'#f1f5f9', color:'#0f172a', padding:'2px 6px', borderRadius:'8px'}}>LOCKED</span> :
                             <span className="badge" style={{background:'#dcfce7', color:'#14532d', padding:'2px 6px', borderRadius:'8px'}}>LIVE</span>
+          )}
+          {showLock && (
+            <button className="btn gray"
+                    onClick={(e)=>{ e.stopPropagation(); onPause(card.id); }}
+                    disabled={card.paused || card.exploded}>
+              <span className="row" style={{gap:6, alignItems:'center'}}>
+                <img src={card.paused ? ICON_LOCK_CLOSED : ICON_LOCK_OPEN} alt="" />
+                {card.paused || card.exploded ? 'Locked' : 'Lock'}
+              </span>
+            </button>
           )}
         </div>
       </div>
 
+      {/* Grid */}
       <div className="gridCard" style={{marginTop:10}}>
         {card.grid.flatMap((row,r)=>row.map((cell,c)=>
           <Cell key={r+'-'+c} cell={cell} highlight={lastCalled===cell.n && !cell.daubed} />
@@ -306,17 +315,18 @@ function Modal({open, onClose, children, title, primaryText='Got it', onPrimary}
   );
 }
 
-// ---------- App ----------
 function App(){
+  // Alias + wallet
   const [alias, setAlias]     = useState('');
   const [askAlias, setAsk]    = useState(true);
   const [wallet, setWallet]   = useState(100);
   const [resetKey, setResetKey] = useState(0);
 
-  const freshAvail = () => Array.from({length:4},()=>makeCard(uid('pool'),'')); // start with 4
+  // Available (pre-buy) vs Owned (purchased)
+  const freshAvail = () => Array.from({length:4},()=>makeCard(uid('pool'),'')); // start with 4 visible
   const [available, setAvailable] = useState(freshAvail);
   const [selectedPool, setSelectedPool] = useState(new Set());
-  const [player, setPlayer] = useState(()=>({ id:uid('p'), cards:[] }));
+  const [player, setPlayer] = useState(()=>({ id:uid('p'), cards:[] })); // owned
 
   const [audio, setAudio] = useState(false);
   const [volume, setVolume] = useState(0.85);
@@ -327,14 +337,14 @@ function App(){
   const [speedMs,setSpeedMs] = useState(800);
   const [called,setCalled] = useState([]);
 
+  // Popups
   const [showHowTo, setShowHowTo] = useState(true);
-  const [syncedWinner, setSyncedWinner] = useState(null);
+  const [syncedWinner, setSyncedWinner] = useState(null); // {alias, daubs} | null
 
+  // ensure we only end once
   const endPostedRef = useRef(false);
-  const lastPhaseRef = useRef('setup');
-  const lastCountRef = useRef(0);
 
-  // Pre-buy actions
+  // ---------- Pre-buy actions (include shields) ----------
   function toggleSelectPool(id){ setSelectedPool(s=>{ const n=new Set(s); n.has(id)?n.delete(id):n.add(id); return n; }); }
   function generateCards(n){
     n=Math.max(1,Math.min(12,Number(n)||0));
@@ -348,50 +358,47 @@ function App(){
     if (wallet < cost) { alert(`Not enough coins. Need ${cost}.`); return; }
     setWallet(w=>w - cost);
 
+    // Move selected available -> owned preserving wantsShield; refresh ids
     const ownedAdd = picks.map(c => ({ ...c, id: uid('c') }));
     setPlayer(p=>({...p, cards:[...p.cards, ...ownedAdd]}));
     setAvailable(a=>a.filter(c=>!selectedPool.has(c.id)));
     setSelectedPool(new Set());
   }
+  // shield per-card for AVAILABLE pool (pre-buy only)
   function toggleShieldAvailable(cardId,on){
     setAvailable(a=>a.map(c=>c.id===cardId?({...c, wantsShield:on}):c));
   }
+  // bulk shields on SELECTED available cards
   function shieldSelectedAvailable(on){
     setAvailable(a=>a.map(c=> selectedPool.has(c.id) ? ({...c, wantsShield:on}) : c ));
   }
 
-  // Tap-to-lock
-  function lockOwned(cardId){
-    setPlayer(p=>({...p, cards:p.cards.map(c=>(c.id===cardId && !c.paused && !c.exploded)?({...c, paused:true}):c)}));
-  }
+  // Owned management
+  function pauseOwned(cardId){ setPlayer(p=>({...p, cards:p.cards.map(c=>(c.id===cardId && !c.paused && !c.exploded)?({...c, paused:true}):c)})); }
 
-  // Poll state (no dependency on player.cards to avoid loops)
+  // Poll state + transitions + global winner sync + stop caller on game over
   useEffect(()=>{
-    let active=true;
+    let mounted=true, lastPhase='setup', lastCount=0;
 
     async function maybeEndRoundOnServer(id){
       if (endPostedRef.current || !id) return;
       endPostedRef.current = true;
-      try{ await fetch('/api/round/end?ts='+Date.now(), { method:'POST', cache:'no-store', headers:{Accept:'application/json'}}); }catch{}
+      try{
+        await fetch('/api/round/end?ts='+Date.now(), { method:'POST', cache:'no-store', headers:{Accept:'application/json'}});
+      }catch{}
     }
 
     async function pull(){
       try{
         const r=await fetch('/api/round/state?ts='+Date.now(), {cache:'no-store', headers:{Accept:'application/json'}});
-        if(!active) return;
         const s=await r.json();
+        if(!mounted) return;
 
         const newPhase = s.phase || 'setup';
         const newCalls = Array.isArray(s.called) ? s.called : [];
         setRoundId(s.id || null);
-        setPhase(newPhase);
-        setSpeedMs(Number(s.speed_ms)||800);
-        setCalled(newCalls);
 
-        const lastPhase = lastPhaseRef.current;
-        const lastCount = lastCountRef.current;
-
-        // Reset UI when returning to setup or on fresh round
+        // RESET TO SETUP: clear purchases & selections, regenerate Available and force paint
         if ((lastPhase !== 'setup' && newPhase === 'setup') || (newCalls.length < lastCount)) {
           setPlayer({ id: uid('p'), cards: [] });
           setAvailable(freshAvail());
@@ -400,30 +407,24 @@ function App(){
           setSyncedWinner(null);
           setAsk(true);
           endPostedRef.current = false;
-          setResetKey(k => k + 1);
+          setResetKey(k => k + 1);     // <- forces a repaint
         }
 
-        // Apply new numbers to owned cards
+        // Apply new calls to owned cards
         if (newCalls.length > lastCount) {
           const news = newCalls.slice(lastCount);
-          setPlayer(p=>{
-            let next = p.cards;
-            news.forEach(n => { next = applyCallToCards(next, n, audio, volume); });
-            return {...p, cards: next};
-          });
+          let next = player.cards;
+          news.forEach(n => { next = applyCallToCards(next, n, audio, volume); });
+          setPlayer(p=>({...p, cards: next}));
         }
 
-        // End-game detection & stop caller
+        // End-game detection
         if (newPhase === 'live' && s.id) {
           const deckExhausted = newCalls.length >= 25;
-          // compute live from current state at this moment
-          const liveMineCount = (() => {
-            const arr = player.cards || [];
-            return arr.filter(c=>!c.exploded && !c.paused).length;
-          })();
+          const liveMine = player.cards.filter(c => !c.exploded && !c.paused).length;
 
-          if (deckExhausted || liveMineCount === 0) {
-            const alive = (player.cards||[]).filter(c=>!c.exploded);
+          if (deckExhausted || liveMine === 0) {
+            const alive = player.cards.filter(c=>!c.exploded);
             const best = alive.length ? Math.max(...alive.map(c=>c.daubs)) : 0;
             if (alias) {
               fetch(`/api/round/winner?ts=${Date.now()}`, {
@@ -432,11 +433,12 @@ function App(){
                 body: JSON.stringify({ round_id: s.id, alias, daubs: best })
               }).catch(()=>{});
             }
+            // Stop further calls globally
             maybeEndRoundOnServer(s.id);
           }
         }
 
-        // poll winner
+        // Poll current winner (same for everyone)
         if (s.id) {
           fetch(`/api/round/winner?round_id=${encodeURIComponent(s.id)}&ts=${Date.now()}`, { cache:'no-store' })
             .then(r=>r.json())
@@ -444,30 +446,24 @@ function App(){
             .catch(()=>{});
         }
 
-        lastPhaseRef.current = newPhase;
-        lastCountRef.current = newCalls.length;
+        lastPhase = newPhase; lastCount = newCalls.length;
+        setPhase(newPhase);
+        setSpeedMs(Number(s.speed_ms)||800);
+        setCalled(newCalls);
       }catch{}
     }
 
     pull();
     const id=setInterval(pull, 1000);
-    return ()=>{ active=false; clearInterval(id); };
-  // only basic deps to avoid render-loop
-  }, [alias, audio, volume]);
+    return ()=>{ mounted=false; clearInterval(id); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [player.cards, audio, volume, alias]);
 
   const lastCalled = called[called.length-1];
 
-  function sortOwnedForLive(cards){
-    return cards.slice().sort((a,b)=>{
-      const rank = (c)=> c.exploded ? 2 : (c.paused ? 1 : 0);
-      const r = rank(a) - rank(b);
-      if (r !== 0) return r;
-      return (b.daubs||0) - (a.daubs||0);
-    });
-  }
-
   return (
     <div key={resetKey} className={`grid ${phase === 'live' ? 'phase-live' : 'phase-setup'}`} style={{gap:14}} >
+      {/* Header */}
       <div className="row" style={{justifyContent:'space-between'}}>
         <div>
           <h2 className="title">Bingo + Crash — Multiplayer</h2>
@@ -481,7 +477,9 @@ function App(){
         </div>
       </div>
 
+      {/* Body */}
       <div className="grid twoCol">
+        {/* Left: Purchase Panel (setup) / Caller (live) */}
         <div className="card">
           {phase==='live'
             ? (<>
@@ -495,6 +493,7 @@ function App(){
                   <div className="muted" style={{marginRight:'auto'}}>Purchase Panel</div>
                   <input id="genN" className="chip" style={{padding:'8px 10px'}} type="number" min="1" max="12" defaultValue="2"/>
                   <button className="btn" onClick={()=>{ const el=document.getElementById('genN'); generateCards(Number(el?.value)||2); }}>Generate n</button>
+                  {/* bulk shields for SELECTED AVAILABLE */}
                   <button className="btn" onClick={()=>shieldSelectedAvailable(true)} disabled={selectedPool.size===0}>Shield selected</button>
                   <button className="btn" onClick={()=>shieldSelectedAvailable(false)} disabled={selectedPool.size===0}>Unshield selected</button>
                   <button className="btn primary" onClick={buySelected} disabled={selectedPool.size===0}>Buy selected</button>
@@ -503,9 +502,11 @@ function App(){
           }
         </div>
 
+        {/* Right: Setup → OWNED first, then AVAILABLE; Live → OWNED with LOCKS */}
         <div className="card">
           {phase==='setup' ? (
             <>
+              {/* Purchased / Owned */}
               {player.cards.length===0
                 ? <div className="muted" style={{marginTop:8}}>You don’t own any cards yet.</div>
                 : <div className="cardsGrid" style={{marginTop:10}}>
@@ -514,7 +515,7 @@ function App(){
                         key={c.id}
                         card={c}
                         lastCalled={null}
-                        onTapLive={()=>{}}
+                        onPause={()=>{}}
                         phase="setup"
                         selectable={false}
                         selected={false}
@@ -522,11 +523,13 @@ function App(){
                         owned={true}
                         showShield={false}
                         onShieldToggle={()=>{}}
+                        showLock={false}
                       />
                     )}
                   </div>
               }
 
+              {/* Available pool */}
               <div className="row" style={{justifyContent:'space-between', marginTop:16}}>
                 <div className="muted">Available Cards ({available.length}) · Selected: {selectedPool.size}</div>
               </div>
@@ -538,7 +541,7 @@ function App(){
                         key={c.id}
                         card={c}
                         lastCalled={null}
-                        onTapLive={()=>{}}
+                        onPause={()=>{}}
                         phase="setup"
                         selectable={true}
                         selected={selectedPool.has(c.id)}
@@ -546,8 +549,9 @@ function App(){
                         owned={false}
                         showShield={true}
                         onShieldToggle={toggleShieldAvailable}
+                        showLock={false}
                       />
-                    ))}
+                    )}
                   </div>
               }
             </>
@@ -555,17 +559,16 @@ function App(){
             <>
               <div className="row" style={{justifyContent:'space-between'}}>
                 <div className="muted">My Cards ({player.cards.length})</div>
-                <div className="muted">Tip: tap a live card to <b>Lock</b>.</div>
               </div>
               {player.cards.length===0
                 ? <div className="muted" style={{marginTop:8}}>No cards owned.</div>
                 : <div className="cardsGrid" style={{marginTop:10}}>
-                    {sortOwnedForLive(player.cards).map(c=>
+                    {player.cards.map(c=>
                       <CardView
                         key={c.id}
                         card={c}
                         lastCalled={called[called.length-1]}
-                        onTapLive={lockOwned}
+                        onPause={pauseOwned}
                         phase="live"
                         selectable={false}
                         selected={false}
@@ -573,6 +576,7 @@ function App(){
                         owned={true}
                         showShield={false}
                         onShieldToggle={()=>{}}
+                        showLock={true}
                       />
                     )}
                   </div>
@@ -582,18 +586,20 @@ function App(){
         </div>
       </div>
 
+      {/* Popups */}
       <Modal
         open={showHowTo}
         onClose={()=>setShowHowTo(false)}
         title="How to Play"
         primaryText="Got it, start"
       >
-        • Tap a <b>live card</b> to <b>Lock</b>.
+        • Tap the <b>Lock</b> button to lockin your card.
         {'\n'}• If a called number has a <b>bomb</b>, your card explodes <i>(unless shielded)</i>.
         {'\n'}• <b>Shield</b>: choose on available cards <i>before buying</i>. Absorbs the first bomb on that card.
         {'\n'}• <b>Winner(s)</b>: non-exploded card(s) with the most daubs. Ties split the prize equally.
       </Modal>
 
+      {/* Winner modal (synced across players) */}
       <Modal
         open={!!syncedWinner}
         onClose={()=>location.reload()}
@@ -604,6 +610,7 @@ function App(){
         {syncedWinner ? <>Winner: <b>{syncedWinner.alias}</b> with <b>{syncedWinner.daubs}</b> daubs.</> : '—'}
       </Modal>
 
+      {/* Alias prompt */}
       <Modal
         open={askAlias}
         onClose={()=>{}}

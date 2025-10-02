@@ -124,70 +124,102 @@ function FXStyles(){
 
       .ownedCard{ border:1.5px solid #22c55e !important; box-shadow:0 0 0 3px rgba(34,197,94,.12); }
       .burned{ background:#0b0b0b !important; border-color:#111 !important; filter:saturate(.2) contrast(.9); }
-      .explosion-img{ z-index:5; pointer-events:none; }
-		/* Slightly smaller text & bombs during live play to avoid crowding */
-		.phase-live .cell .num{ font-size:15px; }
-		.phase-live .bomb{ font-size:12px; }
+	
 
       /* Base */
+	/* Grid: always 5 equal columns, no min-width traps */
 	.gridCard{
-	  display:grid;
-	  grid-template-columns: repeat(5, minmax(0, 1fr));
-	  gap: var(--cell-gap, 8px);                   /* control from media queries */
+	  display: grid;
+	  grid-template-columns: repeat(5, minmax(0,1fr));
+	  gap: var(--cell-gap, 8px);
+	  width: 100%;
 	}
-	/* Each cell is a perfect square that can shrink safely */
+	
+	/* Cells are perfect squares that can shrink safely */
 	.cell{
-	  position:relative;
-	  display:grid;
-	  place-items:center;                          /* centers the number */
-	  aspect-ratio: 1 / 1;                         /* square cells */
-	  border:1px solid #e2e8f0;
+	  position: relative;
+	  display: grid;
+	  place-items: center;           /* number centered both axes */
+	  aspect-ratio: 1 / 1;
+	  border: 1px solid #e2e8f0;
 	  border-radius: var(--cell-radius, 10px);
-	  background:#fff;
-	  box-sizing:border-box;
-	  padding:0;                                   /* no stray padding */
+	  background: #fff;
+	  box-sizing: border-box;
+	  min-width: 0;                  /* 👈 prevents overflow on narrow cards */
+	  padding: 0;
 	}
-	/* Number sits dead-center and never gets pushed by the bomb */
+	
+	/* Number never drifts */
 	.cell .num{
-	  display:block;
-	  width:100%;
-	  text-align:center;
-	  font-weight:700;
-	  font-size: var(--cell-font, 16px);           /* desktop default */
-	  line-height:1;
-	  z-index:1;
-	  pointer-events:none;
+	  display: block;
+	  width: 100%;
+	  text-align: center;
+	  font-weight: 700;
+	  font-size: var(--cell-font, 16px);
+	  line-height: 1;
+	  z-index: 1;
+	  pointer-events: none;
 	}
-		  .cell.daub { background:#dcfce7; border-color:#86efac; }
-		  .cell.hl   { background:#fef9c3; border-color:#fde047; }
-	/* Bomb is small and pinned, never affects layout */
+	
+    .cell.daub { background:#dcfce7; border-color:#86efac; }
+	.cell.hl   { background:#fef9c3; border-color:#fde047; }
+	
+	/* Bomb pinned and small */
 	.bomb{
-	  position:absolute;
-	  top:6px; right:6px;
+	  position: absolute;
+	  top: 6px; right: 6px;
 	  font-size: var(--bomb-font, 12px);
-	  line-height:1;
-	  pointer-events:none;
-	  z-index:2;
+	  line-height: 1;
+	  pointer-events: none;
+	  z-index: 2;
 	}
-	/* Live: nudge sizes down slightly to avoid crowding */
+	
+	/* Game phase: nudge down slightly so live cells never crowd */
 	.phase-live .cell .num{ --cell-font: 15px; }
 	.phase-live .bomb     { --bomb-font: 11px; }
 	
-	/* Make the card itself clip the explosion and remove excess paddings */
+	/* Make the card a container so we can scale by card width (not the whole viewport) */
 	.card{
-	  position:relative;
-	  overflow:hidden;
-	  padding:12px;
-	  border-radius:16px;
+	  position: relative;
+	  overflow: hidden;
+	  padding: 12px;
+	  border-radius: 16px;
+	  container-type: inline-size;   /* 👈 enables cqw units */
 	}
-	  .explosion-img{  position:absolute;  inset:0; /* top/right/bottom/left = 0 */  width:100%;  height:100%;  object-fit:cover; /* or 'contain' if you prefer full image visible */  z-index:5;  pointer-events:none;}
-	  .priceTag{  display:inline-flex;  align-items:center;  padding:2px 8px;  font-size:12px;  line-height:1;  border-radius:999px;  background:#f1f5f9;  border:1px solid #e2e8f0;  color:#0f172a;}
-	  .shieldCtl{ font-size:12px; }
+
+	  /* Explosion: stretch to card size */
+	.explosion-img{
+	  position:absolute; inset:0;
+	  width:100%; height:100%;
+	  object-fit: cover;          /* or 'contain' if you prefer full gif visible */
+	  z-index:5; pointer-events:none;
+	}
 	
-	.card .gridCard{ padding:2px; }
+	.priceTag{  display:inline-flex;  align-items:center;  padding:2px 8px;  font-size:12px;  line-height:1;  border-radius:999px;  background:#f1f5f9;  border:1px solid #e2e8f0;  color:#0f172a;}
+	.shieldCtl{ font-size:12px; }
+	
+
+	@container (max-width: 360px){
+	  .gridCard{ --cell-gap: 5px; }
+	  .cell{ --cell-radius: 8px; }
+	  /* 1cqw = 1% of card width; these values fit iPhone mini → Pro Max */
+	  .cell .num { --cell-font: clamp(11px, 9cqw, 14px); }
+	  .bomb      { --bomb-font: clamp(9px, 7cqw, 12px); top: 3px; right: 3px; }
+	  .phase-live .cell .num { --cell-font: clamp(10px, 8cqw, 13px); }
+	  .phase-live .bomb      { --bomb-font: clamp(8px, 6.5cqw, 11px); }
+	  .card{ padding: 10px; }
+	}
+
+	/* slightly larger phones */
+	@container (min-width: 360px) and (max-width: 460px){
+	  .gridCard{ --cell-gap: 6px; }
+	  .cell .num { --cell-font: clamp(12px, 8.2cqw, 15px); }
+	  .bomb      { --bomb-font: clamp(10px, 6.8cqw, 12px); }
+	  .phase-live .cell .num { --cell-font: clamp(11px, 7.6cqw, 14px); }
+	}
 
       /* Mobile layout tweaks */
-		@media (max-width: 640px){
+		@media (min-width: 460px) and (max-width: 640px){
 		/* tighter gaps & corners on small screens */
 		.gridCard{ --cell-gap: 6px; }
 		.cell{ --cell-radius: 8px; }

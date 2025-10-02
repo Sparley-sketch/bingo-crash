@@ -261,12 +261,15 @@ function CardView({
 
         {/* RIGHT: daubs / badges / lock (game only) */}
         <div className="row" style={{gap:8, alignItems:'center'}}>
+          {phase === 'live' && (
+            <span className="badge" style={{background:'#f1f5f9', padding:'2px 6px', borderRadius:'8px'}}>D: <b>{card.daubs}</b></span>
+          )} 
           {phase === 'live' && card.wantsShield && !card.shieldUsed && (
             <span className="badge" style={{background:'#22c55e30', color:'#16a34a', padding:'2px 6px', borderRadius:'8px'}}>shield active</span>
           )}
           {phase === 'live' && card.shieldUsed && (
             <span className="badge" style={{background:'#f8717130', color:'#dc2626', padding:'2px 6px', borderRadius:'8px'}}>shield used</span>
-          )}          
+          )}
           {showLock && (
             <button className="btn gray"
                     onClick={(e)=>{ e.stopPropagation(); onPause(card.id); }}

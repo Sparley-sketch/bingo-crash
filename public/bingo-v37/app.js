@@ -265,7 +265,7 @@ function CardView({
             <span className="badge" style={{background:'#f1f5f9', padding:'2px 6px', borderRadius:'8px'}}>D: <b>{card.daubs}</b></span>
           )} 
           {phase === 'live' && card.wantsShield && !card.shieldUsed && (
-            <span className="badge" style={{background-image:URL(SHIELD_SRC), color:'#16a34a', padding:'2px 6px', borderRadius:'8px'}}>shield active</span>
+            <span className="badge" style={{background:'#22c55e30', color:'#16a34a', padding:'2px 6px', borderRadius:'8px'}}>shield active</span>
           )}
           {phase === 'live' && card.shieldUsed && (
             <span className="badge" style={{background:'#f8717130', color:'#dc2626', padding:'2px 6px', borderRadius:'8px'}}>shield used</span>

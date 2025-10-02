@@ -130,29 +130,78 @@ function FXStyles(){
 		.phase-live .bomb{ font-size:12px; }
 
       /* Base */
-      .gridCard { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:8px; }
-	  .cell{  position:relative;  display:grid; /* <— grid centers more reliably than flex for text */  place-items:center; /* center both axis */  box-sizing:border-box;  line-height:1;  padding:0; /* ensure no inherited padding */}
-	  .cell .num{  display:block;  width:100%;  text-align:center;  font-weight:700;  font-size:16px;         /* base size */}
-      .cell.daub { background:#dcfce7; border-color:#86efac; }
-      .cell.hl   { background:#fef9c3; border-color:#fde047; }
-      .bomb{  position:absolute;  top:6px; right:6px;  font-size:12px;  line-height:1;  pointer-events:none;  z-index:2;}
-	  .phase-live .cell .num{ font-size:15px; }
-      .card{ position:relative; overflow:hidden; }   /* make card a clipping container */
+	.gridCard{
+	  display:grid;
+	  grid-template-columns: repeat(5, minmax(0, 1fr));
+	  gap: var(--cell-gap, 8px);                   /* control from media queries */
+	}
+	/* Each cell is a perfect square that can shrink safely */
+	.cell{
+	  position:relative;
+	  display:grid;
+	  place-items:center;                          /* centers the number */
+	  aspect-ratio: 1 / 1;                         /* square cells */
+	  border:1px solid #e2e8f0;
+	  border-radius: var(--cell-radius, 10px);
+	  background:#fff;
+	  box-sizing:border-box;
+	  padding:0;                                   /* no stray padding */
+	}
+	/* Number sits dead-center and never gets pushed by the bomb */
+	.cell .num{
+	  display:block;
+	  width:100%;
+	  text-align:center;
+	  font-weight:700;
+	  font-size: var(--cell-font, 16px);           /* desktop default */
+	  line-height:1;
+	  z-index:1;
+	  pointer-events:none;
+	}
+		  .cell.daub { background:#dcfce7; border-color:#86efac; }
+		  .cell.hl   { background:#fef9c3; border-color:#fde047; }
+	/* Bomb is small and pinned, never affects layout */
+	.bomb{
+	  position:absolute;
+	  top:6px; right:6px;
+	  font-size: var(--bomb-font, 12px);
+	  line-height:1;
+	  pointer-events:none;
+	  z-index:2;
+	}
+	/* Live: nudge sizes down slightly to avoid crowding */
+	.phase-live .cell .num{ --cell-font: 15px; }
+	.phase-live .bomb     { --bomb-font: 11px; }
+	
+	/* Make the card itself clip the explosion and remove excess paddings */
+	.card{
+	  position:relative;
+	  overflow:hidden;
+	  padding:12px;
+	  border-radius:16px;
+	}
 	  .explosion-img{  position:absolute;  inset:0; /* top/right/bottom/left = 0 */  width:100%;  height:100%;  object-fit:cover; /* or 'contain' if you prefer full image visible */  z-index:5;  pointer-events:none;}
 	  .priceTag{  display:inline-flex;  align-items:center;  padding:2px 8px;  font-size:12px;  line-height:1;  border-radius:999px;  background:#f1f5f9;  border:1px solid #e2e8f0;  color:#0f172a;}
 	  .shieldCtl{ font-size:12px; }
+	
+	.card .gridCard{ padding:2px; }
 
       /* Mobile layout tweaks */
-      @media (max-width: 640px){
+		@media (max-width: 640px){
+		/* tighter gaps & corners on small screens */
+		.gridCard{ --cell-gap: 6px; }
+		.cell{ --cell-radius: 8px; }
         .twoCol   { grid-template-columns: 1fr !important; }
         .cardsGrid{ grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
         .topBar   { display:flex; gap:6px; flex-wrap:wrap; }
-        .gridCard { gap:6px; }
-        .cell{ min-width:36px; min-height:36px; }
-   	    .cell .num{ font-size:14px; }
-    	.bomb{ font-size:11px; top:4px; right:4px; }
-	    .phase-live .cell .num{ font-size:13px; }
-		.phase-live .bomb{ font-size:9px; right:3px; top:3px; }		
+		
+		/* responsive font sizes using clamp() */
+		.cell .num{ --cell-font: clamp(11px, 3.4vw, 13px); }
+		.bomb      { --bomb-font: clamp(9px, 2.8vw, 11px); top:3px; right:3px; }
+		
+		/* during live, step down one notch again */
+		.phase-live .cell .num{ --cell-font: clamp(10px, 3.2vw, 12px); }
+		.phase-live .bomb      { --bomb-font: clamp(8px, 2.6vw, 10px); }
 		.priceTag{ font-size:11px; padding:2px 6px; }
 		.shieldCtl{ font-size:11px; }
 		}	
@@ -161,6 +210,8 @@ function FXStyles(){
         .chip     { font-size:12px; }
         .title    { font-size:18px; }
         .aliasInput{ font-size:16px; }     /* prevents iOS zoom */		
+		.card	  { padding:10px; }
+		.card .gridCard{ padding:1px; }
       }
 	  /* keep the number perfectly centered even with an absolute bomb icon */
 		.cell { position:relative; display:flex; align-items:center; justify-content:center; }

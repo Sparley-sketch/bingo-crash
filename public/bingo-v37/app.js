@@ -95,8 +95,8 @@ function applyCallToCards(cards, n, audioOn, volume){
 const ICON_LOCK_OPEN  = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="%231e293b"><path d="M7 10V7a5 5 0 1 1 10 0h-2a3 3 0 1 0-6 0v3h10v12H5V10h2z"/></svg>';
 const ICON_LOCK_CLOSED= 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="%231e293b"><path d="M7 10V8a5 5 0 1 1 10 0v2h2v12H5V10h2zm2 0h6V8a3 3 0 1 0-6 0v2z"/></svg>';
 
-// Explosion image (animated GIF)
-const EXPLOSION_SRC = '/bingo-v37/explosion3.gif';
+// Explosion image (animated GIF) — replace with your slower/faster GIF if desired
+const EXPLOSION_SRC = '/bingo-v37/explosion.gif';
 
 function Cell({cell, highlight}){
   const cls=['cell']; if(cell.daubed) cls.push('daub'); else if(highlight) cls.push('hl');
@@ -110,100 +110,41 @@ function FXStyles(){
       .ownedCard{ border:1.5px solid #22c55e !important; box-shadow:0 0 0 3px rgba(34,197,94,.12); }
       .burned{ background:#0b0b0b !important; border-color:#111 !important; filter:saturate(.2) contrast(.9); }
       .explosion-img{ position:absolute; inset:auto; left:50%; top:50%; transform:translate(-50%,-50%); width:140%; pointer-events:none; }
+
+      /* Base */
+      .gridCard { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:8px; }
+      .cell { position:relative; min-width:44px; min-height:44px; display:flex; align-items:center; justify-content:center; border:1px solid #e2e8f0; border-radius:10px; background:#fff; }
+      .cell.daub { background:#dcfce7; border-color:#86efac; }
+      .cell.hl   { background:#fef9c3; border-color:#fde047; }
+      .bomb{ position:absolute; right:6px; bottom:4px; }
+
       /* Mobile layout tweaks */
       @media (max-width: 640px){
-        .twoCol { grid-template-columns: 1fr !important; }
-        .cardsGrid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
-        .topBar { display:flex; gap:6px; flex-wrap:wrap; }
+        .twoCol   { grid-template-columns: 1fr !important; }
+        .cardsGrid{ grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+        .topBar   { display:flex; gap:6px; flex-wrap:wrap; }
+        .gridCard { gap:6px; }
+        .cell     { min-width:34px; min-height:34px; font-size:14px; border-radius:8px; }
+        .badge    { font-size:10px; padding:2px 6px; }
+        .btn      { font-size:12px; padding:6px 8px; }
+        .chip     { font-size:12px; }
+        .title    { font-size:18px; }
       }
-	  /* Base (keeps desktop as-is) */
-.gridCard { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:8px; }
-.cell { min-width:44px; min-height:44px; display:flex; align-items:center; justify-content:center; border:1px solid #e2e8f0; border-radius:10px; background:#fff; }
-.cell.daub { background:#dcfce7; border-color:#86efac; }
-.cell.hl   { background:#fef9c3; border-color:#fde047; }
-.bomb{ position:absolute; right:6px; bottom:4px; }
-
-@media (max-width: 640px){
-  .cardsGrid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
-  .gridCard  { gap:6px; }
-  .cell      { min-width:34px; min-height:34px; font-size:14px; border-radius:8px; }
-  .badge     { font-size:10px; padding:2px 6px; }
-  .btn       { font-size:12px; padding:6px 8px; }
-  .chip      { font-size:12px; }
-  .title     { font-size:18px; }
-}
     `}</style>
   );
 }
 
 function CardView({
-//  card, lastCalled,
-//  onPause,
-//  phase,
-//  selectable, selected, onSelectToggle,
-//  owned=false,
-//  showShield=false,    // pre-buy only (requested)
-//  onShieldToggle,
-//  showLock=false
-
-{/* price only in pre-buy (available cards) */}
-{phase === 'setup' && selectable && <div className="priceTag">1 coin</div>}
-
-<div className="row" style={{justifyContent:'space-between'}}>
-  {/* left side: (nothing for now) */}
-
-  {/* right side: Daubs + (status/lock/shield) */}
-  <div className="row" style={{gap:8, alignItems:'center'}}>
-
-    {/* Daubs always shown, at right */}
-    <span className="badge">Daubs: <b>{card.daubs}</b></span>
-
-    {/* shield badges during live only (post-buy visual feedback) */}
-    {phase === 'live' && card.wantsShield && !card.shieldUsed && (
-      <span className="badge" style={{background:'#22c55e30', color:'#16a34a'}}>shield active</span>
-    )}
-    {phase === 'live' && card.shieldUsed && (
-      <span className="badge" style={{background:'#f8717130', color:'#dc2626'}}>shield used</span>
-    )}
-
-    {/* status badges only post-buy (live) */}
-    {phase === 'live' && (
-      card.exploded ? <span className="badge boom">EXPLODED</span> :
-      card.paused   ? <span className="badge lock">LOCKED</span> :
-                      <span className="badge live">LIVE</span>
-    )}
-
-    {/* Shield toggle ONLY pre-buy (available cards) */}
-    {showShield && (
-      <label className="row" style={{gap:6, fontSize:12, color:'#475569'}}
-             onClick={(e)=>e.stopPropagation()}>
-        <input type="checkbox"
-               checked={!!card.wantsShield}
-               onChange={e=>onShieldToggle(card.id, e.target.checked)} />
-        Shield
-      </label>
-    )}
-
-    {/* Lock button ONLY post-buy during live */}
-    {showLock && (
-      <button className="btn gray"
-              onClick={(e)=>{ e.stopPropagation(); onPause(card.id); }}
-              disabled={card.paused || card.exploded}>
-        <span className="row" style={{gap:6, alignItems:'center'}}>
-          <img src={card.paused ? ICON_LOCK_CLOSED : ICON_LOCK_OPEN} alt="" />
-          {card.paused || card.exploded ? 'Locked' : 'Lock'}
-        </span>
-      </button>
-    )}
-  </div>
-</div>
-
+  card, lastCalled,
+  onPause,
+  phase,
+  selectable, selected, onSelectToggle,
+  owned = false,
+  showShield = false,       // pre-buy only
+  onShieldToggle = () => {},
+  showLock = false          // live only
 }){
-  const status = card.exploded ? <span className="badge boom">EXPLODED</span>
-               : card.paused   ? <span className="badge lock">LOCKED</span>
-                               : <span className="badge live">LIVE</span>;
-
-  const wrapperCls=['card']; 
+  const wrapperCls=['card'];
   if(selectable && selected) wrapperCls.push('isSelected');
   if(owned) wrapperCls.push('ownedCard');
   if(card.exploded) wrapperCls.push('burned');
@@ -215,36 +156,49 @@ function CardView({
       style={selectable ? { cursor:'pointer', outline:selected?'3px solid #2563eb40':'none', position:'relative' } : {position:'relative'}}
     >
       <FXStyles />
-      {/* Replaced FX with animated GIF */}
+
+      {/* Explosion GIF overlay */}
       {card.justExploded && <img src={EXPLOSION_SRC} className="explosion-img" alt="boom" />}
-      <div className="priceTag">1 coin</div>
 
+      {/* price only in pre-buy (available cards) */}
+      {phase === 'setup' && selectable && <div className="priceTag">1 coin</div>}
+
+      {/* Header */}
       <div className="row" style={{justifyContent:'space-between'}}>
+        {/* left empty on purpose */}
+
+        {/* right: Daubs + (badges) + controls */}
         <div className="row" style={{gap:8, alignItems:'center'}}>
-          <div className="row" style={{gap:8}}>
-            {status}
-            <span className="badge">Daubs: <b>{card.daubs}</b></span>
+          {/* Daubs always (right side) */}
+          <span className="badge">Daubs: <b>{card.daubs}</b></span>
 
-            {card.wantsShield && !card.shieldUsed && (
-    <span className="badge" style={{background:'#22c55e30', color:'#16a34a'}}>shield active</span>
-  )}
-  {card.shieldUsed && (
-    <span className="badge" style={{background:'#f8717130', color:'#dc2626'}}>shield used</span>
-  )}   
-          </div>
-        </div>
+          {/* Live-only: shield state & status */}
+          {phase === 'live' && card.wantsShield && !card.shieldUsed && (
+            <span className="badge" style={{background:'#22c55e30', color:'#16a34a'}}>shield active</span>
+          )}
+          {phase === 'live' && card.shieldUsed && (
+            <span className="badge" style={{background:'#f8717130', color:'#dc2626'}}>shield used</span>
+          )}
+          {phase === 'live' && (
+            card.exploded ? <span className="badge boom">EXPLODED</span> :
+            card.paused   ? <span className="badge lock">LOCKED</span> :
+                            <span className="badge live">LIVE</span>
+          )}
 
-        <div className="row" style={{gap:8}}>
           {/* Shield checkbox ONLY in pre-buy */}
           {showShield && (
             <label className="row" style={{gap:6, fontSize:12, color:'#475569'}}
                    onClick={(e)=>e.stopPropagation()}>
-              <input type="checkbox"
-                     checked={!!card.wantsShield}
-                     onChange={e=>onShieldToggle(card.id, e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={!!card.wantsShield}
+                onChange={e=>onShieldToggle(card.id, e.target.checked)}
+              />
               Shield
             </label>
           )}
+
+          {/* Lock button ONLY post-buy during live */}
           {showLock && (
             <button className="btn gray"
                     onClick={(e)=>{ e.stopPropagation(); onPause(card.id); }}
@@ -258,6 +212,7 @@ function CardView({
         </div>
       </div>
 
+      {/* Grid */}
       <div className="gridCard" style={{marginTop:10}}>
         {card.grid.flatMap((row,r)=>row.map((cell,c)=>
           <Cell key={r+'-'+c} cell={cell} highlight={lastCalled===cell.n && !cell.daubed} />
@@ -291,9 +246,8 @@ function App(){
   const [wallet, setWallet]   = useState(100);
   const [resetKey, setResetKey] = useState(0);
 
-
   // Available (pre-buy) vs Owned (purchased)
-  const freshAvail = () => Array.from({length:4},()=>makeCard(uid('pool'),''));
+  const freshAvail = () => Array.from({length:4},()=>makeCard(uid('pool'),'')); // start with 4 visible
   const [available, setAvailable] = useState(freshAvail);
   const [selectedPool, setSelectedPool] = useState(new Set());
   const [player, setPlayer] = useState(()=>({ id:uid('p'), cards:[] })); // owned
@@ -368,7 +322,7 @@ function App(){
         const newCalls = Array.isArray(s.called) ? s.called : [];
         setRoundId(s.id || null);
 
-        // RESET TO SETUP: clear purchases & selections, regenerate Available
+        // RESET TO SETUP: clear purchases & selections, regenerate Available and force paint
         if ((lastPhase !== 'setup' && newPhase === 'setup') || (newCalls.length < lastCount)) {
           setPlayer({ id: uid('p'), cards: [] });
           setAvailable(freshAvail());
@@ -377,11 +331,10 @@ function App(){
           setSyncedWinner(null);
           setAsk(true);
           endPostedRef.current = false;
-		  setResetKey(k => k + 1);
+          setResetKey(k => k + 1);
         }
 
-
-        // Apply new calls to owned cards (only if not ended for client)
+        // Apply new calls to owned cards
         if (newCalls.length > lastCount) {
           const news = newCalls.slice(lastCount);
           let next = player.cards;
@@ -445,7 +398,7 @@ function App(){
         <div className="row">
           {!audio
             ? <button className="btn primary" onClick={async()=>{ if(await enableAudio()){ setAudio(true); boom(0.6);} }}>Enable Sound</button>
-            : (<div className="row"><span className="muted">Vol</span><input type="range" min="0" max="1" step="0.05" value={volume} onChange={e=>setVolume(Number(e.target.value))}/></div>)
+            : (<div className="row"><span className="muted">Vol</span><input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e)=>setVolume(Number(e.target.value))}/></div>)
           }
         </div>
       </div>
@@ -498,7 +451,7 @@ function App(){
                         selected={false}
                         onSelectToggle={()=>{}}
                         owned={true}
-                        showShield={false}     // <<< no shields post-buy
+                        showShield={false}
                         onShieldToggle={()=>{}}
                         showLock={false}
                       />
@@ -524,7 +477,7 @@ function App(){
                         selected={selectedPool.has(c.id)}
                         onSelectToggle={id=>toggleSelectPool(id)}
                         owned={false}
-                        showShield={true}                 // <<< shield in pre-buy
+                        showShield={true}
                         onShieldToggle={toggleShieldAvailable}
                         showLock={false}
                       />
@@ -551,7 +504,7 @@ function App(){
                         selected={false}
                         onSelectToggle={()=>{}}
                         owned={true}
-                        showShield={false}     // <<< removed post-buy
+                        showShield={false}
                         onShieldToggle={()=>{}}
                         showLock={true}
                       />

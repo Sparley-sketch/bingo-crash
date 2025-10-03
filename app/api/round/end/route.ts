@@ -11,43 +11,6 @@ function admin() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-async function hasWinner(
-  supabase: ReturnType<typeof admin>,
-  roundId: string
-): Promise<boolean> {
-  // Pattern A: table `round_winner` (one row per round)
-  try {
-    const { data, error } = await supabase
-      .from('round_winner')
-      .select('id')
-      .eq('round_id', roundId)
-      .limit(1);
-    if (!error && (data?.length ?? 0) > 0) return true;
-  } catch {}
-
-  // Pattern B: table `winners` (could be multiple rows if ties)
-  try {
-    const { data, error } = await supabase
-      .from('winners')
-      .select('id')
-      .eq('round_id', roundId)
-      .limit(1);
-    if (!error && (data?.length ?? 0) > 0) return true;
-  } catch {}
-
-  // Pattern C: winner stored on the round row itself
-  try {
-    const { data, error } = await supabase
-      .from('rounds')
-      .select('winner_alias')
-      .eq('id', roundId)
-      .maybeSingle();
-    if (!error && data && (data as any).winner_alias) return true;
-  } catch {}
-
-  return false;
-}
-
 function nocache() {
   return {
     'cache-control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',

@@ -47,4 +47,8 @@ export async function POST() {
     { n, called: upd.called, remaining: upd.deck?.length ?? nextDeck.length },
     { headers: { 'Cache-Control': 'no-store' } }
   );
+
+  if (live.phase !== 'live') {
+  return NextResponse.json({ error:'not-live', phase: live.phase }, { status:409, headers:nocache() });
+}
 }

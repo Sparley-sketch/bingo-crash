@@ -1,9 +1,8 @@
+
 // Bingo + Crash — Multiplayer client (light theme)
 // React (UMD) + Babel — no build step
 
 const { useEffect, useState, useRef } = React;
-const ownedAtStartRef = React.useRef(0);
-const postedOutRef    = React.useRef(false);
 
 function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a; }
 function uid(p='id'){ return p+Math.random().toString(36).slice(2,8); }
@@ -320,6 +319,10 @@ function App(){
   const [wallet, setWallet]   = useState(100);
   const [resetKey, setResetKey] = useState(0);
 
+  // useRef hooks MUST be inside a component:
+  const ownedAtStartRef = useRef(0);
+  const postedOutRef    = useRef(false);
+
   // Available (pre-buy) vs Owned (purchased)
   const freshAvail = () => Array.from({length:4},()=>makeCard(uid('pool'),'')); // start with 4 visible
   const [available, setAvailable] = useState(freshAvail);
@@ -363,13 +366,13 @@ function App(){
     setSelectedPool(new Set());
 	
 	// After successful purchase, mark this alias as "joined" for the current round.
-if (alias) {
-  fetch('/api/round/join', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ alias })
-  }).catch(() => {});
-}
+    if (alias) {
+      fetch('/api/round/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alias })
+      }).catch(() => {});
+    }
   }
   // shield per-card for AVAILABLE pool (pre-buy only)
   function toggleShieldAvailable(cardId,on){
@@ -396,9 +399,10 @@ if (alias) {
     }
 
     async function pull(){
+      let s = null;
       try{
         const r=await fetch('/api/round/state?ts='+Date.now(), {cache:'no-store', headers:{Accept:'application/json'}});
-        const s=await r.json();
+        s=await r.json();
         if(!mounted) return;
 
         const newPhase = s.phase || 'setup';
@@ -423,22 +427,22 @@ if (alias) {
           let next = player.cards;
           news.forEach(n => { next = applyCallToCards(next, n, audio, volume); });
           setPlayer(p=>({...p, cards: next}));
-		  const hasProgress = newCalls.length > 0;
-		  if (newPhase === 'live' && hasProgress && ownedAtStartRef.current > 0) {
-			const liveMine = next.filter(c => !c.exploded && !c.paused).length;
-			if (liveMine === 0 && !postedOutRef.current && alias) {
-			  postedOutRef.current = true;
-			  fetch('/api/round/out', {
-				method:'POST',
-				headers:{ 'Content-Type':'application/json' },
-				body: JSON.stringify({ alias })
-			  }).catch(()=>{});
-			}
-		  }
-		}
+
+          const hasProgress = newCalls.length > 0;
+          if (newPhase === 'live' && hasProgress && ownedAtStartRef.current > 0) {
+            const liveMine = next.filter(c => !c.exploded && !c.paused).length;
+            if (liveMine === 0 && !postedOutRef.current && alias) {
+              postedOutRef.current = true;
+              fetch('/api/round/out', {
+                method:'POST',
+                headers:{ 'Content-Type':'application/json' },
+                body: JSON.stringify({ alias })
+              }).catch(()=>{});
+            }
+          }
         }
 
-		// End-game detection
+        // End-game detection
         if (newPhase === 'live' && s.id) {
           const deckExhausted = newCalls.length >= 25;
           const liveMine = player.cards.filter(c => !c.exploded && !c.paused).length;
@@ -459,12 +463,12 @@ if (alias) {
         }
 
         // when phase enters live, remember how many cards I had at start, and reset "postedOut" flag
-		if (phase !== 'live' && newPhase === 'live') {
-		  ownedAtStartRef.current = (player.cards || []).length;
-		  postedOutRef.current = false;
-		}	
+        if (lastPhase !== 'live' && newPhase === 'live') {
+          ownedAtStartRef.current = (player.cards || []).length;
+          postedOutRef.current = false;
+        }	
 		
-		// Poll current winner (same for everyone)
+        // Poll current winner (same for everyone)
         if (s.id) {
           fetch(`/api/round/winner?round_id=${encodeURIComponent(s.id)}&ts=${Date.now()}`, { cache:'no-store' })
             .then(r=>r.json())
@@ -476,25 +480,26 @@ if (alias) {
         setPhase(newPhase);
         setSpeedMs(Number(s.speed_ms)||800);
         setCalled(newCalls);
-      }catch{}
-	  
-	  if (newPhase === 'ended') {
-	  // Stop any auto-caller you might have
-	  if (typeof setAutoRun === 'function') setAutoRun(false);
 
-	  // (Optional) Pull the synced winner to show name + daubs
-	  if (s.id) {
-		fetch(`/api/round/winner?round_id=${encodeURIComponent(s.id)}&ts=${Date.now()}`, { cache:'no-store' })
-		  .then(r => r.json())
-		  .then(w => {
-			if (w?.alias) setSyncedWinner({ alias: w.alias, daubs: w.daubs });
-			else setSyncedWinner({ alias: '—', daubs: 0 }); // fallback
-		  })
-		  .catch(() => setSyncedWinner({ alias: '—', daubs: 0 }));
-	  } else {
-		setSyncedWinner({ alias: '—', daubs: 0 });
-	  }
-}
+        // If server says round ended, sequence winner popup and stop any local auto-caller
+        if (newPhase === 'ended') {
+          if (typeof setAutoRun === 'function') setAutoRun(false);
+          if (s.id) {
+            fetch(`/api/round/winner?round_id=${encodeURIComponent(s.id)}&ts=${Date.now()}`, { cache:'no-store' })
+              .then(r => r.json())
+              .then(w => {
+                if (w?.alias) setSyncedWinner({ alias: w.alias, daubs: w.daubs });
+                else setSyncedWinner({ alias: '—', daubs: 0 });
+              })
+              .catch(() => setSyncedWinner({ alias: '—', daubs: 0 }));
+          } else {
+            setSyncedWinner({ alias: '—', daubs: 0 });
+          }
+        }
+
+      }catch(e){
+        // swallow errors to keep polling resilient
+      }
     }
 
     pull();

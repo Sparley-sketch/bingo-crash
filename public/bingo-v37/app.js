@@ -2,6 +2,8 @@
 // React (UMD) + Babel — no build step
 
 const { useEffect, useState, useRef } = React;
+const ownedAtStartRef = React.useRef(0);
+const postedOutRef    = React.useRef(false);
 
 function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a; }
 function uid(p='id'){ return p+Math.random().toString(36).slice(2,8); }
@@ -359,6 +361,15 @@ function App(){
     setPlayer(p=>({...p, cards:[...p.cards, ...ownedAdd]}));
     setAvailable(a=>a.filter(c=>!selectedPool.has(c.id)));
     setSelectedPool(new Set());
+	
+	// After successful purchase, mark this alias as "joined" for the current round.
+if (alias) {
+  fetch('/api/round/join', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ alias })
+  }).catch(() => {});
+}
   }
   // shield per-card for AVAILABLE pool (pre-buy only)
   function toggleShieldAvailable(cardId,on){

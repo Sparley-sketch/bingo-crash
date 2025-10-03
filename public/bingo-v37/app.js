@@ -423,9 +423,22 @@ if (alias) {
           let next = player.cards;
           news.forEach(n => { next = applyCallToCards(next, n, audio, volume); });
           setPlayer(p=>({...p, cards: next}));
+		  const hasProgress = newCalls.length > 0;
+		  if (newPhase === 'live' && hasProgress && ownedAtStartRef.current > 0) {
+			const liveMine = next.filter(c => !c.exploded && !c.paused).length;
+			if (liveMine === 0 && !postedOutRef.current && alias) {
+			  postedOutRef.current = true;
+			  fetch('/api/round/out', {
+				method:'POST',
+				headers:{ 'Content-Type':'application/json' },
+				body: JSON.stringify({ alias })
+			  }).catch(()=>{});
+			}
+		  }
+		}
         }
 
-        // End-game detection
+		// End-game detection
         if (newPhase === 'live' && s.id) {
           const deckExhausted = newCalls.length >= 25;
           const liveMine = player.cards.filter(c => !c.exploded && !c.paused).length;
@@ -445,7 +458,13 @@ if (alias) {
           }
         }
 
-        // Poll current winner (same for everyone)
+        // when phase enters live, remember how many cards I had at start, and reset "postedOut" flag
+		if (phase !== 'live' && newPhase === 'live') {
+		  ownedAtStartRef.current = (player.cards || []).length;
+		  postedOutRef.current = false;
+		}	
+		
+		// Poll current winner (same for everyone)
         if (s.id) {
           fetch(`/api/round/winner?round_id=${encodeURIComponent(s.id)}&ts=${Date.now()}`, { cache:'no-store' })
             .then(r=>r.json())
@@ -458,6 +477,24 @@ if (alias) {
         setSpeedMs(Number(s.speed_ms)||800);
         setCalled(newCalls);
       }catch{}
+	  
+	  if (newPhase === 'ended') {
+	  // Stop any auto-caller you might have
+	  if (typeof setAutoRun === 'function') setAutoRun(false);
+
+	  // (Optional) Pull the synced winner to show name + daubs
+	  if (s.id) {
+		fetch(`/api/round/winner?round_id=${encodeURIComponent(s.id)}&ts=${Date.now()}`, { cache:'no-store' })
+		  .then(r => r.json())
+		  .then(w => {
+			if (w?.alias) setSyncedWinner({ alias: w.alias, daubs: w.daubs });
+			else setSyncedWinner({ alias: '—', daubs: 0 }); // fallback
+		  })
+		  .catch(() => setSyncedWinner({ alias: '—', daubs: 0 }));
+	  } else {
+		setSyncedWinner({ alias: '—', daubs: 0 });
+	  }
+}
     }
 
     pull();

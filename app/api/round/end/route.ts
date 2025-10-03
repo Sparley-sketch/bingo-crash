@@ -96,6 +96,27 @@ export async function POST(req: Request) {
       );
     }
 
+const calls = Array.isArray(r.called) ? r.called.length : 0;
+const deckExhausted = calls >= 25;
+
+// winner already present? (your existing helper)
+const winnerAlready = await hasWinner(supabase, r.id);
+
+// all joined players out?
+const { data: joined } = await supabase.from('round_players').select('id').eq('round_id', r.id);
+const { data: outs }   = await supabase.from('round_players').select('id').eq('round_id', r.id).not('out_at','is', null);
+const allOut = (joined?.length || 0) > 0 && (joined!.length === (outs?.length || 0));
+
+// allow end if any global condition holds (or force=1)
+if (!(deckExhausted || winnerAlready || allOut) && !force) {
+  return NextResponse.json(
+    { ok:false, refused:true, reason:'deck-not-exhausted-and-no-winner-and-not-all-out', calls,
+      joined: joined?.length || 0, outs: outs?.length || 0 },
+    { status:409, headers:nocache() }
+  );
+}
+
+    
     // Allow end when deck is exhausted OR a winner is already recorded.
     const deckExhausted = calls >= 25;
     const winnerAlready = await hasWinner(supabase, r.id);

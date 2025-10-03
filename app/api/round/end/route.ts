@@ -5,6 +5,15 @@ import { createClient } from '@supabase/supabase-js';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+/** Disable caches for all responses */
+function nocache() {
+  return {
+    'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+    Pragma: 'no-cache',
+    Expires: '0',
+  };
+}
+
 /** Admin (service-role) client: read/write rounds safely */
 function admin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -15,124 +24,170 @@ function admin() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-function nocache() {
-  return {
-    'cache-control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
-    pragma: 'no-cache',
-    expires: '0',
-    'content-type': 'application/json; charset=utf-8',
-  };
+/** Types you likely have on your "rounds" table (adjust as needed) */
+type RoundRow = {
+  id: string;
+  phase: 'idle' | 'live' | 'ended' | string;
+  called?: number[] | null;       // array of called ball numbers
+  deck?: number[] | null;         // optional: full deck stored as array
+  total_balls?: number | null;    // optional: deck size if not storing the full deck
+  winner_alias?: string | null;   // optional: winner display name/alias
+  ended_at?: string | null;
+};
+
+/** Fetch a round with the fields we need */
+async function getRound(supabase: ReturnType<typeof admin>, roundId: string) {
+  const { data, error } = await supabase
+    .from('rounds')
+    .select('id, phase, called, deck, total_balls, winner_alias, ended_at')
+    .eq('id', roundId)
+    .maybeSingle();
+  if (error) throw new Error(`Failed to load round: ${error.message}`);
+  if (!data) throw new Error('Round not found');
+  return data as RoundRow;
 }
 
 /**
- * Returns true if a winner is already recorded for this round.
- * Adjust the table/column names below to match your schema.
+ * Count server-side "live cards" for the round.
+ * IMPORTANT: Adjust the table/column names in the TODO below to match your schema.
  */
-async function hasWinner(
+async function countLiveCards(supabase: ReturnType<typeof admin>, roundId: string) {
+  // TODO: If your table is named differently (e.g., "tickets", "round_cards"),
+  // and your live indicator is different (e.g., status in ('active','live')), update this query.
+  const { count, error } = await supabase
+    .from('cards')                 // <-- TODO: table name
+    .select('id', { count: 'exact', head: true })
+    .eq('round_id', roundId)       // <-- TODO: foreign key column
+    .eq('is_live', true);          // <-- TODO: live-state column
+  if (error) throw new Error(`Failed to count live cards: ${error.message}`);
+  return count ?? 0;
+}
+
+/** Decide if deck is exhausted based on your available round fields */
+function isDeckExhausted(r: RoundRow) {
+  const calls = Array.isArray(r.called) ? r.called.length : 0;
+
+  // Prefer explicit total if present
+  if (typeof r.total_balls === 'number' && r.total_balls > 0) {
+    return calls >= r.total_balls;
+  }
+
+  // Otherwise, if entire deck is stored, compare lengths
+  if (Array.isArray(r.deck)) {
+    return calls >= r.deck.length;
+  }
+
+  // Fallback: cannot determine; assume not exhausted
+  return false;
+}
+
+/** End the round atomically if not already ended */
+async function endRoundIfNeeded(
   supabase: ReturnType<typeof admin>,
-  roundId: string
-): Promise<boolean> {
-  // Pattern A: single row per round
-  try {
-    const { data, error } = await supabase
-      .from('round_winner')
-      .select('id')
-      .eq('round_id', roundId)
-      .limit(1);
-    if (!error && (data?.length ?? 0) > 0) return true;
-  } catch {}
+  roundId: string,
+  extra: Partial<RoundRow> = {}
+) {
+  const patch: any = {
+    phase: 'ended',
+    ended_at: new Date().toISOString(),
+    ...extra,
+  };
 
-  // Pattern B: multiple rows for ties
-  try {
-    const { data, error } = await supabase
-      .from('winners')
-      .select('id')
-      .eq('round_id', roundId)
-      .limit(1);
-    if (!error && (data?.length ?? 0) > 0) return true;
-  } catch {}
+  const { data, error } = await supabase
+    .from('rounds')
+    .update(patch)
+    .eq('id', roundId)
+    .neq('phase', 'ended') // avoid touching already-ended rows
+    .select('id, phase, called')
+    .maybeSingle();
 
-  // Pattern C: winner stored directly on rounds table (e.g., winner_alias)
-  try {
-    const { data, error } = await supabase
+  if (error) throw new Error(`Failed to end round: ${error.message}`);
+
+  // If data is null, either already ended or row not found under the filter;
+  // fetch current for a consistent response.
+  if (!data) {
+    const { data: current, error: readErr } = await supabase
       .from('rounds')
-      .select('winner_alias')
+      .select('id, phase, called')
       .eq('id', roundId)
       .maybeSingle();
-    if (!error && data && (data as any).winner_alias) return true;
-  } catch {}
+    if (readErr) throw new Error(`Failed to read round after end attempt: ${readErr.message}`);
+    return current as { id: string; phase: string; called: number[] | null } | null;
+  }
 
-  return false;
+  return data as { id: string; phase: string; called: number[] | null } | null;
+}
+
+/** Check if there is a winner recorded */
+function hasWinner(r: RoundRow) {
+  return !!r.winner_alias && String(r.winner_alias).trim().length > 0;
 }
 
 export async function POST(req: Request) {
   try {
     const supabase = admin();
-    const force = new URL(req.url).searchParams.get('force') === '1';
 
-    // Fetch newest round (pure read)
-    const { data: round, error } = await supabase
-      .from('rounds')
-      .select('id, phase, called, created_at')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500, headers: nocache() });
+    // Accept roundId from either JSON body or query param (?roundId=...)
+    let roundId: string | null = null;
+    try {
+      const url = new URL(req.url);
+      roundId = url.searchParams.get('roundId');
+    } catch {}
+    if (!roundId) {
+      try {
+        const body = await req.json().catch(() => null);
+        roundId = body?.roundId ?? null;
+      } catch {}
     }
-    if (!round) {
-      return NextResponse.json({ ok: true, reason: 'no-round' }, { status: 200, headers: nocache() });
-    }
-
-    const r: any = round;
-    const calls = Array.isArray(r.called) ? r.called.length : 0;
-
-    // If not live, nothing to do (idempotent end)
-    if (r.phase !== 'live') {
-      return NextResponse.json(
-        { ok: true, phase: r.phase, calls },
-        { status: 200, headers: nocache() }
-      );
-    }
-   
-    // Allow end when deck is exhausted OR a winner is already recorded.
-    const deckExhausted = calls >= 25;
-    const winnerAlready = await hasWinner(supabase, r.id);
-
-    if (!(deckExhausted || winnerAlready) && !force) {
-      return NextResponse.json(
-        { ok: false, refused: true, reason: 'deck-not-exhausted-and-no-winner', calls },
-        { status: 409, headers: nocache() }
-      );
+    if (!roundId) {
+      return NextResponse.json({ ok: false, error: 'Missing roundId' }, { status: 400, headers: nocache() });
     }
 
-    // End the round (guard on current phase so we don't clobber concurrent updates)
-    const { data: updated, error: uerr } = await supabase
-      .from('rounds')
-      .update({ phase: 'ended' })
-      .eq('id', r.id)
-      .eq('phase', 'live') // only if still live at write time
-      .select('id, phase, called')
-      .maybeSingle();
+    // Load round
+    const round = await getRound(supabase, roundId);
+    const calls = Array.isArray(round.called) ? round.called.length : 0;
 
-    if (uerr) {
-      return NextResponse.json({ ok: false, error: uerr.message }, { status: 500, headers: nocache() });
+    // Authoritative server-side count of "live" cards across ALL players
+    const liveCards = await countLiveCards(supabase, roundId);
+
+    // Compute termination signals
+    const deckExhausted = isDeckExhausted(round);
+    const winnerRecorded = hasWinner(round);
+
+    // The round should END only when NO live cards remain (server-side), OR the deck is exhausted
+    const shouldEnd = deckExhausted || liveCards === 0;
+
+    // The "winner popup" should be shown only AFTER the round ended.
+    // We return a flag the client can use to sequence the popup strictly after ended.
+    let updatedPhase = round.phase;
+
+    if (shouldEnd && round.phase !== 'ended') {
+      const updated = await endRoundIfNeeded(supabase, roundId);
+      if (updated?.phase) updatedPhase = updated.phase as RoundRow['phase'];
     }
 
-    // If guard failed (someone else ended first), return success with current state
-    if (!updated) {
-      return NextResponse.json(
-        { ok: true, phase: 'ended', calls },
-        { status: 200, headers: nocache() }
-      );
-    }
+    const ended = updatedPhase === 'ended';
+
+    // Only allow the client to show the winner popup after the round ended.
+    const showWinnerPopup = ended && winnerRecorded;
 
     return NextResponse.json(
-      { ok: true, phase: updated.phase, calls: Array.isArray(updated.called) ? updated.called.length : calls },
+      {
+        ok: true,
+        roundId,
+        phase: updatedPhase,
+        calls,
+        deckExhausted,
+        liveCards,
+        winnerRecorded,
+        showWinnerPopup,
+      },
       { status: 200, headers: nocache() }
     );
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message || 'unknown' }, { status: 500, headers: nocache() });
+    return NextResponse.json(
+      { ok: false, error: e?.message || 'unknown' },
+      { status: 500, headers: nocache() }
+    );
   }
 }

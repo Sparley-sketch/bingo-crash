@@ -441,27 +441,9 @@ function App(){
           }
         }
 
-        // End-game detection - only check deck exhaustion on client side
-        // Server will handle ending when all players have no live cards
-
-        if (newPhase === 'live' && s.id) {
-          const deckExhausted = newCalls.length >= 25;
-         
-
-          if (deckExhausted) {
-            const alive = player.cards.filter(c=>!c.exploded);
-            const best = alive.length ? Math.max(...alive.map(c=>c.daubs)) : 0;
-            if (alias) {
-              fetch(`/api/round/winner?ts=${Date.now()}`, {
-                method:'POST',
-                headers:{'Content-Type':'application/json', Accept:'application/json'},
-                body: JSON.stringify({ round_id: s.id, alias, daubs: best })
-              }).catch(()=>{});
-            }
-            // Stop further calls globally
-            maybeEndRoundOnServer(s.id);
-          }
-        }
+        // End-game detection is handled entirely by the server
+        // Server will end the game when live_cards_count reaches 0 or deck is exhausted
+        // Client should not try to end the game based on deck exhaustion
 
         // when phase enters live, remember how many cards I had at start, and reset "postedOut" flag
         if (lastPhase !== 'live' && newPhase === 'live') {

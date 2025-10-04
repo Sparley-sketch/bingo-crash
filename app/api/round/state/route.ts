@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
-import { getRound, recomputeLiveCardsCount } from '../_lib/roundStore';
+import { getRound, recomputeLiveCardsCount, maybeEndRound } from '../_lib/roundStore';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   const r = getRound();
+  
+  // Check if game should end (when live cards = 0)
+  maybeEndRound(r);
+  
   const live = recomputeLiveCardsCount(r);
   return NextResponse.json({
     id: r.id,

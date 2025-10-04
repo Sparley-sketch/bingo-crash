@@ -79,6 +79,7 @@ export function maybeEndRound(r: RoundState = round) {
   
   // Game ends ONLY when all live cards are gone
   if (live === 0) {
+    console.log(`Game ending: live cards = ${live}, setting phase to 'ended'`);
     r.phase = 'ended';
     r.ended_at = Date.now();
     r.winner = computeWinner(r);

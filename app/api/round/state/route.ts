@@ -10,6 +10,8 @@ export async function GET() {
   maybeEndRound(r);
   
   const live = recomputeLiveCardsCount(r);
+  console.log(`State endpoint: phase=${r.phase}, live_cards=${live}, called=${r.called.length}`);
+  
   return NextResponse.json({
     id: r.id,
     phase: r.phase,

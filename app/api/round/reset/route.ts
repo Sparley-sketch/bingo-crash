@@ -40,7 +40,7 @@ export async function POST() {
   if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
 
   return NextResponse.json(
-    { id: ins.id, phase: 'setup', speed_ms: ins.speed_ms ?? speed_ms, called: ins.called ??, ok: true, id: getRound().id [] },
+    { id: ins.id, phase: 'setup', speed_ms: ins.speed_ms ?? speed_ms, called: ins.called ??, id: getRound().id [] },
     { headers: { 'Cache-Control': 'no-store' } }
   );
 }

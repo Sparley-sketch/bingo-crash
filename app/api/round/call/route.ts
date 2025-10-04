@@ -5,7 +5,11 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   const r = getRound();
-  if (r.phase !== 'live') return new NextResponse('not live', { status: 409 });
+  
+  // Stop accepting calls if game is not live
+  if (r.phase !== 'live') {
+    return new NextResponse('Game not live', { status: 409 });
+  }
 
   let n: number;
   try {

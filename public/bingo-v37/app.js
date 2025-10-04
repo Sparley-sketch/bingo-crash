@@ -452,8 +452,8 @@ function App(){
           postedOutRef.current = false;
         }	
 		
-        // Poll current winner (same for everyone)
-        if (s.id) {
+        // Poll current winner (same for everyone) - only if game is live
+        if (s.id && newPhase === 'live') {
           fetch(`/api/round/winner?round_id=${encodeURIComponent(s.id)}&ts=${Date.now()}`, { cache:'no-store' })
             .then(r=>r.json())
             .then(w=>{ if (w?.alias) setSyncedWinner({ alias:w.alias, daubs:w.daubs }); })

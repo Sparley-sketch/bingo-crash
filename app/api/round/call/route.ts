@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getRound, applyCallServerSide, maybeEndRound } from '../../_lib/roundStore';
+import { getRound, applyCallServerSide, maybeEndRound } from '../_lib/roundStore';
 
 export const dynamic = 'force-dynamic';
 

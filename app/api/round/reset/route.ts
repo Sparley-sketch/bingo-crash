@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { resetRound, getRound } from '../../_lib/roundStore';
+import { resetRound, getRound } from '../_lib/roundStore';
 
 export const dynamic = 'force-dynamic';
 

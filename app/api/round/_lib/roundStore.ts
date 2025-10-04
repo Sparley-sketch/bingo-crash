@@ -76,10 +76,8 @@ export function computeWinner(r: RoundState = round): { alias: string; daubs: nu
 export function maybeEndRound(r: RoundState = round) {
   if (r.phase !== 'live') return;
   const live = recomputeLiveCardsCount(r);
-  const deckExhausted = r.called.length >= r.deckSize;
   
   // Game ends ONLY when all live cards are gone
-  // Deck exhaustion should not end the game - players should keep seeing numbers
   if (live === 0) {
     r.phase = 'ended';
     r.ended_at = Date.now();

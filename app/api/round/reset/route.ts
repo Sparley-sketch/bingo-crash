@@ -19,7 +19,9 @@ async function readSpeed(supabase:any){
 
 export async function POST() {
   resetRound();
-  const supabase = createClient(
+  return NextResponse.json({ ok: true, id: getRound().id });
+
+const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
@@ -40,7 +42,7 @@ export async function POST() {
   if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
 
   return NextResponse.json(
-    { id: ins.id, phase: 'setup', speed_ms: ins.speed_ms ?? speed_ms, called: ins.called ??, id: getRound().id [] },
+    { id: ins.id, phase: 'setup', speed_ms: ins.speed_ms ?? speed_ms, called: ins.called ??},
     { headers: { 'Cache-Control': 'no-store' } }
   );
 }

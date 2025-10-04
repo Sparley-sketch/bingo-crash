@@ -441,12 +441,14 @@ function App(){
           }
         }
 
-        // End-game detection
+        // End-game detection - only check deck exhaustion on client side
+        // Server will handle ending when all players have no live cards
+
         if (newPhase === 'live' && s.id) {
           const deckExhausted = newCalls.length >= 25;
-          const liveMine = player.cards.filter(c => !c.exploded && !c.paused).length;
+         
 
-          if (deckExhausted || liveMine === 0) {
+          if (deckExhausted) {
             const alive = player.cards.filter(c=>!c.exploded);
             const best = alive.length ? Math.max(...alive.map(c=>c.daubs)) : 0;
             if (alias) {

@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 export const dynamic = 'force-dynamic'; export const revalidate = 0;
+import { getRound } from '../../_lib/roundStore';
 
 function admin() { return createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -32,4 +33,13 @@ export async function POST(req: Request) {
 
   if (error) return NextResponse.json({ ok:false, error: error.message }, { status:500, headers:nocache() });
   return NextResponse.json({ ok:true, round_id:(round as any).id, phase:(round as any).phase }, { status:200, headers:nocache() });
+}
+export async function POST(req: Request) {
+  const { alias } = await req.json().catch(() => ({}));
+  if (!alias) return new NextResponse('alias required', { status: 400 });
+
+  const r = getRound();
+  if (!r.players[alias]) r.players[alias] = { alias, cards: [] };
+
+  return NextResponse.json({ ok: true });
 }

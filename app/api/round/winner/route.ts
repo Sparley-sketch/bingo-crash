@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getRound } from '../../_lib/roundStore';
 
 function serverClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -45,4 +46,20 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ ok:false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok:true }, { status: 200 });
+}
+export async function POST(req: Request) {
+  const r = getRound();
+  if (r.phase !== 'ended') return new NextResponse('round not ended', { status: 409 });
+
+  const { alias, daubs } = await req.json().catch(() => ({}));
+  if (alias && typeof daubs === 'number') {
+    r.winner = { alias, daubs }; // optional: reconcile vs computed winner
+  }
+  return NextResponse.json({ ok: true, winner: r.winner });
+}
+
+// Optional: allow GET to read winner (used by client to sync popup)
+export async function GET() {
+  const r = getRound();
+  return NextResponse.json(r.winner ?? null);
 }

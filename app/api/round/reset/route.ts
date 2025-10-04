@@ -1,6 +1,7 @@
 /* @ts-nocheck */
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { resetRound, getRound } from '../../_lib/roundStore';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -41,4 +42,8 @@ export async function POST() {
     { id: ins.id, phase: 'setup', speed_ms: ins.speed_ms ?? speed_ms, called: ins.called ?? [] },
     { headers: { 'Cache-Control': 'no-store' } }
   );
+}
+export async function POST() {
+  resetRound();
+  return NextResponse.json({ ok: true, id: getRound().id });
 }

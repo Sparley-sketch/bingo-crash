@@ -1,6 +1,7 @@
 // app/api/round/out/route.ts
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getRound } from '../../_lib/roundStore';
 export const dynamic = 'force-dynamic'; export const revalidate = 0;
 
 function admin(){ return createClient(
@@ -54,4 +55,12 @@ export async function POST(req: Request) {
   const allOut = counts ? counts.all_out === true : false;
 
   return NextResponse.json({ ok:true, round_id: r.id, phase: r.phase, calls, allOut }, { status:200, headers:nocache() });
+}
+export async function POST(req: Request) {
+  const { alias } = await req.json().catch(() => ({}));
+  const r = getRound();
+  if (!alias || !r.players[alias]) return new NextResponse('unknown alias', { status: 400 });
+
+  r.players[alias].postedOut = true; // DO NOT change phase here.
+  return NextResponse.json({ ok: true });
 }

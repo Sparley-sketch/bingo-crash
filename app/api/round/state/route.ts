@@ -1,6 +1,7 @@
 // app/api/round/state/route.ts
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getRound, recomputeLiveCardsCount } from '../../_lib/roundStore';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0; // do not cache
@@ -77,4 +78,15 @@ function nocache() {
     pragma: 'no-cache',
     expires: '0',
   };
+}
+export async function GET() {
+  const r = getRound();
+  const live = recomputeLiveCardsCount(r);
+  return NextResponse.json({
+    id: r.id,
+    phase: r.phase,
+    called: r.called,
+    speed_ms: r.speed_ms,
+    live_cards_count: live
+  });
 }

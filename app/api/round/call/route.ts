@@ -1,6 +1,7 @@
 /* @ts-nocheck */
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getRound, applyCallServerSide, maybeEndRound } from '../../_lib/roundStore';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -47,4 +48,19 @@ export async function POST() {
     { n, called: upd.called, remaining: upd.deck?.length ?? nextDeck.length },
     { headers: { 'Cache-Control': 'no-store' } }
   );
+}
+export async function POST(req: Request) {
+  const r = getRound();
+  if (r.phase !== 'live') return new NextResponse('not live', { status: 409 });
+
+  const { n } = await req.json().catch(() => ({}));
+  if (typeof n !== 'number') return new NextResponse('n required', { status: 400 });
+
+  if (!r.called.includes(n)) {
+    r.called.push(n);
+    applyCallServerSide(n, r); // <-- update cards (daubs/explosions) for ALL players here
+    maybeEndRound(r);          // <-- only ends when global live cards == 0 (or deck exhausted)
+  }
+
+  return NextResponse.json({ ok: true, called: r.called.length });
 }

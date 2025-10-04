@@ -10,7 +10,11 @@ function normPhase(x:any){ return String(x ?? '').trim().toLowerCase(); }
 
 async function readSpeed(supabase:any){
   try {
-    const { data } = await supabase.from('config').select('value').eq('key','round.duration_ms').maybeSingle();
+    const { data } = await supabase
+      .from('config')
+      .select('value')
+      .eq('key','round.duration_ms')
+      .maybeSingle();
     const n = Number(data?.value);
     if (Number.isFinite(n) && n >= 100 && n <= 5000) return n;
   } catch {}
@@ -18,31 +22,62 @@ async function readSpeed(supabase:any){
 }
 
 export async function POST() {
-  resetRound();
-  return NextResponse.json({ ok: true, id: getRound().id });
-
-const supabase = createClient(
+  // 1) Init Supabase (server-side keys)
+  const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const { data: rows } = await supabase.from('rounds').select('id,phase').order('created_at',{ascending:false}).limit(1000);
-  const liveIds = (rows || []).filter(r => normPhase(r.phase) === 'live').map(r => r.id);
+  // 2) End any previously live rounds in DB (safety)
+  const { data: rows, error: rowsErr } = await supabase
+    .from('rounds')
+    .select('id,phase')
+    .order('created_at', { ascending: false })
+    .limit(1000);
+
+  if (rowsErr) {
+    return NextResponse.json({ error: rowsErr.message }, { status: 500 });
+  }
+
+  const liveIds = (rows ?? [])
+    .filter((r:any) => normPhase(r.phase) === 'live')
+    .map((r:any) => r.id);
+
   if (liveIds.length) {
-    const { error: upErr } = await supabase.from('rounds').update({ phase: 'ended' }).in('id', liveIds);
+    const { error: upErr } = await supabase
+      .from('rounds')
+      .update({ phase: 'ended' })
+      .in('id', liveIds);
     if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
   }
 
+  // 3) Insert a new "setup" round in DB
   const speed_ms = await readSpeed(supabase);
+
   const { data: ins, error: insErr } = await supabase
     .from('rounds')
     .insert([{ phase: 'setup', speed_ms, deck: [], called: [] }])
-    .select('*').single();
+    .select('*')
+    .single();
 
-  if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
+  if (insErr) {
+    return NextResponse.json({ error: insErr.message }, { status: 500 });
+  }
 
+  // 4) Reset in-memory store to keep API/state in sync
+  resetRound();
+  const mem = getRound();
+
+  // 5) Respond (no early returns before DB work)
   return NextResponse.json(
-    { id: ins.id, phase: 'setup', speed_ms: ins.speed_ms ?? speed_ms, called: ins.called ??},
+    {
+      ok: true,
+      id: ins.id,                     // DB round id
+      phase: 'setup',
+      speed_ms: ins.speed_ms ?? speed_ms,
+      called: Array.isArray(ins.called) ? ins.called : [],
+      mem_id: mem.id                  // optional: helps verify in-memory reset happened
+    },
     { headers: { 'Cache-Control': 'no-store' } }
   );
 }

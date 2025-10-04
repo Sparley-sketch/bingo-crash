@@ -77,7 +77,17 @@ export function maybeEndRound(r: RoundState = round) {
   if (r.phase !== 'live') return;
   const live = recomputeLiveCardsCount(r);
   const deckExhausted = r.called.length >= r.deckSize;
+  
+  // Debug logging
+  console.log(`maybeEndRound: live=${live}, deckExhausted=${deckExhausted}, called=${r.called.length}`);
+  console.log(`Players:`, Object.keys(r.players).map(alias => {
+    const player = r.players[alias];
+    const aliveCards = player.cards.filter(c => !c.exploded && !c.paused);
+    return `${alias}: ${aliveCards.length} live cards`;
+  }));
+  
   if (live === 0 || deckExhausted) {
+    console.log(`Game ending: live=${live}, deckExhausted=${deckExhausted}`);
     r.phase = 'ended';
     r.ended_at = Date.now();
     r.winner = computeWinner(r);
@@ -87,6 +97,8 @@ export function maybeEndRound(r: RoundState = round) {
 // Hook for your engine to apply a call to every player's cards server-side.
 // Replace this stub with your real logic.
 export function applyCallServerSide(n: number, r: RoundState = round) {
+  console.log(`applyCallServerSide: called number ${n}`);
+  
   // In a real bingo game, cards have specific numbers and only get daubs
   // when the called number matches a number on that card.
   for (const p of Object.values(r.players)) {
@@ -100,6 +112,7 @@ export function applyCallServerSide(n: number, r: RoundState = round) {
               cell.daubed = true;
               c.daubs = (c.daubs ?? 0) + 1;
               foundNumber = true;
+              console.log(`Card ${c.id} daubed number ${n}, bomb: ${cell.bomb}`);
               
               // Check if this was a bomb - if so, handle shield protection
               if (cell.bomb) {
@@ -107,11 +120,13 @@ export function applyCallServerSide(n: number, r: RoundState = round) {
                   // Shield protects from the first bomb
                   c.shieldUsed = true;
                   c.justSaved = true;
+                  console.log(`Card ${c.id} saved by shield`);
                   // Number is still daubed, but card doesn't explode
                 } else {
                   // No shield or shield already used - card explodes
                   c.exploded = true;
                   c.justExploded = true;
+                  console.log(`Card ${c.id} exploded!`);
                 }
               }
               break;

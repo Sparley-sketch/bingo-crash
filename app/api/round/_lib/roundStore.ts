@@ -72,12 +72,11 @@ export function maybeEndRound(r: RoundState = round) {
 // Hook for your engine to apply a call to every player's cards server-side.
 // Replace this stub with your real logic.
 export function applyCallServerSide(n: number, r: RoundState = round) {
-  // Example stub: increment daubs on all non-exploded, non-paused cards
+  // Simple placeholder logic: increment daubs on all non-exploded, non-paused cards.
   for (const p of Object.values(r.players)) {
     for (const c of p.cards) {
       if (!c.exploded && !c.paused) {
-        c.daubedCount = (c as any).daubedCount ? (c as any).daubedCount + 1 : 1;
-        c.daubs = Math.max(c.daubs || 0, (c as any).daubedCount);
+        c.daubs = (c.daubs ?? 0) + 1;
       }
     }
   }

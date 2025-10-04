@@ -86,9 +86,9 @@ export function maybeEndRound(r: RoundState = round) {
     return `${alias}: ${aliveCards.length} live cards`;
   }));
   
-  // Game ends ONLY when all live cards are gone OR when deck is exhausted
-  // But we prioritize live cards = 0 over deck exhaustion
-  if (live === 0 || deckExhausted) {
+  // Game ends ONLY when all live cards are gone
+  // Deck exhaustion should not end the game - players should keep seeing numbers
+  if (live === 0) {
     console.log(`Game ending: live=${live}, deckExhausted=${deckExhausted}`);
     r.phase = 'ended';
     r.ended_at = Date.now();

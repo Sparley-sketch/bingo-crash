@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   if (!r.called.includes(n)) {
     r.called.push(n);
     applyCallServerSide(n, r);
-    maybeEndRound(r); // only ends when global live cards == 0 or deck exhausted
+    maybeEndRound(r); // only ends when global live cards == 0
   }
 
   return NextResponse.json({ ok: true, called: r.called.length, number: n }, { headers: { 'Cache-Control': 'no-store' }});

@@ -1,11 +1,12 @@
-// Centralized server-side state & helpers.
-// Swap this to a DB as needed.
+// Centralized server-side state & helpers (in-memory).
+// Swap this to a DB if needed.
 
 export type Card = { id: string; exploded: boolean; paused?: boolean; daubs: number };
 export type PlayerState = { alias: string; cards: Card[]; postedOut?: boolean };
+export type Phase = 'setup' | 'live' | 'ended';
 export type RoundState = {
   id: string;
-  phase: 'setup' | 'live' | 'ended';
+  phase: Phase;
   called: number[];
   speed_ms: number;
   deckSize: number;
@@ -23,10 +24,7 @@ let round: RoundState = {
   players: {}
 };
 
-export function getRound(): RoundState {
-  return round;
-}
-
+export function getRound(): RoundState { return round; }
 export function resetRound() {
   round = {
     id: crypto.randomUUID(),
@@ -38,7 +36,7 @@ export function resetRound() {
   };
 }
 
-export function recomputeLiveCardsCount(r = round): number {
+export function recomputeLiveCardsCount(r: RoundState = round): number {
   let total = 0;
   for (const p of Object.values(r.players)) {
     total += p.cards.filter(c => !c.exploded && !c.paused).length;
@@ -46,7 +44,7 @@ export function recomputeLiveCardsCount(r = round): number {
   return total;
 }
 
-export function computeWinner(r = round): { alias: string; daubs: number } | undefined {
+export function computeWinner(r: RoundState = round): { alias: string; daubs: number } | undefined {
   let bestDaubs = -1;
   let best: { alias: string; daubs: number } | undefined;
   for (const p of Object.values(r.players)) {
@@ -60,7 +58,7 @@ export function computeWinner(r = round): { alias: string; daubs: number } | und
   return best ?? { alias: '—', daubs: 0 };
 }
 
-export function maybeEndRound(r = round) {
+export function maybeEndRound(r: RoundState = round) {
   if (r.phase !== 'live') return;
   const live = recomputeLiveCardsCount(r);
   const deckExhausted = r.called.length >= r.deckSize;
@@ -72,8 +70,15 @@ export function maybeEndRound(r = round) {
 }
 
 // Hook for your engine to apply a call to every player's cards server-side.
-export function applyCallServerSide(n: number, r = round) {
-  // TODO: integrate your actual card logic here.
-  // This stub just exists so POST /call has a single place to update state.
-  // For example, loop players -> player.cards -> mutate card.daubs / card.exploded based on n.
+// Replace this stub with your real logic.
+export function applyCallServerSide(n: number, r: RoundState = round) {
+  // Example stub: increment daubs on all non-exploded, non-paused cards
+  for (const p of Object.values(r.players)) {
+    for (const c of p.cards) {
+      if (!c.exploded && !c.paused) {
+        c.daubedCount = (c as any).daubedCount ? (c as any).daubedCount + 1 : 1;
+        c.daubs = Math.max(c.daubs || 0, (c as any).daubedCount);
+      }
+    }
+  }
 }

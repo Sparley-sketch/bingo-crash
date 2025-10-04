@@ -340,6 +340,7 @@ function App(){
   // Popups
   const [showHowTo, setShowHowTo] = useState(true);
   const [syncedWinner, setSyncedWinner] = useState(null); // {alias, daubs} | null
+  const [liveCardsCount, setLiveCardsCount] = useState(0); // Total live cards in the game
 
   // ensure we only end once
   const endPostedRef = useRef(false);
@@ -463,6 +464,7 @@ function App(){
         setPhase(newPhase);
         setSpeedMs(Number(s.speed_ms)||800);
         setCalled(newCalls);
+        setLiveCardsCount(Number(s.live_cards_count) || 0);
 
         // If server says round ended, sequence winner popup and stop any local auto-caller
         if (newPhase === 'ended') {
@@ -639,7 +641,12 @@ function App(){
         primaryText="OK"
         onPrimary={()=>location.reload()}
       >
-        {syncedWinner ? <>Winner: <b>{syncedWinner.alias}</b> with <b>{syncedWinner.daubs}</b> daubs.</> : '—'}
+        {syncedWinner ? (
+          <>
+            Winner: <b>{syncedWinner.alias}</b> with <b>{syncedWinner.daubs}</b> daubs.
+            {'\n\n'}Live cards remaining: <b>{liveCardsCount}</b>
+          </>
+        ) : '—'}
       </Modal>
 
       {/* Alias prompt */}

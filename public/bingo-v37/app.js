@@ -22,10 +22,10 @@ function boom(vol=0.85){ try{ const c=audioCtx(); if(!c) return; const t=c.curre
 
 // ---- Card helpers ----
 // 5x3 grid, 15 numbers (1..25) with 3 bombs at random positions.
-function makeCard(id,name){
+function makeCard(id,name,bombsCount=3){
   const nums = shuffle(Array.from({length:25},(_,i)=>i+1)).slice(0,15);
   const gridNums = [0,1,2].map(r => nums.slice(r*5, r*5+5));
-  const bombIdxs = new Set(shuffle(Array.from({length:15},(_,i)=>i)).slice(0,3));
+  const bombIdxs = new Set(shuffle(Array.from({length:15},(_,i)=>i)).slice(0,bombsCount));
   const grid = gridNums.map((row,r) =>
     row.map((n,c)=>{
       const flat = r*5 + c;
@@ -349,7 +349,7 @@ function App(){
   const postedOutRef    = useRef(false);
 
   // Available (pre-buy) vs Owned (purchased)
-  const freshAvail = () => Array.from({length:4},()=>makeCard(uid('pool'),'')); // start with 4 visible
+  const freshAvail = () => Array.from({length:4},()=>makeCard(uid('pool'),'', bombsPerCard)); // start with 4 visible
   const [available, setAvailable] = useState(freshAvail);
   const [selectedPool, setSelectedPool] = useState(new Set());
   const [player, setPlayer] = useState(()=>({ id:uid('p'), cards:[] })); // owned
@@ -362,6 +362,7 @@ function App(){
   const [phase,setPhase] = useState('setup');
   const [speedMs,setSpeedMs] = useState(800);
   const [called,setCalled] = useState([]);
+  const [bombsPerCard, setBombsPerCard] = useState(3);
 
   // Popups
   const [showHowTo, setShowHowTo] = useState(true);
@@ -375,7 +376,7 @@ function App(){
   function toggleSelectPool(id){ setSelectedPool(s=>{ const n=new Set(s); n.has(id)?n.delete(id):n.add(id); return n; }); }
   function generateCards(n){
     n=Math.max(1,Math.min(12,Number(n)||0));
-    setAvailable(a=>[...a, ...Array.from({length:n},()=>makeCard(uid('pool'),''))]);
+    setAvailable(a=>[...a, ...Array.from({length:n},()=>makeCard(uid('pool'),'', bombsPerCard))]);
   }
   function buySelected(){
     const price = 1;
@@ -457,6 +458,26 @@ function App(){
       return c;
     })})); 
   }
+
+  // Load bombs configuration on app start
+  useEffect(()=>{
+    fetch(`/api/config/get?key=round.bombs_per_card&ts=${Date.now()}`, {
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    })
+    .then(r => r.json())
+    .then(j => {
+      if (j?.value != null) {
+        setBombsPerCard(Number(j.value) || 3);
+      }
+    })
+    .catch(() => {});
+  }, []);
+
+  // Regenerate available cards when bombs configuration changes
+  useEffect(() => {
+    setAvailable(freshAvail);
+  }, [bombsPerCard]);
 
   // Poll state + transitions + global winner sync + stop caller on game over
   useEffect(()=>{

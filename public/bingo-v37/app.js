@@ -78,6 +78,38 @@ function applyCallToCards(cards, n, audioOn, volume){
     return {...card, grid, exploded, daubs, shieldUsed, justExploded, justSaved};
   });
 
+  // Update database for any cards that changed status
+  next.forEach(card => {
+    const originalCard = cards.find(c => c.id === card.id);
+    if (originalCard && (
+      originalCard.exploded !== card.exploded || 
+      originalCard.paused !== card.paused || 
+      originalCard.daubs !== card.daubs ||
+      originalCard.shieldUsed !== card.shieldUsed
+    )) {
+      console.log(`Updating card ${card.id} in database:`, {
+        exploded: card.exploded,
+        paused: card.paused,
+        daubs: card.daubs,
+        shieldUsed: card.shieldUsed
+      });
+      
+      fetch('/api/round/update-card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cardId: card.id,
+          exploded: card.exploded,
+          paused: card.paused,
+          daubs: card.daubs,
+          shieldUsed: card.shieldUsed
+        })
+      }).catch(error => {
+        console.error(`Failed to update card ${card.id}:`, error);
+      });
+    }
+  });
+
   if(anyBoom){
     vibrate([80,40,120]);
     if(audioOn) boom(volume);
@@ -420,7 +452,25 @@ function App(){
   }
 
   // Owned management
-  function pauseOwned(cardId){ setPlayer(p=>({...p, cards:p.cards.map(c=>(c.id===cardId && !c.paused && !c.exploded)?({...c, paused:true}):c)})); }
+  function pauseOwned(cardId){ 
+    setPlayer(p=>({...p, cards:p.cards.map(c=>{
+      if(c.id===cardId && !c.paused && !c.exploded){
+        // Update database when card is paused
+        fetch('/api/round/update-card', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cardId: cardId,
+            paused: true
+          })
+        }).catch(error => {
+          console.error(`Failed to pause card ${cardId}:`, error);
+        });
+        return {...c, paused:true};
+      }
+      return c;
+    })})); 
+  }
 
   // Poll state + transitions + global winner sync + stop caller on game over
   useEffect(()=>{

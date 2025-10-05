@@ -54,20 +54,8 @@ export async function GET() {
     const liveCardsCount = liveCardsData?.length || 0;
     const playerCount = playersData?.length || 0;
 
-    // Check if game should end (when live cards = 0)
-    if (round.phase === 'live' && liveCardsCount === 0) {
-      // End the game
-      const { error: updateError } = await supabaseAdmin
-        .from('rounds')
-        .update({ phase: 'ended' })
-        .eq('id', round.id);
-
-      if (updateError) {
-        console.error('Error ending round:', updateError);
-      } else {
-        round.phase = 'ended';
-      }
-    }
+    // Note: Automatic round ending removed - rounds should only end manually or via other endpoints
+    // This prevents rounds from ending immediately when there are no cards
 
     console.log(`State endpoint: phase=${round.phase}, live_cards=${liveCardsCount}, players=${playerCount}, called=${round.called?.length || 0}`);
     

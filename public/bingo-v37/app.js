@@ -392,6 +392,15 @@ function App(){
             
             const result = await response.json();
             console.log(`Card ${i + 1} created:`, result);
+            
+            // Check if the API call was successful
+            if (!response.ok) {
+              console.error(`Card ${i + 1} API failed:`, response.status, result);
+            } else if (!result.ok) {
+              console.error(`Card ${i + 1} result failed:`, result);
+            } else {
+              console.log(`✅ Card ${i + 1} successfully created with ID: ${result.cardId}`);
+            }
           } catch (error) {
             console.error(`Card ${i + 1} failed:`, error);
           }

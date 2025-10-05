@@ -3,9 +3,18 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
     console.log('End round endpoint called');
+    
+    // Try to get roundId from request body if provided
+    let roundId = null;
+    try {
+      const body = await req.json().catch(() => ({}));
+      roundId = body.roundId;
+    } catch {
+      // No body or invalid JSON, continue without roundId
+    }
     
     // Get current round
     const { data: round, error: roundError } = await supabaseAdmin
@@ -15,7 +24,7 @@ export async function POST() {
       .limit(1)
       .single();
 
-    console.log('Round data:', { round, roundError });
+    console.log('Round data:', { round, roundError, requestedRoundId: roundId });
 
     if (roundError && roundError.code !== 'PGRST116') {
       console.error('Error fetching round:', roundError);

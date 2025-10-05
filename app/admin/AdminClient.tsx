@@ -89,9 +89,14 @@ export default function AdminClient({ canWrite }: { canWrite: boolean }) {
   }
 
   async function endRound() {
-    const r = await fetch('/api/round/end', { method: 'POST' });
+    const body = round?.id ? { roundId: round.id } : undefined;
+    const r = await fetch('/api/round/end', { 
+      method: 'POST',
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      body: body ? JSON.stringify(body) : undefined
+    });
     const j = await r.json().catch(()=>({}));
-    if (!r.ok) alert((await r.json().catch(()=>({}))).error || r.statusText);
+    if (!r.ok) alert(`End failed: ${j.error || r.statusText}`);
   }
   async function resetToSetup() {
     const r = await fetch('/api/round/reset', { method: 'POST' });

@@ -3,8 +3,19 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
+    console.log('Start round endpoint called');
+
+    // Try to get roundId from request body if provided
+    let roundId = null;
+    try {
+      const body = await req.json().catch(() => ({}));
+      roundId = body.roundId;
+    } catch {
+      // No body or invalid JSON, continue without roundId
+    }
+
     // Get current round
     const { data: currentRound, error: fetchError } = await supabaseAdmin
       .from('rounds')
@@ -13,6 +24,8 @@ export async function POST() {
       .limit(1)
       .single();
 
+    console.log('Current round data:', { currentRound, fetchError, requestedRoundId: roundId });
+
     if (fetchError && fetchError.code !== 'PGRST116') {
       console.error('Error fetching current round:', fetchError);
       return NextResponse.json({ error: 'Failed to fetch current round' }, { status: 500 });
@@ -20,6 +33,7 @@ export async function POST() {
 
     // If already live, return current state
     if (currentRound && currentRound.phase === 'live') {
+      console.log('Round is already live, returning current state');
       return NextResponse.json(
         { 
           id: currentRound.id, 
@@ -38,8 +52,11 @@ export async function POST() {
       speed_ms: 800
     };
 
+    console.log('Starting round with data:', roundData);
+
     let result;
     if (currentRound) {
+      console.log('Updating existing round:', currentRound.id);
       // Update existing round
       const { data, error } = await supabaseAdmin
         .from('rounds')
@@ -53,7 +70,9 @@ export async function POST() {
         return NextResponse.json({ error: 'Failed to update round' }, { status: 500 });
       }
       result = data;
+      console.log('Round updated successfully:', result);
     } else {
+      console.log('Creating new round');
       // Create new round
       const { data, error } = await supabaseAdmin
         .from('rounds')
@@ -66,6 +85,7 @@ export async function POST() {
         return NextResponse.json({ error: 'Failed to create round' }, { status: 500 });
       }
       result = data;
+      console.log('Round created successfully:', result);
     }
 
     return NextResponse.json(

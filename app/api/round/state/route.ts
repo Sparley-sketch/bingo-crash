@@ -108,29 +108,23 @@ export async function GET() {
         }
       }
       
-      // End the round and start consecutive games cycle
+      // End the round (temporarily without consecutive games)
       const now = new Date();
-      const prebuyEndsAt = new Date(now.getTime() + 30 * 1000); // 30 seconds from now
-      const roundStartsAt = new Date(now.getTime() + 35 * 1000); // 35 seconds from now
       
       const { error: endError } = await supabaseAdmin
         .from('rounds')
         .update({ 
-          phase: 'prebuy',
+          phase: 'ended',
           ended_at: now.toISOString(),
-          winner: winner,
-          prebuy_ends_at: prebuyEndsAt.toISOString(),
-          round_starts_at: roundStartsAt.toISOString()
+          winner: winner
         })
         .eq('id', round.id);
 
       if (!endError) {
         // Update the round object for the response
-        round.phase = 'prebuy';
+        round.phase = 'ended';
         round.ended_at = now.toISOString();
         round.winner = winner;
-        round.prebuy_ends_at = prebuyEndsAt.toISOString();
-        round.round_starts_at = roundStartsAt.toISOString();
       }
     }
 

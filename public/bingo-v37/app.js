@@ -104,8 +104,13 @@ function applyCallToCards(cards, n, audioOn, volume){
           daubs: card.daubs,
           shieldUsed: card.shieldUsed
         })
-      }).catch(error => {
-        console.error(`Failed to update card ${card.id}:`, error);
+      })
+      .then(response => response.json())
+      .then(result => {
+        console.log(`✅ Card ${card.id} updated successfully:`, result);
+      })
+      .catch(error => {
+        console.error(`❌ Failed to update card ${card.id}:`, error);
       });
     }
   });
@@ -463,8 +468,13 @@ function App(){
             cardId: cardId,
             paused: true
           })
-        }).catch(error => {
-          console.error(`Failed to pause card ${cardId}:`, error);
+        })
+        .then(response => response.json())
+        .then(result => {
+          console.log(`✅ Card ${cardId} paused successfully:`, result);
+        })
+        .catch(error => {
+          console.error(`❌ Failed to pause card ${cardId}:`, error);
         });
         return {...c, paused:true};
       }

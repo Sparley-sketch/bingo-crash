@@ -57,6 +57,7 @@ export async function POST(req: Request) {
     }
 
     // Get or create player
+    console.log(`Looking for existing player: alias=${alias}, round_id=${round.id}`);
     let { data: player, error: playerError } = await supabaseAdmin
       .from('players')
       .select('id')
@@ -64,8 +65,11 @@ export async function POST(req: Request) {
       .eq('alias', alias)
       .single();
 
+    console.log('Player lookup result:', { player, playerError });
+
     if (playerError && playerError.code === 'PGRST116') {
       // Player doesn't exist, create them
+      console.log(`Creating new player: alias=${alias}, round_id=${round.id}`);
       const { data: newPlayer, error: insertError } = await supabaseAdmin
         .from('players')
         .insert([{ round_id: round.id, alias }])
@@ -78,9 +82,12 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: `Failed to create player: ${insertError.message}` }, { status: 500 });
       }
       player = newPlayer;
+      console.log('New player created:', player);
     } else if (playerError) {
       console.error('Error fetching player:', playerError);
       return NextResponse.json({ error: 'Failed to fetch player' }, { status: 500 });
+    } else {
+      console.log('Found existing player:', player);
     }
 
     // Ensure player exists

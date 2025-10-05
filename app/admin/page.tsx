@@ -159,19 +159,15 @@ export default function AdminPage() {
 
       {/* Config card */}
       <section className="card">
-        <div className="field">
-          <label>Key</label>
-          <input className="input" value="round.duration_ms" readOnly />
-          <p className="hint">The round duration (ms) controls the auto-caller speed when Auto-run is used.</p>
-        </div>
         <div className="row">
-          <div className="field grow">
-            <label>Value (ms)</label>
+          <div className="field">
+            <label>Auto caller speed</label>
             <input
               className="input"
               value={cfgValue}
               onChange={(e) => setCfgValue(e.target.value)}
               inputMode="numeric"
+              placeholder="ms"
             />
           </div>
           <div className="actions">
@@ -181,6 +177,7 @@ export default function AdminPage() {
             <button className="btn" onClick={loadConfig}>Reload</button>
           </div>
         </div>
+        <p className="hint">Controls the auto-caller speed when Auto-run is used.</p>
       </section>
 
       {/* Control card */}

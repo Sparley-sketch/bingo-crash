@@ -8,6 +8,8 @@ type RoundState = {
   speed_ms: number;
   called: number[];
   created_at: string | null;
+  live_cards_count?: number;
+  player_count?: number;
 };
 
 export default function AdminPage() {
@@ -110,7 +112,9 @@ export default function AdminPage() {
 
   const phase = state?.phase ?? '—';
   const called = Array.isArray(state?.called) ? state!.called.length : 0;
-const speed = (state?.speed_ms ?? Number(cfgValue)) || 800;
+  const speed = (state?.speed_ms ?? Number(cfgValue)) || 800;
+  const liveCards = state?.live_cards_count ?? 0;
+  const playerCount = state?.player_count ?? 0;
 
   return (
     <main className="wrap">
@@ -122,6 +126,23 @@ const speed = (state?.speed_ms ?? Number(cfgValue)) || 800;
           <span>· Speed: <b>{speed}</b> ms</span>
         </div>
       </header>
+
+      {/* Game Status Notification */}
+      {phase === 'live' && (
+        <section className="notification">
+          <div className="notification-content">
+            <div className="notification-icon">🎮</div>
+            <div className="notification-text">
+              <div className="notification-title">Game in Progress</div>
+              <div className="notification-details">
+                <span><b>{playerCount}</b> players</span>
+                <span>·</span>
+                <span><b>{liveCards}</b> live cards</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Config card */}
       <section className="card">
@@ -217,6 +238,13 @@ const speed = (state?.speed_ms ?? Number(cfgValue)) || 800;
         .purple:hover { background:#8b5cf6; }
 
         .check { display:inline-flex; align-items:center; gap:8px; font-size:14px; color:#c5cbe0; }
+
+        .notification { background: linear-gradient(135deg, #1e3a8a, #1e40af); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; padding: 16px; margin-top: 16px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2); }
+        .notification-content { display: flex; align-items: center; gap: 12px; }
+        .notification-icon { font-size: 24px; }
+        .notification-text { flex: 1; }
+        .notification-title { font-weight: 600; color: #dbeafe; margin-bottom: 4px; }
+        .notification-details { display: flex; align-items: center; gap: 8px; color: #bfdbfe; font-size: 14px; }
       `}</style>
     </main>
   );

@@ -10,13 +10,15 @@ export async function GET() {
   maybeEndRound(r);
   
   const live = recomputeLiveCardsCount(r);
-  console.log(`State endpoint: phase=${r.phase}, live_cards=${live}, called=${r.called.length}`);
+  const playerCount = Object.keys(r.players).length;
+  console.log(`State endpoint: phase=${r.phase}, live_cards=${live}, players=${playerCount}, called=${r.called.length}`);
   
   return NextResponse.json({
     id: r.id,
     phase: r.phase,
     called: r.called,
     speed_ms: r.speed_ms,
-    live_cards_count: live
+    live_cards_count: live,
+    player_count: playerCount
   }, { headers: { 'Cache-Control': 'no-store' }});
 }

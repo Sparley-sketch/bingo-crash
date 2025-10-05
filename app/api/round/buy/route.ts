@@ -96,7 +96,9 @@ export async function POST(req: Request) {
     }
 
     // Create a new card with proper bingo structure
-    const newCard = makeCard(`card_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, cardName);
+    // Generate a proper UUID for the card ID
+    const cardId = crypto.randomUUID();
+    const newCard = makeCard(cardId, cardName);
 
     // Insert card into database
     const { error: cardError } = await supabaseAdmin

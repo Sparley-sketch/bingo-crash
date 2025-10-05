@@ -7,15 +7,8 @@ ADD COLUMN IF NOT EXISTS prebuy_ends_at timestamptz,
 ADD COLUMN IF NOT EXISTS round_starts_at timestamptz;
 
 -- Update the phase constraint to include new phases
--- First, drop any existing constraints
-DO $$ 
-BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.table_constraints 
-               WHERE constraint_name LIKE '%phase%' 
-               AND table_name = 'rounds') THEN
-        ALTER TABLE public.rounds DROP CONSTRAINT IF EXISTS rounds_phase_check;
-    END IF;
-END $$;
+-- Drop existing constraint if it exists
+ALTER TABLE public.rounds DROP CONSTRAINT IF EXISTS rounds_phase_check;
 
 -- Add new constraint for expanded phases
 ALTER TABLE public.rounds 

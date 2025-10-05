@@ -66,21 +66,18 @@ export async function GET() {
           .eq('round_id', round.id);
 
         if (!allCardsError && allCardsData) {
-          // Group by player and find the best daubs count from NON-EXPLODED cards only
+          // Group by player and find the best daubs count from ALL cards
           const playerStats = new Map();
           allCardsData.forEach(card => {
-            // Only count non-exploded cards for winner determination
-            if (!card.exploded) {
-              const playerId = card.player_id;
-              if (!playerStats.has(playerId)) {
-                playerStats.set(playerId, { maxDaubs: 0, alias: null });
-              }
-              const stats = playerStats.get(playerId);
-              stats.maxDaubs = Math.max(stats.maxDaubs, card.daubs);
+            const playerId = card.player_id;
+            if (!playerStats.has(playerId)) {
+              playerStats.set(playerId, { maxDaubs: 0, alias: null });
             }
+            const stats = playerStats.get(playerId);
+            stats.maxDaubs = Math.max(stats.maxDaubs, card.daubs);
           });
 
-          // Find the player with the highest daubs from non-exploded cards
+          // Find the player with the highest daubs from all cards
           let bestDaubs = -1;
           let bestPlayerId = null;
           for (const [playerId, stats] of playerStats) {
@@ -90,7 +87,7 @@ export async function GET() {
             }
           }
 
-          // Get the winner's alias (only if there are non-exploded cards)
+          // Get the winner's alias
           if (bestPlayerId && bestDaubs >= 0) {
             const { data: winnerPlayer, error: winnerError } = await supabaseAdmin
               .from('players')
@@ -102,7 +99,7 @@ export async function GET() {
               winner = { alias: winnerPlayer.alias, daubs: bestDaubs };
             }
           } else {
-            // All cards exploded - no winner
+            // No cards found - no winner
             winner = { alias: '—', daubs: 0 };
           }
         }

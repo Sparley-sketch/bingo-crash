@@ -64,7 +64,16 @@ export async function POST(req: Request) {
     }
 
     // Get or create player
-    console.log(`Looking for existing player: alias=${alias}, round_id=${round.id}`);
+    console.log(`Looking for existing player: alias="${alias}", round_id=${round.id}`);
+    
+    // First, let's see what players already exist for this round
+    const { data: existingPlayers, error: listError } = await supabaseAdmin
+      .from('players')
+      .select('id, alias, created_at')
+      .eq('round_id', round.id);
+    
+    console.log(`Existing players in round ${round.id}:`, existingPlayers);
+    
     let { data: player, error: playerError } = await supabaseAdmin
       .from('players')
       .select('id')

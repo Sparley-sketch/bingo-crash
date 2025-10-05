@@ -13,12 +13,10 @@ type RoundState = {
 };
 
 export default function AdminPage() {
-  const CFG_KEY_DURATION = 'round.duration_ms';
-  const CFG_KEY_BOMBS = 'round.bombs_per_card';
+  const CFG_KEY = 'round.duration_ms';
 
   // Config UI
   const [cfgValue, setCfgValue] = React.useState('1500');
-  const [bombsValue, setBombsValue] = React.useState('3');
   const [saving, setSaving] = React.useState(false);
 
   // Round state
@@ -75,43 +73,24 @@ export default function AdminPage() {
 
   // Config endpoints
   async function loadConfig() {
-    // Load duration config
-    const durationR = await fetch(`/api/config/get?key=${encodeURIComponent(CFG_KEY_DURATION)}&ts=${Date.now()}`, {
-      cache: 'no-store',
-      headers: { Accept: 'application/json' },
-      next: { revalidate: 0 },
-    });
-    const durationJ = await durationR.json();
-    if (durationJ?.value != null) setCfgValue(String(durationJ.value));
-
-    // Load bombs config
-    const bombsR = await fetch(`/api/config/get?key=${encodeURIComponent(CFG_KEY_BOMBS)}&ts=${Date.now()}`, {
-      cache: 'no-store',
-      headers: { Accept: 'application/json' },
-      next: { revalidate: 0 },
-    });
-    const bombsJ = await bombsR.json();
-    if (bombsJ?.value != null) setBombsValue(String(bombsJ.value));
+      const r = await fetch(`/api/config/get?key=${encodeURIComponent(CFG_KEY)}&ts=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+        next: { revalidate: 0 },
+      });
+      const j = await r.json();
+      if (j?.value != null) setCfgValue(String(j.value));
   }
   
   async function saveConfig() {
     setSaving(true);
     try {
-      // Save both configs
-      await Promise.all([
-        fetch(`/api/config/set?ts=${Date.now()}`, {
-          method: 'POST',
-          cache: 'no-store',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({ key: CFG_KEY_DURATION, value: cfgValue }),
-        }),
-        fetch(`/api/config/set?ts=${Date.now()}`, {
-          method: 'POST',
-          cache: 'no-store',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({ key: CFG_KEY_BOMBS, value: bombsValue }),
-        })
-      ]);
+      await fetch(`/api/config/set?ts=${Date.now()}`, {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ key: CFG_KEY, value: cfgValue }),
+      });
       await fetchStateOnce();
     } finally {
       setSaving(false);
@@ -177,38 +156,27 @@ export default function AdminPage() {
         </section>
       )}
 
-      {/* Config card */}
-      <section className="card">
-        <div className="row">
-          <div className="field">
-            <label>Auto caller speed</label>
-            <input
-              className="input"
-              value={cfgValue}
-              onChange={(e) => setCfgValue(e.target.value)}
-              inputMode="numeric"
-              placeholder="ms"
-            />
-          </div>
-          <div className="field">
-            <label>Bombs per card</label>
-            <input
-              className="input"
-              value={bombsValue}
-              onChange={(e) => setBombsValue(e.target.value)}
-              inputMode="numeric"
-              placeholder="count"
-            />
-          </div>
-          <div className="actions">
-            <button className="btn primary" onClick={saveConfig} disabled={saving}>
-              {saving ? 'Saving…' : 'Save'}
-            </button>
-            <button className="btn" onClick={loadConfig}>Reload</button>
-          </div>
-        </div>
-        <p className="hint">Auto caller speed controls timing when Auto-run is used. Bombs per card sets the number of bombs for new cards.</p>
-      </section>
+          {/* Config card */}
+          <section className="card">
+            <div className="row between">
+              <div className="field">
+                <label>Round Duration</label>
+                <input
+                  className="input"
+                  value={cfgValue}
+                  onChange={(e) => setCfgValue(e.target.value)}
+                  inputMode="numeric"
+                  placeholder="ms"
+                />
+              </div>
+              <div className="actions">
+                <button className="btn primary" onClick={saveConfig} disabled={saving}>
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+                <button className="btn" onClick={loadConfig}>Reload</button>
+              </div>
+            </div>
+          </section>
 
       {/* Control card */}
       <section className="card">

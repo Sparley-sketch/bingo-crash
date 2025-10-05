@@ -349,7 +349,7 @@ function App(){
   const postedOutRef    = useRef(false);
 
   // Available (pre-buy) vs Owned (purchased)
-  const freshAvail = () => Array.from({length:4},()=>makeCard(uid('pool'),'', bombsPerCard)); // start with 4 visible
+  const freshAvail = () => Array.from({length:4},()=>makeCard(uid('pool'),'', 3)); // start with 4 visible
   const [available, setAvailable] = useState(freshAvail);
   const [selectedPool, setSelectedPool] = useState(new Set());
   const [player, setPlayer] = useState(()=>({ id:uid('p'), cards:[] })); // owned
@@ -362,7 +362,6 @@ function App(){
   const [phase,setPhase] = useState('setup');
   const [speedMs,setSpeedMs] = useState(800);
   const [called,setCalled] = useState([]);
-  const [bombsPerCard, setBombsPerCard] = useState(3);
 
   // Popups
   const [showHowTo, setShowHowTo] = useState(true);
@@ -376,7 +375,7 @@ function App(){
   function toggleSelectPool(id){ setSelectedPool(s=>{ const n=new Set(s); n.has(id)?n.delete(id):n.add(id); return n; }); }
   function generateCards(n){
     n=Math.max(1,Math.min(12,Number(n)||0));
-    setAvailable(a=>[...a, ...Array.from({length:n},()=>makeCard(uid('pool'),'', bombsPerCard))]);
+    setAvailable(a=>[...a, ...Array.from({length:n},()=>makeCard(uid('pool'),'', 3))]);
   }
   function buySelected(){
     const price = 1;
@@ -459,25 +458,6 @@ function App(){
     })})); 
   }
 
-  // Load bombs configuration on app start
-  useEffect(()=>{
-    fetch(`/api/config/get?key=round.bombs_per_card&ts=${Date.now()}`, {
-      cache: 'no-store',
-      headers: { Accept: 'application/json' },
-    })
-    .then(r => r.json())
-    .then(j => {
-      if (j?.value != null) {
-        setBombsPerCard(Number(j.value) || 3);
-      }
-    })
-    .catch(() => {});
-  }, []);
-
-  // Regenerate available cards when bombs configuration changes
-  useEffect(() => {
-    setAvailable(freshAvail);
-  }, [bombsPerCard]);
 
   // Poll state + transitions + global winner sync + stop caller on game over
   useEffect(()=>{
@@ -498,22 +478,6 @@ function App(){
         s=await r.json();
         if(!mounted) return;
 
-        // Also poll bombs configuration
-        try {
-          const bombsR = await fetch(`/api/config/get?key=round.bombs_per_card&ts=${Date.now()}`, {
-            cache: 'no-store',
-            headers: { Accept: 'application/json' },
-          });
-          const bombsJ = await bombsR.json();
-          if (bombsJ?.value != null) {
-            const newBombsCount = Number(bombsJ.value) || 3;
-            if (newBombsCount !== bombsPerCard) {
-              setBombsPerCard(newBombsCount);
-            }
-          }
-        } catch (e) {
-          // Ignore bombs config errors
-        }
 
         const newPhase = s.phase || 'setup';
         const newCalls = Array.isArray(s.called) ? s.called : [];

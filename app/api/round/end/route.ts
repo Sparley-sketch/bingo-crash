@@ -5,6 +5,8 @@ export const dynamic = 'force-dynamic';
 
 export async function POST() {
   try {
+    console.log('End round endpoint called');
+    
     // Get current round
     const { data: round, error: roundError } = await supabaseAdmin
       .from('rounds')
@@ -13,16 +15,22 @@ export async function POST() {
       .limit(1)
       .single();
 
+    console.log('Round data:', { round, roundError });
+
     if (roundError && roundError.code !== 'PGRST116') {
       console.error('Error fetching round:', roundError);
       return NextResponse.json({ error: 'Failed to fetch round' }, { status: 500 });
     }
 
     if (!round) {
+      console.log('No round found');
       return NextResponse.json({ error: 'No round found' }, { status: 404 });
     }
 
+    console.log(`Current round phase: ${round.phase}`);
+
     if (round.phase === 'live') {
+      console.log('Ending round...');
       // End the round
       const { error: updateError } = await supabaseAdmin
         .from('rounds')
@@ -35,6 +43,8 @@ export async function POST() {
       }
 
       console.log(`Round ${round.id} ended manually`);
+    } else {
+      console.log(`Round is not live (phase: ${round.phase}), not ending`);
     }
 
     return NextResponse.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' }});

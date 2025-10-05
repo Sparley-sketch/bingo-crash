@@ -82,6 +82,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Failed to fetch player' }, { status: 500 });
     }
 
+    // Ensure player exists
+    if (!player) {
+      return NextResponse.json({ error: 'Player not found' }, { status: 404 });
+    }
+
     // Create a new card with proper bingo structure
     const newCard = makeCard(`card_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, cardName);
 

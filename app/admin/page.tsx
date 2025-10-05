@@ -43,10 +43,15 @@ export default function AdminPage() {
   async function post(path: string) {
     setBusy(path);
     try {
+      const body = path.includes('/api/round/') && state?.id ? { roundId: state.id } : undefined;
       const r = await fetch(`${path}?ts=${Date.now()}`, {
         method: 'POST',
         cache: 'no-store',
-        headers: { Accept: 'application/json' },
+        headers: { 
+          Accept: 'application/json',
+          ...(body ? { 'Content-Type': 'application/json' } : {})
+        },
+        ...(body ? { body: JSON.stringify(body) } : {})
       });
       await r.json().catch(() => ({}));
       // Re-pull twice to avoid race with DB write

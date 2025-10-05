@@ -34,6 +34,13 @@ function makeCard(id: string, name: string) {
 
 export async function POST(req: Request) {
   try {
+    console.log('Buy endpoint called');
+    
+    // Log request details for debugging
+    const userAgent = req.headers.get('user-agent') || 'unknown';
+    const isMobile = userAgent.toLowerCase().includes('mobile');
+    console.log(`Request from ${isMobile ? 'MOBILE' : 'DESKTOP'} device: ${userAgent}`);
+    
     const { alias, cardName } = await req.json().catch(() => ({}));
     
     if (!alias) return NextResponse.json({ error: 'alias required' }, { status: 400 });

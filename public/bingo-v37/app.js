@@ -365,13 +365,28 @@ function App(){
     setAvailable(a=>a.filter(c=>!selectedPool.has(c.id)));
     setSelectedPool(new Set());
 	
-	// After successful purchase, mark this alias as "joined" for the current round.
+	// After successful purchase, create cards in the database
     if (alias) {
-      fetch('/api/round/join', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ alias })
-      }).catch(() => {});
+      console.log('Creating cards in database for alias:', alias, 'picks:', picks.length);
+      // Create each purchased card in the database
+      picks.forEach((card, index) => {
+        console.log(`Creating card ${index + 1}/${picks.length}:`, card.name || 'Bingo Card');
+        fetch('/api/round/buy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            alias: alias,
+            cardName: card.name || 'Bingo Card'
+          })
+        })
+        .then(response => response.json())
+        .then(result => {
+          console.log(`Card ${index + 1} created:`, result);
+        })
+        .catch(error => {
+          console.error(`Card ${index + 1} failed:`, error);
+        });
+      });
     }
   }
   // shield per-card for AVAILABLE pool (pre-buy only)

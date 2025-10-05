@@ -74,7 +74,8 @@ export async function POST(req: Request) {
 
       if (insertError) {
         console.error('Error creating player:', insertError);
-        return NextResponse.json({ error: 'Failed to create player' }, { status: 500 });
+        console.error('Player insert details:', { round_id: round.id, alias });
+        return NextResponse.json({ error: `Failed to create player: ${insertError.message}` }, { status: 500 });
       }
       player = newPlayer;
     } else if (playerError) {

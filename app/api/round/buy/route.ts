@@ -118,7 +118,23 @@ export async function POST(req: Request) {
 
     if (cardError) {
       console.error('Error creating card:', cardError);
-      return NextResponse.json({ error: 'Failed to create card' }, { status: 500 });
+      console.error('Card insert details:', { 
+        cardId: newCard.id, 
+        roundId: round.id, 
+        playerId: player.id,
+        cardData: {
+          name: newCard.name,
+          grid: newCard.grid,
+          paused: newCard.paused,
+          exploded: newCard.exploded,
+          daubs: newCard.daubs,
+          wants_shield: newCard.wantsShield,
+          shield_used: newCard.shieldUsed,
+          just_exploded: newCard.justExploded,
+          just_saved: newCard.justSaved
+        }
+      });
+      return NextResponse.json({ error: `Failed to create card: ${cardError.message}` }, { status: 500 });
     }
 
     // Get total cards for this player

@@ -66,18 +66,21 @@ export async function GET() {
           .eq('round_id', round.id);
 
         if (!allCardsError && allCardsData) {
-          // Group by player and find the best daubs count
+          // Group by player and find the best daubs count from NON-EXPLODED cards only
           const playerStats = new Map();
           allCardsData.forEach(card => {
-            const playerId = card.player_id;
-            if (!playerStats.has(playerId)) {
-              playerStats.set(playerId, { maxDaubs: 0, alias: null });
+            // Only count non-exploded cards for winner determination
+            if (!card.exploded) {
+              const playerId = card.player_id;
+              if (!playerStats.has(playerId)) {
+                playerStats.set(playerId, { maxDaubs: 0, alias: null });
+              }
+              const stats = playerStats.get(playerId);
+              stats.maxDaubs = Math.max(stats.maxDaubs, card.daubs);
             }
-            const stats = playerStats.get(playerId);
-            stats.maxDaubs = Math.max(stats.maxDaubs, card.daubs);
           });
 
-          // Find the player with the highest daubs
+          // Find the player with the highest daubs from non-exploded cards
           let bestDaubs = -1;
           let bestPlayerId = null;
           for (const [playerId, stats] of playerStats) {
@@ -87,8 +90,8 @@ export async function GET() {
             }
           }
 
-          // Get the winner's alias
-          if (bestPlayerId) {
+          // Get the winner's alias (only if there are non-exploded cards)
+          if (bestPlayerId && bestDaubs >= 0) {
             const { data: winnerPlayer, error: winnerError } = await supabaseAdmin
               .from('players')
               .select('alias')
@@ -98,6 +101,9 @@ export async function GET() {
             if (!winnerError && winnerPlayer) {
               winner = { alias: winnerPlayer.alias, daubs: bestDaubs };
             }
+          } else {
+            // All cards exploded - no winner
+            winner = { alias: '—', daubs: 0 };
           }
         }
       }

@@ -498,6 +498,23 @@ function App(){
         s=await r.json();
         if(!mounted) return;
 
+        // Also poll bombs configuration
+        try {
+          const bombsR = await fetch(`/api/config/get?key=round.bombs_per_card&ts=${Date.now()}`, {
+            cache: 'no-store',
+            headers: { Accept: 'application/json' },
+          });
+          const bombsJ = await bombsR.json();
+          if (bombsJ?.value != null) {
+            const newBombsCount = Number(bombsJ.value) || 3;
+            if (newBombsCount !== bombsPerCard) {
+              setBombsPerCard(newBombsCount);
+            }
+          }
+        } catch (e) {
+          // Ignore bombs config errors
+        }
+
         const newPhase = s.phase || 'setup';
         const newCalls = Array.isArray(s.called) ? s.called : [];
         setRoundId(s.id || null);

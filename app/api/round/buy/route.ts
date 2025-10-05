@@ -3,8 +3,8 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
-// 5x3 grid, 15 numbers (1..25) with 3 bombs at random positions.
-function makeCard(id: string, name: string) {
+// 5x3 grid, 15 numbers (1..25) with configurable bombs at random positions.
+function makeCard(id: string, name: string, bombsCount: number = 3) {
   function shuffle(a: number[]) {
     a = a.slice();
     for (let i = a.length - 1; i > 0; i--) {
@@ -16,7 +16,7 @@ function makeCard(id: string, name: string) {
 
   const nums = shuffle(Array.from({ length: 25 }, (_, i) => i + 1)).slice(0, 15);
   const gridNums = [0, 1, 2].map(r => nums.slice(r * 5, r * 5 + 5));
-  const bombIdxs = new Set(shuffle(Array.from({ length: 15 }, (_, i) => i)).slice(0, 3));
+  const bombIdxs = new Set(shuffle(Array.from({ length: 15 }, (_, i) => i)).slice(0, bombsCount));
   const grid = gridNums.map((row, r) =>
     row.map((n, c) => {
       const flat = r * 5 + c;
@@ -111,10 +111,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Player not found' }, { status: 404 });
     }
 
+    // Get bombs configuration
+    const { data: bombsConfig, error: bombsError } = await supabaseAdmin
+      .from('config')
+      .select('value')
+      .eq('key', 'round.bombs_per_card')
+      .single();
+
+    const bombsCount = bombsConfig?.value ? Number(bombsConfig.value) : 3;
+
     // Create a new card with proper bingo structure
     // Generate a proper UUID for the card ID
     const cardId = crypto.randomUUID();
-    const newCard = makeCard(cardId, cardName);
+    const newCard = makeCard(cardId, cardName, bombsCount);
 
     // Insert card into database
     const { error: cardError } = await supabaseAdmin

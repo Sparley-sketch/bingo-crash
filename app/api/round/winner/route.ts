@@ -52,8 +52,6 @@ export async function POST(req: Request) {
 
 export async function GET() {
   try {
-    console.log('Winner GET endpoint called');
-    
     // Get current round with all columns to avoid missing column errors
     const { data: round, error: roundError } = await supabaseAdmin
       .from('rounds')
@@ -71,7 +69,6 @@ export async function GET() {
       return NextResponse.json(null, { headers: { 'Cache-Control': 'no-store' }});
     }
 
-    console.log('Round data:', { id: round.id, phase: round.phase, winner: round.winner });
     return NextResponse.json(round.winner ?? null, { headers: { 'Cache-Control': 'no-store' }});
   } catch (error) {
     console.error('Unexpected error in winner GET endpoint:', error);

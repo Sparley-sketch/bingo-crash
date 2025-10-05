@@ -56,8 +56,6 @@ export async function GET() {
 
     // Auto-end game when all cards are exploded or locked (live_cards_count = 0)
     if (round.phase === 'live' && liveCardsCount === 0) {
-      console.log(`Auto-ending game: live_cards=${liveCardsCount}, ending round`);
-      
       // Compute winner before ending the round
       let winner = null;
       if (playerCount > 0) {
@@ -99,7 +97,6 @@ export async function GET() {
 
             if (!winnerError && winnerPlayer) {
               winner = { alias: winnerPlayer.alias, daubs: bestDaubs };
-              console.log(`Winner computed: ${winner.alias} with ${winner.daubs} daubs`);
             }
           }
         }
@@ -115,10 +112,7 @@ export async function GET() {
         })
         .eq('id', round.id);
 
-      if (endError) {
-        console.error('Error auto-ending round:', endError);
-      } else {
-        console.log('Round auto-ended successfully with winner:', winner);
+      if (!endError) {
         // Update the round object for the response
         round.phase = 'ended';
         round.ended_at = new Date().toISOString();
@@ -126,7 +120,6 @@ export async function GET() {
       }
     }
 
-    console.log(`State endpoint: phase=${round.phase}, live_cards=${liveCardsCount}, players=${playerCount}, called=${round.called?.length || 0}`);
     
     return NextResponse.json({
       id: round.id,

@@ -3,8 +3,6 @@
 
 const { useEffect, useState, useRef } = React;
 
-// Debug: Test if JavaScript is loading
-console.log('🚀 Bingo Crash app.js loaded successfully!');
 
 function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a; }
 function uid(p='id'){ return p+Math.random().toString(36).slice(2,8); }
@@ -87,13 +85,6 @@ function applyCallToCards(cards, n, audioOn, volume){
       originalCard.daubs !== card.daubs ||
       originalCard.shieldUsed !== card.shieldUsed
     )) {
-      console.log(`Updating card ${card.id} in database:`, {
-        exploded: card.exploded,
-        paused: card.paused,
-        daubs: card.daubs,
-        shieldUsed: card.shieldUsed
-      });
-      
       fetch('/api/round/update-card', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -104,13 +95,8 @@ function applyCallToCards(cards, n, audioOn, volume){
           daubs: card.daubs,
           shieldUsed: card.shieldUsed
         })
-      })
-      .then(response => response.json())
-      .then(result => {
-        console.log(`✅ Card ${card.id} updated successfully:`, result);
-      })
-      .catch(error => {
-        console.error(`❌ Failed to update card ${card.id}:`, error);
+      }).catch(error => {
+        console.error('Failed to update card:', error);
       });
     }
   });
@@ -392,14 +378,11 @@ function App(){
     setAvailable(a=>[...a, ...Array.from({length:n},()=>makeCard(uid('pool'),''))]);
   }
   function buySelected(){
-    console.log('🔥 buySelected() called!');
     const price = 1;
     const picks = available.filter(c=>selectedPool.has(c.id));
     const cost  = picks.length * price;
-    console.log('Picks selected:', picks.length, 'Cost:', cost, 'Wallet:', wallet);
-    if (picks.length === 0) { console.log('No picks selected'); return; }
+    if (picks.length === 0) return;
     if (wallet < cost) { alert(`Not enough coins. Need ${cost}.`); return; }
-    console.log('Processing purchase...');
     setWallet(w=>w - cost);
 
     // Move selected available -> owned preserving wantsShield; refresh ids
@@ -410,12 +393,10 @@ function App(){
 	
 	// After successful purchase, create cards in the database
     if (alias) {
-      console.log('Creating cards in database for alias:', alias, 'picks:', picks.length);
       // Create each purchased card in the database SEQUENTIALLY to avoid race conditions
       async function createCardsSequentially() {
         for (let i = 0; i < ownedAdd.length; i++) {
-          const card = ownedAdd[i]; // Use the new card with the correct ID
-          console.log(`Creating card ${i + 1}/${ownedAdd.length}:`, card.name || 'Bingo Card');
+          const card = ownedAdd[i];
           
           try {
             const response = await fetch('/api/round/buy', {
@@ -428,36 +409,18 @@ function App(){
             });
             
             const result = await response.json();
-            console.log(`Card ${i + 1} created:`, result);
-            console.log(`🔍 Full result object:`, JSON.stringify(result, null, 2));
             
-            // Check if the API call was successful
-            if (!response.ok) {
-              console.error(`Card ${i + 1} API failed:`, response.status, result);
-            } else if (!result.ok) {
-              console.error(`Card ${i + 1} result failed:`, result);
-            } else {
-              console.log(`✅ Card ${i + 1} successfully created with ID: ${result.cardId}`);
-              console.log(`🔍 result.cardId type:`, typeof result.cardId, `value:`, result.cardId);
-              
+            if (response.ok && result.ok && result.cardId) {
               // Update the local card with the database UUID
-              if (result.cardId) {
-                console.log(`🔄 Updating local card ${card.id} to database UUID ${result.cardId}`);
-                setPlayer(p => {
-                  console.log(`🔍 Current player cards before update:`, p.cards.map(c => ({ id: c.id, name: c.name })));
-                  const updatedCards = p.cards.map(c => 
-                    c.id === card.id ? { ...c, id: result.cardId } : c
-                  );
-                  console.log(`🔍 Updated cards after change:`, updatedCards.map(c => ({ id: c.id, name: c.name })));
-                  console.log(`✅ Local card updated:`, updatedCards.find(c => c.id === result.cardId));
-                  return { ...p, cards: updatedCards };
-                });
-              } else {
-                console.error(`❌ No cardId in result:`, result);
-              }
+              setPlayer(p => ({
+                ...p, 
+                cards: p.cards.map(c => 
+                  c.id === card.id ? { ...c, id: result.cardId } : c
+                )
+              }));
             }
           } catch (error) {
-            console.error(`Card ${i + 1} failed:`, error);
+            console.error('Card creation failed:', error);
           }
         }
       }
@@ -486,13 +449,8 @@ function App(){
             cardId: cardId,
             paused: true
           })
-        })
-        .then(response => response.json())
-        .then(result => {
-          console.log(`✅ Card ${cardId} paused successfully:`, result);
-        })
-        .catch(error => {
-          console.error(`❌ Failed to pause card ${cardId}:`, error);
+        }).catch(error => {
+          console.error('Failed to pause card:', error);
         });
         return {...c, paused:true};
       }

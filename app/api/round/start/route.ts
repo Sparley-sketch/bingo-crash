@@ -67,7 +67,8 @@ export async function POST(req: Request) {
       
       if (error) {
         console.error('Error updating round:', error);
-        return NextResponse.json({ error: 'Failed to update round' }, { status: 500 });
+        console.error('Update details:', { roundId: currentRound.id, roundData });
+        return NextResponse.json({ error: `Failed to update round: ${error.message}` }, { status: 500 });
       }
       result = data;
       console.log('Round updated successfully:', result);
@@ -82,7 +83,8 @@ export async function POST(req: Request) {
       
       if (error) {
         console.error('Error creating round:', error);
-        return NextResponse.json({ error: 'Failed to create round' }, { status: 500 });
+        console.error('Create details:', { roundData });
+        return NextResponse.json({ error: `Failed to create round: ${error.message}` }, { status: 500 });
       }
       result = data;
       console.log('Round created successfully:', result);

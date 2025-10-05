@@ -39,11 +39,21 @@ export async function POST(req: Request) {
     console.log(`Current round phase: ${round.phase}`);
 
     if (round.phase === 'live') {
-      console.log('Ending round...');
-      // End the round
+      console.log('Ending round and starting consecutive games cycle...');
+      
+      const now = new Date();
+      const prebuyEndsAt = new Date(now.getTime() + 30 * 1000); // 30 seconds from now
+      const roundStartsAt = new Date(now.getTime() + 35 * 1000); // 35 seconds from now
+      
+      // End the round and start prebuy phase
       const { error: updateError } = await supabaseAdmin
         .from('rounds')
-        .update({ phase: 'ended' })
+        .update({ 
+          phase: 'prebuy',
+          ended_at: now.toISOString(),
+          prebuy_ends_at: prebuyEndsAt.toISOString(),
+          round_starts_at: roundStartsAt.toISOString()
+        })
         .eq('id', round.id);
 
       if (updateError) {
@@ -51,7 +61,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Failed to end round' }, { status: 500 });
       }
 
-      console.log(`Round ${round.id} ended manually`);
+      console.log(`Round ${round.id} ended, prebuy phase started until ${prebuyEndsAt.toISOString()}`);
     } else {
       console.log(`Round is not live (phase: ${round.phase}), not ending`);
     }

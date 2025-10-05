@@ -338,9 +338,9 @@ function Modal({open, onClose, children, title, primaryText='Got it', onPrimary}
 }
 
 function App(){
-  // Alias + wallet
-  const [alias, setAlias]     = useState('');
-  const [askAlias, setAsk]    = useState(true);
+  // Alias + wallet (with localStorage persistence)
+  const [alias, setAlias]     = useState(() => localStorage.getItem('bingo-alias') || '');
+  const [askAlias, setAsk]    = useState(() => !localStorage.getItem('bingo-alias'));
   const [wallet, setWallet]   = useState(100);
   const [resetKey, setResetKey] = useState(0);
 
@@ -362,6 +362,8 @@ function App(){
   const [phase,setPhase] = useState('setup');
   const [speedMs,setSpeedMs] = useState(800);
   const [called,setCalled] = useState([]);
+  const [prebuyEndsAt, setPrebuyEndsAt] = useState(null);
+  const [roundStartsAt, setRoundStartsAt] = useState(null);
 
   // Popups
   const [showHowTo, setShowHowTo] = useState(true);
@@ -539,9 +541,11 @@ function App(){
         setSpeedMs(Number(s.speed_ms)||800);
         setCalled(newCalls);
         setLiveCardsCount(Number(s.live_cards_count) || 0);
+        setPrebuyEndsAt(s.prebuy_ends_at || null);
+        setRoundStartsAt(s.round_starts_at || null);
 
-        // If server says round ended, sequence winner popup and stop any local auto-caller
-        if (newPhase === 'ended') {
+        // If server says round ended (or in prebuy/countdown), sequence winner popup and stop any local auto-caller
+        if (newPhase === 'ended' || newPhase === 'prebuy' || newPhase === 'countdown') {
           if (typeof setAutoRun === 'function') setAutoRun(false);
           // Use winner from state response if available, otherwise fetch separately
           if (s.winner && s.winner.alias) {
@@ -570,6 +574,30 @@ function App(){
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player.cards, audio, volume, alias]);
 
+  // Auto-transition polling for consecutive games
+  useEffect(() => {
+    if (!roundId) return;
+    
+    const checkAutoTransitions = async () => {
+      try {
+        await fetch('/api/round/auto-transition?ts=' + Date.now(), {
+          method: 'POST',
+          cache: 'no-store',
+          headers: { Accept: 'application/json' },
+        });
+      } catch (e) {
+        // Ignore auto-transition errors
+      }
+    };
+
+    // Check auto-transitions every 2 seconds when in prebuy or countdown phases
+    if (phase === 'prebuy' || phase === 'countdown') {
+      checkAutoTransitions();
+      const id = setInterval(checkAutoTransitions, 2000);
+      return () => clearInterval(id);
+    }
+  }, [phase, roundId]);
+
   const lastCalled = called[called.length-1];
 
   return (
@@ -587,6 +615,28 @@ function App(){
           }
         </div>
       </div>
+
+      {/* Countdown Display */}
+      {(phase === 'prebuy' || phase === 'countdown') && (
+        <div className="card" style={{textAlign:'center', backgroundColor: phase === 'prebuy' ? '#fff3cd' : '#f8d7da'}}>
+          {phase === 'prebuy' && prebuyEndsAt && (
+            <div>
+              <h3 style={{margin:0, color:'#856404'}}>🛒 Pre-buy Phase</h3>
+              <div style={{fontSize:'1.2em', fontWeight:'bold', color:'#856404'}}>
+                {Math.max(0, Math.ceil((new Date(prebuyEndsAt) - new Date()) / 1000))}s to buy cards for next round
+              </div>
+            </div>
+          )}
+          {phase === 'countdown' && roundStartsAt && (
+            <div>
+              <h3 style={{margin:0, color:'#721c24'}}>🚀 Next Round Starting</h3>
+              <div style={{fontSize:'1.2em', fontWeight:'bold', color:'#721c24'}}>
+                {Math.max(0, Math.ceil((new Date(roundStartsAt) - new Date()) / 1000))}s
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Body */}
       <div className="grid twoCol">
@@ -737,6 +787,7 @@ function App(){
           const val=(el?.value||'').trim();
           if(!val){ alert('Please enter an alias.'); return; }
           setAlias(val);
+          localStorage.setItem('bingo-alias', val);
           setAsk(false);
         }}
       >

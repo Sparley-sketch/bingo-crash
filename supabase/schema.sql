@@ -9,12 +9,14 @@ create table if not exists public.config (
 -- Optional game tables (expand as needed)
 create table if not exists public.rounds (
   id uuid primary key default gen_random_uuid(),
-  phase text not null default 'setup', -- 'setup' | 'live' | 'ended'
+  phase text not null default 'setup', -- 'setup' | 'live' | 'ended' | 'prebuy' | 'countdown'
   called int[] default '{}',
   speed_ms int default 800,
   seed text,
   started_at timestamptz,
   ended_at timestamptz,
+  prebuy_ends_at timestamptz,
+  round_starts_at timestamptz,
   created_at timestamptz default now()
 );
 

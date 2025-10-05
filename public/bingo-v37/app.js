@@ -374,25 +374,31 @@ function App(){
 	// After successful purchase, create cards in the database
     if (alias) {
       console.log('Creating cards in database for alias:', alias, 'picks:', picks.length);
-      // Create each purchased card in the database
-      picks.forEach((card, index) => {
-        console.log(`Creating card ${index + 1}/${picks.length}:`, card.name || 'Bingo Card');
-        fetch('/api/round/buy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            alias: alias,
-            cardName: card.name || 'Bingo Card'
-          })
-        })
-        .then(response => response.json())
-        .then(result => {
-          console.log(`Card ${index + 1} created:`, result);
-        })
-        .catch(error => {
-          console.error(`Card ${index + 1} failed:`, error);
-        });
-      });
+      // Create each purchased card in the database SEQUENTIALLY to avoid race conditions
+      async function createCardsSequentially() {
+        for (let i = 0; i < picks.length; i++) {
+          const card = picks[i];
+          console.log(`Creating card ${i + 1}/${picks.length}:`, card.name || 'Bingo Card');
+          
+          try {
+            const response = await fetch('/api/round/buy', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                alias: alias,
+                cardName: card.name || 'Bingo Card'
+              })
+            });
+            
+            const result = await response.json();
+            console.log(`Card ${i + 1} created:`, result);
+          } catch (error) {
+            console.error(`Card ${i + 1} failed:`, error);
+          }
+        }
+      }
+      
+      createCardsSequentially();
     }
   }
   // shield per-card for AVAILABLE pool (pre-buy only)

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getRound } from '../_lib/roundStore';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,27 +33,98 @@ function makeCard(id: string, name: string) {
 }
 
 export async function POST(req: Request) {
-  const { alias, cardName } = await req.json().catch(() => ({}));
-  
-  if (!alias) return new NextResponse('alias required', { status: 400 });
-  if (!cardName) return new NextResponse('cardName required', { status: 400 });
+  try {
+    const { alias, cardName } = await req.json().catch(() => ({}));
+    
+    if (!alias) return NextResponse.json({ error: 'alias required' }, { status: 400 });
+    if (!cardName) return NextResponse.json({ error: 'cardName required' }, { status: 400 });
 
-  const r = getRound();
-  
-  // Ensure player exists
-  if (!r.players[alias]) {
-    r.players[alias] = { alias, cards: [] };
+    // Get current round
+    const { data: round, error: roundError } = await supabaseAdmin
+      .from('rounds')
+      .select('id')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (roundError && roundError.code !== 'PGRST116') {
+      console.error('Error fetching round:', roundError);
+      return NextResponse.json({ error: 'Failed to fetch round' }, { status: 500 });
+    }
+
+    if (!round) {
+      return NextResponse.json({ error: 'No round found' }, { status: 404 });
+    }
+
+    // Get or create player
+    let { data: player, error: playerError } = await supabaseAdmin
+      .from('players')
+      .select('id')
+      .eq('round_id', round.id)
+      .eq('alias', alias)
+      .single();
+
+    if (playerError && playerError.code === 'PGRST116') {
+      // Player doesn't exist, create them
+      const { data: newPlayer, error: insertError } = await supabaseAdmin
+        .from('players')
+        .insert([{ round_id: round.id, alias }])
+        .select('id')
+        .single();
+
+      if (insertError) {
+        console.error('Error creating player:', insertError);
+        return NextResponse.json({ error: 'Failed to create player' }, { status: 500 });
+      }
+      player = newPlayer;
+    } else if (playerError) {
+      console.error('Error fetching player:', playerError);
+      return NextResponse.json({ error: 'Failed to fetch player' }, { status: 500 });
+    }
+
+    // Create a new card with proper bingo structure
+    const newCard = makeCard(`card_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, cardName);
+
+    // Insert card into database
+    const { error: cardError } = await supabaseAdmin
+      .from('cards')
+      .insert([{
+        id: newCard.id,
+        round_id: round.id,
+        player_id: player.id,
+        name: newCard.name,
+        grid: newCard.grid,
+        paused: newCard.paused,
+        exploded: newCard.exploded,
+        daubs: newCard.daubs,
+        wants_shield: newCard.wantsShield,
+        shield_used: newCard.shieldUsed,
+        just_exploded: newCard.justExploded,
+        just_saved: newCard.justSaved
+      }]);
+
+    if (cardError) {
+      console.error('Error creating card:', cardError);
+      return NextResponse.json({ error: 'Failed to create card' }, { status: 500 });
+    }
+
+    // Get total cards for this player
+    const { data: cardsData, error: cardsError } = await supabaseAdmin
+      .from('cards')
+      .select('id')
+      .eq('player_id', player.id);
+
+    if (cardsError) {
+      console.error('Error fetching cards:', cardsError);
+    }
+
+    return NextResponse.json({ 
+      ok: true, 
+      cardId: newCard.id,
+      totalCards: cardsData?.length || 1
+    }, { headers: { 'Cache-Control': 'no-store' }});
+  } catch (error) {
+    console.error('Unexpected error in buy endpoint:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-
-  // Create a new card with proper bingo structure
-  const newCard = makeCard(`card_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, cardName);
-
-  // Add card to player
-  r.players[alias].cards.push(newCard);
-
-  return NextResponse.json({ 
-    ok: true, 
-    cardId: newCard.id,
-    totalCards: r.players[alias].cards.length 
-  }, { headers: { 'Cache-Control': 'no-store' }});
 }

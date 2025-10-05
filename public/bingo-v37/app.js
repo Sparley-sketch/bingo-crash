@@ -3,6 +3,9 @@
 
 const { useEffect, useState, useRef } = React;
 
+// Debug: Test if JavaScript is loading
+console.log('🚀 Bingo Crash app.js loaded successfully!');
+
 function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a; }
 function uid(p='id'){ return p+Math.random().toString(36).slice(2,8); }
 
@@ -352,11 +355,14 @@ function App(){
     setAvailable(a=>[...a, ...Array.from({length:n},()=>makeCard(uid('pool'),''))]);
   }
   function buySelected(){
+    console.log('🔥 buySelected() called!');
     const price = 1;
     const picks = available.filter(c=>selectedPool.has(c.id));
     const cost  = picks.length * price;
-    if (picks.length === 0) return;
+    console.log('Picks selected:', picks.length, 'Cost:', cost, 'Wallet:', wallet);
+    if (picks.length === 0) { console.log('No picks selected'); return; }
     if (wallet < cost) { alert(`Not enough coins. Need ${cost}.`); return; }
+    console.log('Processing purchase...');
     setWallet(w=>w - cost);
 
     // Move selected available -> owned preserving wantsShield; refresh ids

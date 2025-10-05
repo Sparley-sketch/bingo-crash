@@ -36,6 +36,7 @@ export default function AdminPage() {
       next: { revalidate: 0 },
     });
     const json = (await r.json()) as RoundState;
+    console.log('📊 Fetched state:', json);
     setState(json);
     return json;
   }
@@ -44,6 +45,8 @@ export default function AdminPage() {
     setBusy(path);
     try {
       const body = path.includes('/api/round/') && state?.id ? { roundId: state.id } : undefined;
+      console.log(`🚀 Calling ${path} with body:`, body);
+      
       const r = await fetch(`${path}?ts=${Date.now()}`, {
         method: 'POST',
         cache: 'no-store',
@@ -53,11 +56,16 @@ export default function AdminPage() {
         },
         ...(body ? { body: JSON.stringify(body) } : {})
       });
-      await r.json().catch(() => ({}));
+      
+      const response = await r.json().catch(() => ({}));
+      console.log(`📡 Response from ${path}:`, response);
+      
       // Re-pull twice to avoid race with DB write
+      console.log('🔄 Fetching state after API call...');
       await fetchStateOnce();
       await new Promise((res) => setTimeout(res, 120));
       await fetchStateOnce();
+      console.log('✅ State fetch completed');
     } finally {
       setBusy(null);
     }

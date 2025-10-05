@@ -413,9 +413,9 @@ function App(){
       console.log('Creating cards in database for alias:', alias, 'picks:', picks.length);
       // Create each purchased card in the database SEQUENTIALLY to avoid race conditions
       async function createCardsSequentially() {
-        for (let i = 0; i < picks.length; i++) {
-          const card = picks[i];
-          console.log(`Creating card ${i + 1}/${picks.length}:`, card.name || 'Bingo Card');
+        for (let i = 0; i < ownedAdd.length; i++) {
+          const card = ownedAdd[i]; // Use the new card with the correct ID
+          console.log(`Creating card ${i + 1}/${ownedAdd.length}:`, card.name || 'Bingo Card');
           
           try {
             const response = await fetch('/api/round/buy', {

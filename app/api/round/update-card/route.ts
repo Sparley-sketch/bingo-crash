@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    console.log('Update card endpoint called');
+    console.log('🔥 Update card endpoint called - POST request received');
     
     const { cardId, exploded, paused, daubs, shieldUsed } = await req.json().catch(() => ({}));
     

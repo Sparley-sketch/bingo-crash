@@ -439,12 +439,14 @@ function App(){
               console.log(`✅ Card ${i + 1} successfully created with ID: ${result.cardId}`);
               
               // Update the local card with the database UUID
-              setPlayer(p => ({
-                ...p, 
-                cards: p.cards.map(c => 
+              console.log(`🔄 Updating local card ${card.id} to database UUID ${result.cardId}`);
+              setPlayer(p => {
+                const updatedCards = p.cards.map(c => 
                   c.id === card.id ? { ...c, id: result.cardId } : c
-                )
-              }));
+                );
+                console.log(`✅ Local card updated:`, updatedCards.find(c => c.id === result.cardId));
+                return { ...p, cards: updatedCards };
+              });
             }
           } catch (error) {
             console.error(`Card ${i + 1} failed:`, error);

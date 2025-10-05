@@ -437,6 +437,14 @@ function App(){
               console.error(`Card ${i + 1} result failed:`, result);
             } else {
               console.log(`✅ Card ${i + 1} successfully created with ID: ${result.cardId}`);
+              
+              // Update the local card with the database UUID
+              setPlayer(p => ({
+                ...p, 
+                cards: p.cards.map(c => 
+                  c.id === card.id ? { ...c, id: result.cardId } : c
+                )
+              }));
             }
           } catch (error) {
             console.error(`Card ${i + 1} failed:`, error);

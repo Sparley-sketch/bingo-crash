@@ -505,7 +505,10 @@ function App(){
         // If server says round ended, sequence winner popup and stop any local auto-caller
         if (newPhase === 'ended') {
           if (typeof setAutoRun === 'function') setAutoRun(false);
-          if (s.id) {
+          // Use winner from state response if available, otherwise fetch separately
+          if (s.winner && s.winner.alias) {
+            setSyncedWinner({ alias: s.winner.alias, daubs: s.winner.daubs });
+          } else if (s.id) {
             fetch(`/api/round/winner?round_id=${encodeURIComponent(s.id)}&ts=${Date.now()}`, { cache:'no-store' })
               .then(r => r.json())
               .then(w => {

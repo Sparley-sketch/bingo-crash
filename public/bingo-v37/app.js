@@ -429,6 +429,7 @@ function App(){
             
             const result = await response.json();
             console.log(`Card ${i + 1} created:`, result);
+            console.log(`🔍 Full result object:`, JSON.stringify(result, null, 2));
             
             // Check if the API call was successful
             if (!response.ok) {
@@ -437,16 +438,23 @@ function App(){
               console.error(`Card ${i + 1} result failed:`, result);
             } else {
               console.log(`✅ Card ${i + 1} successfully created with ID: ${result.cardId}`);
+              console.log(`🔍 result.cardId type:`, typeof result.cardId, `value:`, result.cardId);
               
               // Update the local card with the database UUID
-              console.log(`🔄 Updating local card ${card.id} to database UUID ${result.cardId}`);
-              setPlayer(p => {
-                const updatedCards = p.cards.map(c => 
-                  c.id === card.id ? { ...c, id: result.cardId } : c
-                );
-                console.log(`✅ Local card updated:`, updatedCards.find(c => c.id === result.cardId));
-                return { ...p, cards: updatedCards };
-              });
+              if (result.cardId) {
+                console.log(`🔄 Updating local card ${card.id} to database UUID ${result.cardId}`);
+                setPlayer(p => {
+                  console.log(`🔍 Current player cards before update:`, p.cards.map(c => ({ id: c.id, name: c.name })));
+                  const updatedCards = p.cards.map(c => 
+                    c.id === card.id ? { ...c, id: result.cardId } : c
+                  );
+                  console.log(`🔍 Updated cards after change:`, updatedCards.map(c => ({ id: c.id, name: c.name })));
+                  console.log(`✅ Local card updated:`, updatedCards.find(c => c.id === result.cardId));
+                  return { ...p, cards: updatedCards };
+                });
+              } else {
+                console.error(`❌ No cardId in result:`, result);
+              }
             }
           } catch (error) {
             console.error(`Card ${i + 1} failed:`, error);

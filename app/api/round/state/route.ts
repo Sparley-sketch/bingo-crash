@@ -80,26 +80,42 @@ export async function GET() {
             }
           });
 
-          // Find the player with the highest daubs from non-exploded cards
+          // Find the player(s) with the highest daubs from non-exploded cards
           let bestDaubs = -1;
-          let bestPlayerId = null;
+          let bestPlayerIds = [];
           for (const [playerId, stats] of playerStats) {
             if (stats.maxDaubs > bestDaubs) {
               bestDaubs = stats.maxDaubs;
-              bestPlayerId = playerId;
+              bestPlayerIds = [playerId];
+            } else if (stats.maxDaubs === bestDaubs && bestDaubs >= 0) {
+              bestPlayerIds.push(playerId);
             }
           }
 
-          // Get the winner's alias (only if there are non-exploded cards)
-          if (bestPlayerId && bestDaubs >= 0) {
-            const { data: winnerPlayer, error: winnerError } = await supabaseAdmin
-              .from('players')
-              .select('alias')
-              .eq('id', bestPlayerId)
-              .single();
+          // Get the winner(s) alias (only if there are non-exploded cards)
+          if (bestPlayerIds.length > 0 && bestDaubs >= 0) {
+            if (bestPlayerIds.length === 1) {
+              // Single winner
+              const { data: winnerPlayer, error: winnerError } = await supabaseAdmin
+                .from('players')
+                .select('alias')
+                .eq('id', bestPlayerIds[0])
+                .single();
 
-            if (!winnerError && winnerPlayer) {
-              winner = { alias: winnerPlayer.alias, daubs: bestDaubs };
+              if (!winnerError && winnerPlayer) {
+                winner = { alias: winnerPlayer.alias, daubs: bestDaubs };
+              }
+            } else {
+              // Multiple winners (tie)
+              const { data: winnerPlayers, error: winnerError } = await supabaseAdmin
+                .from('players')
+                .select('alias')
+                .in('id', bestPlayerIds);
+
+              if (!winnerError && winnerPlayers && winnerPlayers.length > 0) {
+                const aliases = winnerPlayers.map(p => p.alias).join(' and ');
+                winner = { alias: `DRAW between ${aliases}`, daubs: bestDaubs };
+              }
             }
           } else {
             // All cards exploded - no winner

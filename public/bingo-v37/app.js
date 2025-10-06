@@ -275,70 +275,96 @@ function FXStyles(){
 .bingoBall{
   display:inline-flex; align-items:center; justify-content:center;
   width:40px; height:40px; border-radius:50%;
-  background:#fff; /* White background */
-  border:3px solid #dc2626; /* Colored border, will be overridden by color classes */
-  box-shadow:0 4px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.4); /* Enhanced 3D shadow */
+  background:#16a34a; /* Green background, will be overridden by color classes */
+  box-shadow:0 4px 8px rgba(0,0,0,0.3);
   font-size:16px; font-weight:700; color:#000;
   margin:2px; position:relative;
   overflow:hidden; /* Ensure inner elements are clipped */
 }
 .bingoBall::before{
-  content:''; position:absolute; top:3px; left:50%; transform:translateX(-50%);
-  width:18px; height:18px; border-radius:50%;
-  background:radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.6) 40%, rgba(255,255,255,0.2) 70%, transparent 100%);
-  pointer-events:none; z-index:4; /* Highlight */
+  content:''; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
+  width:32px; height:32px; border-radius:50%;
+  background:#fff; /* White ring */
+  pointer-events:none; z-index:1;
+}
+.bingoBall::after{
+  content:''; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
+  width:24px; height:24px; border-radius:50%;
+  background:#16a34a; /* Green inner ring, will be overridden by color classes */
+  pointer-events:none; z-index:2;
 }
 .bingoBall span{
   position:relative; z-index:3; color:#000; font-weight:900;
   display:inline-flex; align-items:center; justify-content:center;
-  width:28px; height:28px; border-radius:50%;
-  background:#fff; border:1px solid #000; /* White circle with black border */
+  width:18px; height:18px; border-radius:50%;
+  background:#fff; /* White center circle */
+  text-shadow: 
+    -1px -1px 0 #0066ff, /* Blue glitch effect */
+    1px 1px 0 #ff6600; /* Orange glitch effect */
 }
 
 .bingoBallMain{
   display:inline-flex; align-items:center; justify-content:center;
   width:80px; height:80px; border-radius:50%;
-  background:#fff; /* White background */
-  border:4px solid #2563eb; /* Colored border, will be overridden by color classes */
-  box-shadow:0 6px 12px rgba(0,0,0,0.4), inset 0 2px 0 rgba(255,255,255,0.4); /* Enhanced 3D shadow */
+  background:#16a34a; /* Green background, will be overridden by color classes */
+  box-shadow:0 6px 12px rgba(0,0,0,0.4);
   font-size:32px; font-weight:900; color:#000;
   position:relative;
   overflow:hidden; /* Ensure inner elements are clipped */
 }
 .bingoBallMain::before{
-  content:''; position:absolute; top:6px; left:50%; transform:translateX(-50%);
-  width:36px; height:36px; border-radius:50%;
-  background:radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.6) 40%, rgba(255,255,255,0.2) 70%, transparent 100%);
-  pointer-events:none; z-index:4; /* Highlight */
+  content:''; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
+  width:64px; height:64px; border-radius:50%;
+  background:#fff; /* White ring */
+  pointer-events:none; z-index:1;
+}
+.bingoBallMain::after{
+  content:''; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
+  width:48px; height:48px; border-radius:50%;
+  background:#16a34a; /* Green inner ring, will be overridden by color classes */
+  pointer-events:none; z-index:2;
 }
 .bingoBallMain span{
   position:relative; z-index:3; color:#000; font-weight:900;
   display:inline-flex; align-items:center; justify-content:center;
-  width:56px; height:56px; border-radius:50%;
-  background:#fff; border:2px solid #000; /* White circle with black border */
+  width:36px; height:36px; border-radius:50%;
+  background:#fff; /* White center circle */
+  text-shadow: 
+    -2px -2px 0 #0066ff, /* Blue glitch effect */
+    2px 2px 0 #ff6600; /* Orange glitch effect */
 }
 
 /* Different colored bingo balls - 5 colors based on number ranges */
-.bingoBall.red{ border-color:#dc2626; }
+.bingoBall.red{ background:#dc2626; }
+.bingoBall.red::after{ background:#dc2626; }
 
-.bingoBall.green{ border-color:#16a34a; }
+.bingoBall.green{ background:#16a34a; }
+.bingoBall.green::after{ background:#16a34a; }
 
-.bingoBall.purple{ border-color:#9333ea; }
+.bingoBall.purple{ background:#9333ea; }
+.bingoBall.purple::after{ background:#9333ea; }
 
-.bingoBall.orange{ border-color:#ea580c; }
+.bingoBall.orange{ background:#ea580c; }
+.bingoBall.orange::after{ background:#ea580c; }
 
-.bingoBall.pink{ border-color:#db2777; }
+.bingoBall.pink{ background:#db2777; }
+.bingoBall.pink::after{ background:#db2777; }
 
 /* Main bingo ball colors - 5 colors based on number ranges */
-.bingoBallMain.red{ border-color:#dc2626; }
+.bingoBallMain.red{ background:#dc2626; }
+.bingoBallMain.red::after{ background:#dc2626; }
 
-.bingoBallMain.green{ border-color:#16a34a; }
+.bingoBallMain.green{ background:#16a34a; }
+.bingoBallMain.green::after{ background:#16a34a; }
 
-.bingoBallMain.purple{ border-color:#9333ea; }
+.bingoBallMain.purple{ background:#9333ea; }
+.bingoBallMain.purple::after{ background:#9333ea; }
 
-.bingoBallMain.orange{ border-color:#ea580c; }
+.bingoBallMain.orange{ background:#ea580c; }
+.bingoBallMain.orange::after{ background:#ea580c; }
 
-.bingoBallMain.pink{ border-color:#db2777; }
+.bingoBallMain.pink{ background:#db2777; }
+.bingoBallMain.pink::after{ background:#db2777; }
 
 /* Enhanced 3D hover effects */
 .bingoBall:hover{

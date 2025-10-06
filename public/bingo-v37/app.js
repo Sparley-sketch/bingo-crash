@@ -175,6 +175,7 @@ function FXStyles(){
   position:relative; display:grid; place-items:center;
   aspect-ratio:1 / 1; border:1px solid #e2e8f0; border-radius:var(--cell-radius,10px);
   background:#fff; min-width:0; box-sizing:border-box; padding:0;
+  z-index:2;
 }
 .cell .num{
   display:block; width:100%; text-align:center; font-weight:700;
@@ -216,18 +217,18 @@ function FXStyles(){
   display:flex; align-items:center; justify-content:center;
   background:transparent; border:1px solid #e2e8f0; border-radius:6px;
   box-sizing:border-box;
-  margin-left:-10px;
+  margin-left:0px;
 }
 
 /* Lock overlay - always behind numbers */
 .mobileLockOverlay{
-  position:absolute; inset:0; z-index:1;
+  position:absolute; inset:0; z-index:0;
   display:flex; align-items:center; justify-content:center;
   background:transparent; border-radius:inherit;
   cursor:pointer; transition:all 0.2s ease;
 }
 .mobileLockOverlay.locked{
-  background:transparent; z-index:1;
+  background:transparent; z-index:0;
 }
 .mobileLockIcon{
   font-size:58px; color:#1e293b;

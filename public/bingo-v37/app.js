@@ -288,12 +288,15 @@ function FXStyles(){
 }
 .bingoBall::after{
   content:''; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
-  width:24px; height:24px; border-radius:50%;
+  width:28px; height:28px; border-radius:50%;
   background:#fff; border:2px solid #dc2626;
   pointer-events:none; z-index:1;
 }
 .bingoBall span{
-  position:relative; z-index:2; color:#000; font-weight:900;
+  position:relative; z-index:3; color:#000; font-weight:900;
+  display:inline-flex; align-items:center; justify-content:center;
+  width:20px; height:20px; border-radius:50%;
+  background:#fff; border:1px solid #dc2626;
 }
 
 .bingoBallMain{
@@ -312,20 +315,20 @@ function FXStyles(){
 }
 .bingoBallMain::after{
   content:''; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
-  width:48px; height:48px; border-radius:50%;
+  width:56px; height:56px; border-radius:50%;
   background:#fff; border:3px solid #2563eb;
   pointer-events:none; z-index:1;
 }
 .bingoBallMain span{
-  position:relative; z-index:2; color:#000; font-weight:900;
+  position:relative; z-index:3; color:#000; font-weight:900;
+  display:inline-flex; align-items:center; justify-content:center;
+  width:40px; height:40px; border-radius:50%;
+  background:#fff; border:2px solid #2563eb;
 }
 
-/* Different colored bingo balls */
+/* Different colored bingo balls - 5 colors based on number ranges */
 .bingoBall.red{ background:linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #b91c1c 100%); border-color:#991b1b; }
 .bingoBall.red::after{ border-color:#dc2626; }
-
-.bingoBall.blue{ background:linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%); border-color:#1e40af; }
-.bingoBall.blue::after{ border-color:#2563eb; }
 
 .bingoBall.green{ background:linear-gradient(135deg, #22c55e 0%, #16a34a 50%, #15803d 100%); border-color:#166534; }
 .bingoBall.green::after{ border-color:#16a34a; }
@@ -336,24 +339,12 @@ function FXStyles(){
 .bingoBall.orange{ background:linear-gradient(135deg, #f97316 0%, #ea580c 50%, #c2410c 100%); border-color:#9a3412; }
 .bingoBall.orange::after{ border-color:#ea580c; }
 
-.bingoBall.yellow{ background:linear-gradient(135deg, #eab308 0%, #ca8a04 50%, #a16207 100%); border-color:#854d0e; }
-.bingoBall.yellow::after{ border-color:#ca8a04; }
-
 .bingoBall.pink{ background:linear-gradient(135deg, #ec4899 0%, #db2777 50%, #be185d 100%); border-color:#9d174d; }
 .bingoBall.pink::after{ border-color:#db2777; }
 
-.bingoBall.cyan{ background:linear-gradient(135deg, #06b6d4 0%, #0891b2 50%, #0e7490 100%); border-color:#155e75; }
-.bingoBall.cyan::after{ border-color:#0891b2; }
-
-.bingoBall.indigo{ background:linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #4338ca 100%); border-color:#3730a3; }
-.bingoBall.indigo::after{ border-color:#4f46e5; }
-
-/* Main bingo ball colors */
+/* Main bingo ball colors - 5 colors based on number ranges */
 .bingoBallMain.red{ background:linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #b91c1c 100%); border-color:#991b1b; }
 .bingoBallMain.red::after{ border-color:#dc2626; }
-
-.bingoBallMain.blue{ background:linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%); border-color:#1e40af; }
-.bingoBallMain.blue::after{ border-color:#2563eb; }
 
 .bingoBallMain.green{ background:linear-gradient(135deg, #22c55e 0%, #16a34a 50%, #15803d 100%); border-color:#166534; }
 .bingoBallMain.green::after{ border-color:#16a34a; }
@@ -364,17 +355,8 @@ function FXStyles(){
 .bingoBallMain.orange{ background:linear-gradient(135deg, #f97316 0%, #ea580c 50%, #c2410c 100%); border-color:#9a3412; }
 .bingoBallMain.orange::after{ border-color:#ea580c; }
 
-.bingoBallMain.yellow{ background:linear-gradient(135deg, #eab308 0%, #ca8a04 50%, #a16207 100%); border-color:#854d0e; }
-.bingoBallMain.yellow::after{ border-color:#ca8a04; }
-
 .bingoBallMain.pink{ background:linear-gradient(135deg, #ec4899 0%, #db2777 50%, #be185d 100%); border-color:#9d174d; }
 .bingoBallMain.pink::after{ border-color:#db2777; }
-
-.bingoBallMain.cyan{ background:linear-gradient(135deg, #06b6d4 0%, #0891b2 50%, #0e7490 100%); border-color:#155e75; }
-.bingoBallMain.cyan::after{ border-color:#0891b2; }
-
-.bingoBallMain.indigo{ background:linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #4338ca 100%); border-color:#3730a3; }
-.bingoBallMain.indigo::after{ border-color:#4f46e5; }
 
 /* Phase sizing (desktop/base) */
 .phase-live .cell .num{ --cell-font:15px; }
@@ -812,13 +794,21 @@ function App(){
             ? (<>
                 <div className="muted">Caller</div>
                 <div className={`bingoBallMain ${lastCalled ? (() => {
-                  const colors = ['red', 'blue', 'green', 'purple', 'orange', 'yellow', 'pink', 'cyan', 'indigo'];
-                  return colors[lastCalled % colors.length];
+                  if (lastCalled >= 1 && lastCalled <= 5) return 'red';
+                  if (lastCalled >= 6 && lastCalled <= 10) return 'green';
+                  if (lastCalled >= 11 && lastCalled <= 15) return 'purple';
+                  if (lastCalled >= 16 && lastCalled <= 20) return 'orange';
+                  if (lastCalled >= 21 && lastCalled <= 25) return 'pink';
+                  return 'red'; // fallback
                 })() : ''}`}><span>{lastCalled ?? '—'}</span></div>
                 <div className="muted" style={{marginTop:6}}>Speed: {(speedMs/1000).toFixed(1)}s · History</div>
                 <div className="list" style={{marginTop:8}}>{called.map(n=>{
-                  const colors = ['red', 'blue', 'green', 'purple', 'orange', 'yellow', 'pink', 'cyan', 'indigo'];
-                  const colorClass = colors[n % colors.length];
+                  let colorClass = 'red'; // fallback
+                  if (n >= 1 && n <= 5) colorClass = 'red';
+                  else if (n >= 6 && n <= 10) colorClass = 'green';
+                  else if (n >= 11 && n <= 15) colorClass = 'purple';
+                  else if (n >= 16 && n <= 20) colorClass = 'orange';
+                  else if (n >= 21 && n <= 25) colorClass = 'pink';
                   return <span key={n} className={`bingoBall ${colorClass}`}><span>{n}</span></span>;
                 })}</div>
               </>)

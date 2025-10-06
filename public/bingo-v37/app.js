@@ -374,40 +374,6 @@ function FXStyles(){
   transition:all 0.2s ease;
 }
 
-/* Rolling animation from caller to history - curved, bouncy, gamified */
-@keyframes rollToHistory {
-  0% { 
-    transform: translateX(0) translateY(0) rotate(0deg) scale(1); 
-    opacity: 1; 
-  }
-  20% { 
-    transform: translateX(80px) translateY(-15px) rotate(72deg) scale(1.05); 
-    opacity: 0.95; 
-  }
-  40% { 
-    transform: translateX(160px) translateY(-25px) rotate(144deg) scale(1.1); 
-    opacity: 0.9; 
-  }
-  60% { 
-    transform: translateX(240px) translateY(-20px) rotate(216deg) scale(1.05); 
-    opacity: 0.85; 
-  }
-  80% { 
-    transform: translateX(320px) translateY(-10px) rotate(288deg) scale(1.02); 
-    opacity: 0.8; 
-  }
-  100% { 
-    transform: translateX(400px) translateY(0) rotate(360deg) scale(1); 
-    opacity: 0; 
-  }
-}
-
-.rollingBall {
-  animation: rollToHistory 3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-  position: absolute;
-  z-index: 1000;
-  pointer-events: none;
-}
 
 /* Phase sizing (desktop/base) */
 .phase-live .cell .num{ --cell-font:15px; }
@@ -607,7 +573,6 @@ function App(){
   const [phase,setPhase] = useState('setup');
   const [speedMs,setSpeedMs] = useState(800);
   const [called,setCalled] = useState([]);
-  const [rollingBall, setRollingBall] = useState(null);
 
   // Popups
   const [showHowTo, setShowHowTo] = useState(true);
@@ -784,13 +749,6 @@ function App(){
         lastPhase = newPhase; lastCount = newCalls.length;
         setPhase(newPhase);
         setSpeedMs(Number(s.speed_ms)||800);
-        // Check if a new number was called and trigger rolling animation
-        if (newCalls.length > called.length && newCalls.length > 0) {
-          const newNumber = newCalls[newCalls.length - 1];
-          setRollingBall(newNumber);
-          // Clear rolling ball after animation completes (3 seconds)
-          setTimeout(() => setRollingBall(null), 3000);
-        }
         
         setCalled(newCalls);
         setLiveCardsCount(Number(s.live_cards_count) || 0);
@@ -861,26 +819,6 @@ function App(){
                   if (lastCalled >= 21 && lastCalled <= 25) return 'pink';
                   return 'red'; // fallback
                 })() : ''}`}><span>{lastCalled ?? '—'}</span></div>
-                
-                {/* Rolling ball animation */}
-                {rollingBall && (
-                  <div className="rollingBall" style={{
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)'
-                  }}>
-                    <div className={`bingoBallMain ${(() => {
-                      if (rollingBall >= 1 && rollingBall <= 5) return 'red';
-                      if (rollingBall >= 6 && rollingBall <= 10) return 'green';
-                      if (rollingBall >= 11 && rollingBall <= 15) return 'purple';
-                      if (rollingBall >= 16 && rollingBall <= 20) return 'orange';
-                      if (rollingBall >= 21 && rollingBall <= 25) return 'pink';
-                      return 'red';
-                    })()}`}>
-                      <span>{rollingBall}</span>
-                    </div>
-                  </div>
-                )}
                 <div className="muted" style={{marginTop:6}}>Speed: {(speedMs/1000).toFixed(1)}s · History</div>
                 <div className="list" style={{marginTop:8}}>{called.map(n=>{
                   let colorClass = 'red'; // fallback

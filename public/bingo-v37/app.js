@@ -275,93 +275,91 @@ function FXStyles(){
 .bingoBall{
   display:inline-flex; align-items:center; justify-content:center;
   width:40px; height:40px; border-radius:50%;
-  background:linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #b91c1c 100%);
-  border:2px solid #991b1b; 
-  box-shadow:0 6px 12px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3);
+  background-color:#dc2626; /* Default red, will be overridden by color classes */
+  border:1px solid #991b1b; /* Subtle border for depth */
+  box-shadow:0 4px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.4); /* Enhanced 3D shadow */
   font-size:16px; font-weight:700; color:#000;
   margin:2px; position:relative;
+  overflow:hidden; /* Ensure inner elements are clipped */
 }
 .bingoBall::before{
   content:''; position:absolute; top:4px; left:50%; transform:translateX(-50%);
   width:20px; height:20px; border-radius:50%;
   background:radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.6) 40%, rgba(255,255,255,0.2) 70%, transparent 100%);
-  pointer-events:none;
+  pointer-events:none; z-index:4; /* Highlight */
 }
 .bingoBall::after{
   content:''; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
   width:36px; height:36px; border-radius:50%;
-  background:#fff; border:2px solid #dc2626;
-  box-shadow:inset 0 2px 4px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.2);
+  background:#fff; border:1px solid #000; /* Outer white ring with gap */
   pointer-events:none; z-index:1;
 }
 .bingoBall span{
   position:relative; z-index:3; color:#000; font-weight:900;
   display:inline-flex; align-items:center; justify-content:center;
   width:24px; height:24px; border-radius:50%;
-  background:#fff; border:1px solid #dc2626;
-  box-shadow:inset 0 1px 2px rgba(0,0,0,0.1);
+  background:#fff; border:1px solid #000; /* Inner white circle with number */
 }
 
 .bingoBallMain{
   display:inline-flex; align-items:center; justify-content:center;
   width:80px; height:80px; border-radius:50%;
-  background:linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%);
-  border:3px solid #1e40af; 
-  box-shadow:0 8px 16px rgba(0,0,0,0.4), 0 4px 8px rgba(0,0,0,0.3), inset 0 2px 0 rgba(255,255,255,0.4);
+  background-color:#2563eb; /* Default blue, will be overridden by color classes */
+  border:1px solid #1e40af; /* Subtle border for depth */
+  box-shadow:0 6px 12px rgba(0,0,0,0.4), inset 0 2px 0 rgba(255,255,255,0.4); /* Enhanced 3D shadow */
   font-size:32px; font-weight:900; color:#000;
   position:relative;
+  overflow:hidden; /* Ensure inner elements are clipped */
 }
 .bingoBallMain::before{
   content:''; position:absolute; top:8px; left:50%; transform:translateX(-50%);
   width:40px; height:40px; border-radius:50%;
   background:radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.6) 40%, rgba(255,255,255,0.2) 70%, transparent 100%);
-  pointer-events:none;
+  pointer-events:none; z-index:4; /* Highlight */
 }
 .bingoBallMain::after{
   content:''; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
   width:72px; height:72px; border-radius:50%;
-  background:#fff; border:3px solid #2563eb;
-  box-shadow:inset 0 3px 6px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.3);
+  background:#fff; border:2px solid #000; /* Outer white ring with gap */
   pointer-events:none; z-index:1;
 }
 .bingoBallMain span{
   position:relative; z-index:3; color:#000; font-weight:900;
   display:inline-flex; align-items:center; justify-content:center;
   width:48px; height:48px; border-radius:50%;
-  background:#fff; border:2px solid #2563eb;
-  box-shadow:inset 0 2px 4px rgba(0,0,0,0.1);
+  background:#fff; border:2px solid #000; /* Inner white circle with number */
 }
 
 /* Different colored bingo balls - 5 colors based on number ranges */
-.bingoBall.red{ background:linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #b91c1c 100%); border-color:#991b1b; }
+.bingoBall.red{ background-color:#dc2626; border-color:#991b1b; }
 .bingoBall.red::after{ border-color:#dc2626; }
 
-.bingoBall.green{ background:linear-gradient(135deg, #22c55e 0%, #16a34a 50%, #15803d 100%); border-color:#166534; }
+.bingoBall.green{ background-color:#16a34a; border-color:#166534; }
 .bingoBall.green::after{ border-color:#16a34a; }
 
-.bingoBall.purple{ background:linear-gradient(135deg, #a855f7 0%, #9333ea 50%, #7c3aed 100%); border-color:#6b21a8; }
+.bingoBall.purple{ background-color:#9333ea; border-color:#6b21a8; }
 .bingoBall.purple::after{ border-color:#9333ea; }
 
-.bingoBall.orange{ background:linear-gradient(135deg, #f97316 0%, #ea580c 50%, #c2410c 100%); border-color:#9a3412; }
+.bingoBall.orange{ background-color:#ea580c; border-color:#9a3412; }
 .bingoBall.orange::after{ border-color:#ea580c; }
 
-.bingoBall.pink{ background:linear-gradient(135deg, #ec4899 0%, #db2777 50%, #be185d 100%); border-color:#9d174d; }
+.bingoBall.pink{ background-color:#db2777; border-color:#9d174d; }
 .bingoBall.pink::after{ border-color:#db2777; }
 
 /* Main bingo ball colors - 5 colors based on number ranges */
-.bingoBallMain.red{ background:linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #b91c1c 100%); border-color:#991b1b; }
+.bingoBallMain.red{ background-color:#dc2626; border-color:#991b1b; }
 .bingoBallMain.red::after{ border-color:#dc2626; }
 
-.bingoBallMain.green{ background:linear-gradient(135deg, #22c55e 0%, #16a34a 50%, #15803d 100%); border-color:#166534; }
+.bingoBallMain.green{ background-color:#16a34a; border-color:#166534; }
 .bingoBallMain.green::after{ border-color:#16a34a; }
 
-.bingoBallMain.purple{ background:linear-gradient(135deg, #a855f7 0%, #9333ea 50%, #7c3aed 100%); border-color:#6b21a8; }
+.bingoBallMain.purple{ background-color:#9333ea; border-color:#6b21a8; }
 .bingoBallMain.purple::after{ border-color:#9333ea; }
 
-.bingoBallMain.orange{ background:linear-gradient(135deg, #f97316 0%, #ea580c 50%, #c2410c 100%); border-color:#9a3412; }
+.bingoBallMain.orange{ background-color:#ea580c; border-color:#9a3412; }
 .bingoBallMain.orange::after{ border-color:#ea580c; }
 
-.bingoBallMain.pink{ background:linear-gradient(135deg, #ec4899 0%, #db2777 50%, #be185d 100%); border-color:#9d174d; }
+.bingoBallMain.pink{ background-color:#db2777; border-color:#9d174d; }
 .bingoBallMain.pink::after{ border-color:#db2777; }
 
 /* Enhanced 3D hover effects */
@@ -376,24 +374,44 @@ function FXStyles(){
   transition:all 0.2s ease;
 }
 
-/* Rolling animation from caller to history */
+/* Rolling animation from caller to history - curved, bouncy, gamified */
 @keyframes rollToHistory {
   0% { 
-    transform: translateX(0) rotate(0deg); 
+    transform: translateX(0) translateY(0) rotate(0deg) scale(1); 
     opacity: 1; 
   }
-  50% { 
-    transform: translateX(50vw) rotate(180deg); 
+  15% { 
+    transform: translateX(15vw) translateY(-20px) rotate(45deg) scale(1.1); 
+    opacity: 0.95; 
+  }
+  30% { 
+    transform: translateX(30vw) translateY(-10px) rotate(90deg) scale(1.05); 
+    opacity: 0.9; 
+  }
+  45% { 
+    transform: translateX(45vw) translateY(-15px) rotate(135deg) scale(1.1); 
+    opacity: 0.85; 
+  }
+  60% { 
+    transform: translateX(60vw) translateY(-5px) rotate(180deg) scale(1.05); 
     opacity: 0.8; 
   }
+  75% { 
+    transform: translateX(75vw) translateY(-10px) rotate(225deg) scale(1.1); 
+    opacity: 0.7; 
+  }
+  90% { 
+    transform: translateX(90vw) translateY(-5px) rotate(270deg) scale(1.05); 
+    opacity: 0.5; 
+  }
   100% { 
-    transform: translateX(100vw) rotate(360deg); 
+    transform: translateX(100vw) translateY(0) rotate(360deg) scale(1); 
     opacity: 0; 
   }
 }
 
 .rollingBall {
-  animation: rollToHistory 1.5s ease-out forwards;
+  animation: rollToHistory 3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
   position: absolute;
   z-index: 1000;
   pointer-events: none;
@@ -778,8 +796,8 @@ function App(){
         if (newCalls.length > called.length && newCalls.length > 0) {
           const newNumber = newCalls[newCalls.length - 1];
           setRollingBall(newNumber);
-          // Clear rolling ball after animation completes
-          setTimeout(() => setRollingBall(null), 1500);
+          // Clear rolling ball after animation completes (3 seconds)
+          setTimeout(() => setRollingBall(null), 3000);
         }
         
         setCalled(newCalls);

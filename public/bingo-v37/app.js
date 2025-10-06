@@ -219,6 +219,12 @@ function FXStyles(){
   box-sizing:border-box;
   margin-left:0px;
 }
+.lockedText{
+  font-size:12px; font-weight:600; color:#dc2626;
+  background:transparent; padding:4px 8px; border-radius:4px;
+  border:1px solid #dc2626; height:32px; display:flex; align-items:center;
+  box-sizing:border-box;
+}
 
 /* Lock overlay - in front but very faded */
 .mobileLockOverlay{
@@ -234,12 +240,12 @@ function FXStyles(){
   font-size:58px; color:#1e293b;
   transition:all 0.2s ease;
   animation: lockPulseFaded 2s ease-in-out infinite;
-  opacity:0.15;
+  opacity:0.05;
 }
 .mobileLockOverlay.locked .mobileLockIcon{
   color:#1e293b; font-size:58px;
   animation: lockShake 0.5s ease-in-out;
-  opacity:0.15;
+  opacity:0.4;
 }
 
 /* Lock animations */
@@ -367,6 +373,10 @@ function CardView({
           {phase === 'setup' && !selectable && card.wantsShield && (
 		  <img src={SHIELD_ICON} alt="Shield active" className="shieldIcon" />
 		)}
+          {/* LOCKED text when card is locked */}
+          {phase === 'live' && card.paused && (
+            <span className="lockedText">LOCKED</span>
+          )}
         </div>
 
         {/* CENTER: empty space (lock button removed) */}

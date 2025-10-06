@@ -783,7 +783,6 @@ function App(){
       </Modal>
     </div>
   );
-    return React.createElement('div', null, 'Replace this stub with the full file contents from app.fixed2.js');
 }
 
 const root = ReactDOM.createRoot(document.getElementById("root"));

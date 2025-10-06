@@ -289,7 +289,7 @@ function FXStyles(){
 }
 .bingoBall::after{
   content:''; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
-  width:28px; height:28px; border-radius:50%;
+  width:36px; height:36px; border-radius:50%;
   background:#fff; border:2px solid #dc2626;
   box-shadow:inset 0 2px 4px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.2);
   pointer-events:none; z-index:1;
@@ -297,7 +297,7 @@ function FXStyles(){
 .bingoBall span{
   position:relative; z-index:3; color:#000; font-weight:900;
   display:inline-flex; align-items:center; justify-content:center;
-  width:20px; height:20px; border-radius:50%;
+  width:24px; height:24px; border-radius:50%;
   background:#fff; border:1px solid #dc2626;
   box-shadow:inset 0 1px 2px rgba(0,0,0,0.1);
 }
@@ -319,7 +319,7 @@ function FXStyles(){
 }
 .bingoBallMain::after{
   content:''; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
-  width:56px; height:56px; border-radius:50%;
+  width:72px; height:72px; border-radius:50%;
   background:#fff; border:3px solid #2563eb;
   box-shadow:inset 0 3px 6px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.3);
   pointer-events:none; z-index:1;
@@ -327,7 +327,7 @@ function FXStyles(){
 .bingoBallMain span{
   position:relative; z-index:3; color:#000; font-weight:900;
   display:inline-flex; align-items:center; justify-content:center;
-  width:40px; height:40px; border-radius:50%;
+  width:48px; height:48px; border-radius:50%;
   background:#fff; border:2px solid #2563eb;
   box-shadow:inset 0 2px 4px rgba(0,0,0,0.1);
 }
@@ -374,6 +374,29 @@ function FXStyles(){
   transform:translateY(-3px);
   box-shadow:0 12px 24px rgba(0,0,0,0.5), 0 6px 12px rgba(0,0,0,0.4), inset 0 2px 0 rgba(255,255,255,0.4);
   transition:all 0.2s ease;
+}
+
+/* Rolling animation from caller to history */
+@keyframes rollToHistory {
+  0% { 
+    transform: translateX(0) rotate(0deg); 
+    opacity: 1; 
+  }
+  50% { 
+    transform: translateX(50vw) rotate(180deg); 
+    opacity: 0.8; 
+  }
+  100% { 
+    transform: translateX(100vw) rotate(360deg); 
+    opacity: 0; 
+  }
+}
+
+.rollingBall {
+  animation: rollToHistory 1.5s ease-out forwards;
+  position: absolute;
+  z-index: 1000;
+  pointer-events: none;
 }
 
 /* Phase sizing (desktop/base) */
@@ -574,6 +597,7 @@ function App(){
   const [phase,setPhase] = useState('setup');
   const [speedMs,setSpeedMs] = useState(800);
   const [called,setCalled] = useState([]);
+  const [rollingBall, setRollingBall] = useState(null);
 
   // Popups
   const [showHowTo, setShowHowTo] = useState(true);
@@ -750,6 +774,14 @@ function App(){
         lastPhase = newPhase; lastCount = newCalls.length;
         setPhase(newPhase);
         setSpeedMs(Number(s.speed_ms)||800);
+        // Check if a new number was called and trigger rolling animation
+        if (newCalls.length > called.length && newCalls.length > 0) {
+          const newNumber = newCalls[newCalls.length - 1];
+          setRollingBall(newNumber);
+          // Clear rolling ball after animation completes
+          setTimeout(() => setRollingBall(null), 1500);
+        }
+        
         setCalled(newCalls);
         setLiveCardsCount(Number(s.live_cards_count) || 0);
 
@@ -819,6 +851,26 @@ function App(){
                   if (lastCalled >= 21 && lastCalled <= 25) return 'pink';
                   return 'red'; // fallback
                 })() : ''}`}><span>{lastCalled ?? '—'}</span></div>
+                
+                {/* Rolling ball animation */}
+                {rollingBall && (
+                  <div className="rollingBall" style={{
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)'
+                  }}>
+                    <div className={`bingoBallMain ${(() => {
+                      if (rollingBall >= 1 && rollingBall <= 5) return 'red';
+                      if (rollingBall >= 6 && rollingBall <= 10) return 'green';
+                      if (rollingBall >= 11 && rollingBall <= 15) return 'purple';
+                      if (rollingBall >= 16 && rollingBall <= 20) return 'orange';
+                      if (rollingBall >= 21 && rollingBall <= 25) return 'pink';
+                      return 'red';
+                    })()}`}>
+                      <span>{rollingBall}</span>
+                    </div>
+                  </div>
+                )}
                 <div className="muted" style={{marginTop:6}}>Speed: {(speedMs/1000).toFixed(1)}s · History</div>
                 <div className="list" style={{marginTop:8}}>{called.map(n=>{
                   let colorClass = 'red'; // fallback

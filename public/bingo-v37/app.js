@@ -270,6 +270,36 @@ function FXStyles(){
   75% { transform: translateX(2px); }
 }
 
+/* Bingo ball styling */
+.bingoBall{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:40px; height:40px; border-radius:50%;
+  background:linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #e2e8f0 100%);
+  border:2px solid #1e293b; box-shadow:0 4px 8px rgba(0,0,0,0.15);
+  font-size:16px; font-weight:700; color:#1e293b;
+  margin:2px; position:relative;
+}
+.bingoBall::before{
+  content:''; position:absolute; top:8px; left:50%; transform:translateX(-50%);
+  width:20px; height:20px; border-radius:50%;
+  background:radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.3) 70%, transparent 100%);
+  pointer-events:none;
+}
+.bingoBallMain{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:80px; height:80px; border-radius:50%;
+  background:linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #e2e8f0 100%);
+  border:3px solid #1e293b; box-shadow:0 6px 12px rgba(0,0,0,0.2);
+  font-size:32px; font-weight:900; color:#1e293b;
+  position:relative;
+}
+.bingoBallMain::before{
+  content:''; position:absolute; top:15px; left:50%; transform:translateX(-50%);
+  width:40px; height:40px; border-radius:50%;
+  background:radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.3) 70%, transparent 100%);
+  pointer-events:none;
+}
+
 /* Phase sizing (desktop/base) */
 .phase-live .cell .num{ --cell-font:15px; }
 .phase-live .bomb{ --bomb-font:11px; }
@@ -298,6 +328,10 @@ function FXStyles(){
   .mobileLockOverlay{ display:flex; }
   .mobileLockIcon{ font-size:35px; }
   .mobileLockIcon img{ width:35px; height:35px; }
+  .bingoBall{ width:32px; height:32px; font-size:14px; }
+  .bingoBallMain{ width:60px; height:60px; font-size:24px; }
+  .bingoBall{ width:32px; height:32px; font-size:14px; }
+  .bingoBallMain{ width:60px; height:60px; font-size:24px; }
 }
 
 /* Small phones (401–480px) */
@@ -317,6 +351,8 @@ function FXStyles(){
   .mobileLockOverlay{ display:flex; }
   .mobileLockIcon{ font-size:35px; }
   .mobileLockIcon img{ width:35px; height:35px; }
+  .bingoBall{ width:32px; height:32px; font-size:14px; }
+  .bingoBallMain{ width:60px; height:60px; font-size:24px; }
 }
 
 /* Larger phones & small tablets */
@@ -699,9 +735,9 @@ function App(){
           {phase==='live'
             ? (<>
                 <div className="muted">Caller</div>
-                <div className="chip" style={{fontSize:36, fontWeight:900, textAlign:'center', padding:'12px 20px', background:'#f1f5f9', border:'1px solid #e2e8f0', borderRadius:12}}>{lastCalled ?? '—'}</div>
+                <div className="bingoBallMain">{lastCalled ?? '—'}</div>
                 <div className="muted" style={{marginTop:6}}>Speed: {(speedMs/1000).toFixed(1)}s · History</div>
-                <div className="list" style={{marginTop:8}}>{called.map(n=><span key={n} className="chip">{n}</span>)}</div>
+                <div className="list" style={{marginTop:8}}>{called.map(n=><span key={n} className="bingoBall">{n}</span>)}</div>
               </>)
             : (<>
                 <div className="row" style={{flexWrap:'wrap', gap:8}}>

@@ -219,14 +219,14 @@ function FXStyles(){
   cursor:pointer; transition:all 0.2s ease;
 }
 .mobileLockOverlay.locked{
-  background:rgba(34,197,94,0.9); z-index:15;
+  background:rgba(0,0,0,0.1); z-index:15;
 }
 .mobileLockIcon{
-  font-size:48px; opacity:0.3; color:#1e293b;
+  font-size:96px; color:#1e293b;
   transition:all 0.2s ease;
 }
 .mobileLockOverlay.locked .mobileLockIcon{
-  opacity:1; color:white; font-size:64px;
+  color:#1e293b; font-size:96px;
 }
 
 /* Phase sizing (desktop/base) */
@@ -372,7 +372,7 @@ function CardView({
       {showLock && (
         <div className={`mobileLockOverlay ${card.paused ? 'locked' : ''}`}
              onClick={(e)=>{ e.stopPropagation(); onPause(card.id); }}>
-          <div className="mobileLockIcon">🔒</div>
+          <div className="mobileLockIcon">{card.paused ? '🔒' : '🔓'}</div>
         </div>
       )}
     </div>

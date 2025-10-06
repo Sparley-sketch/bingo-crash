@@ -189,6 +189,20 @@ function FXStyles(){
 /* Explosion overlay */
 .explosion-img{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; z-index:5; pointer-events:none; }
 
+/* Card UI improvements */
+.daubsCounter{ 
+  font-size:16px; font-weight:600; color:#1e293b; 
+  background:#f1f5f9; padding:6px 12px; border-radius:8px;
+  border:1px solid #e2e8f0;
+}
+.lockButton{ 
+  padding:8px 16px; font-size:14px; font-weight:600;
+  min-height:40px; border-radius:8px;
+}
+.shieldIcon{ 
+  height:24px; width:24px; 
+}
+
 /* Phase sizing (desktop/base) */
 .phase-live .cell .num{ --cell-font:15px; }
 .phase-live .bomb{ --bomb-font:11px; }
@@ -211,7 +225,9 @@ function FXStyles(){
   .phase-live .bomb{ --bomb-font: clamp(7px, 2.3vw, 9.5px); }
   .priceTag{ font-size:11px; padding:2px 6px; }
   .shieldCtl{ font-size:11px; }
-  .shieldIcon{ height:14px; }
+  .shieldIcon{ height:18px; width:18px; }
+  .daubsCounter{ font-size:14px; padding:4px 8px; }
+  .lockButton{ padding:6px 12px; font-size:12px; min-height:32px; }
 }
 
 /* Small phones (401–480px) */
@@ -225,6 +241,9 @@ function FXStyles(){
   .bomb{ --bomb-font: clamp(8.5px, 2.3vw, 11px); top:2px; left:50%; transform:translateX(-50%); }
   .phase-live .cell .num{ --cell-font: clamp(10px, 2.8vw, 13px); }
   .phase-live .bomb{ --bomb-font: clamp(8px, 2.1vw, 10.5px); }
+  .shieldIcon{ height:20px; width:20px; }
+  .daubsCounter{ font-size:15px; padding:5px 10px; }
+  .lockButton{ padding:7px 14px; font-size:13px; min-height:36px; }
 }
 
 /* Larger phones & small tablets */
@@ -267,8 +286,11 @@ function CardView({
       {card.justExploded && <img src={EXPLOSION_SRC} className="explosion-img" alt="boom" />}
 
       <div className="row" style={{justifyContent:'space-between', alignItems:'center'}}>
-        {/* LEFT: price + shield (pre-buy only) */}
-        <div className="row" style={{gap:8}}>
+        {/* LEFT: daubs counter (live phase) or price + shield (setup phase) */}
+        <div className="row" style={{gap:8, alignItems:'center'}}>
+          {phase === 'live' && (
+            <span className="daubsCounter">Daubs: <b>{card.daubs}</b></span>
+          )}
           {phase === 'setup' && selectable && (
             <>
               <span className="priceTag">1 coin</span>
@@ -287,21 +309,19 @@ function CardView({
           {phase === 'setup' && !selectable && card.wantsShield && (
 		  <img src={SHIELD_ICON} alt="Shield active" className="shieldIcon" />
 		)}
-        </div>
-
-        {/* RIGHT: daubs / badges / lock (game only) */}
-        <div className="row" style={{gap:8, alignItems:'center'}}>
-          {phase === 'live' && (
-            <span className="badge" style={{background:'#f1f5f9', padding:'2px 6px', borderRadius:'8px'}}>Daubs: <b>{card.daubs}</b></span>
-          )} 
-			{phase === 'live' && card.wantsShield && !card.shieldUsed && (
+          {/* Live phase shield */}
+          {phase === 'live' && card.wantsShield && !card.shieldUsed && (
 			  <img src={SHIELD_ICON} alt="Shield active" className="shieldIcon" />
 			)}
+        </div>
+
+        {/* RIGHT: lock button (live phase only) */}
+        <div className="row" style={{gap:8, alignItems:'center'}}>
           {showLock && (
-            <button className="btn gray"
+            <button className="btn gray lockButton"
                     onClick={(e)=>{ e.stopPropagation(); onPause(card.id); }}
                     disabled={card.paused || card.exploded}>
-              <span className="row" style={{gap:6, alignItems:'center'}}>
+              <span className="row" style={{gap:8, alignItems:'center'}}>
                 <img src={card.paused ? ICON_LOCK_CLOSED : ICON_LOCK_OPEN} alt="" />
                 {card.paused || card.exploded ? 'Locked' : 'Lock'}
               </span>

@@ -288,17 +288,11 @@ function FXStyles(){
   background:radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.6) 40%, rgba(255,255,255,0.2) 70%, transparent 100%);
   pointer-events:none; z-index:4; /* Highlight */
 }
-.bingoBall::after{
-  content:''; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
-  width:34px; height:34px; border-radius:50%;
-  background:#fff; border:1px solid #000; /* Outer white ring with gap */
-  pointer-events:none; z-index:1;
-}
 .bingoBall span{
   position:relative; z-index:3; color:#000; font-weight:900;
   display:inline-flex; align-items:center; justify-content:center;
-  width:22px; height:22px; border-radius:50%;
-  background:#fff; border:1px solid #000; /* Inner white circle with number */
+  width:28px; height:28px; border-radius:50%;
+  background:#fff; border:1px solid #000; /* Single white circle with number */
 }
 
 .bingoBallMain{
@@ -317,50 +311,34 @@ function FXStyles(){
   background:radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.6) 40%, rgba(255,255,255,0.2) 70%, transparent 100%);
   pointer-events:none; z-index:4; /* Highlight */
 }
-.bingoBallMain::after{
-  content:''; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
-  width:68px; height:68px; border-radius:50%;
-  background:#fff; border:2px solid #000; /* Outer white ring with gap */
-  pointer-events:none; z-index:1;
-}
 .bingoBallMain span{
   position:relative; z-index:3; color:#000; font-weight:900;
   display:inline-flex; align-items:center; justify-content:center;
-  width:44px; height:44px; border-radius:50%;
-  background:#fff; border:2px solid #000; /* Inner white circle with number */
+  width:56px; height:56px; border-radius:50%;
+  background:#fff; border:2px solid #000; /* Single white circle with number */
 }
 
 /* Different colored bingo balls - 5 colors based on number ranges */
 .bingoBall.red{ background-color:#dc2626; border-color:#991b1b; }
-.bingoBall.red::after{ border-color:#dc2626; }
 
 .bingoBall.green{ background-color:#16a34a; border-color:#166534; }
-.bingoBall.green::after{ border-color:#16a34a; }
 
 .bingoBall.purple{ background-color:#9333ea; border-color:#6b21a8; }
-.bingoBall.purple::after{ border-color:#9333ea; }
 
 .bingoBall.orange{ background-color:#ea580c; border-color:#9a3412; }
-.bingoBall.orange::after{ border-color:#ea580c; }
 
 .bingoBall.pink{ background-color:#db2777; border-color:#9d174d; }
-.bingoBall.pink::after{ border-color:#db2777; }
 
 /* Main bingo ball colors - 5 colors based on number ranges */
 .bingoBallMain.red{ background-color:#dc2626; border-color:#991b1b; }
-.bingoBallMain.red::after{ border-color:#dc2626; }
 
 .bingoBallMain.green{ background-color:#16a34a; border-color:#166534; }
-.bingoBallMain.green::after{ border-color:#16a34a; }
 
 .bingoBallMain.purple{ background-color:#9333ea; border-color:#6b21a8; }
-.bingoBallMain.purple::after{ border-color:#9333ea; }
 
 .bingoBallMain.orange{ background-color:#ea580c; border-color:#9a3412; }
-.bingoBallMain.orange::after{ border-color:#ea580c; }
 
 .bingoBallMain.pink{ background-color:#db2777; border-color:#9d174d; }
-.bingoBallMain.pink::after{ border-color:#db2777; }
 
 /* Enhanced 3D hover effects */
 .bingoBall:hover{

@@ -192,21 +192,21 @@ function FXStyles(){
 /* Card UI improvements - aligned heights (reduced by 20%) */
 .daubsCounter{ 
   font-size:13px; font-weight:600; color:#1e293b; 
-  background:#f1f5f9; padding:6px 10px; border-radius:6px;
+  background:transparent; padding:6px 10px; border-radius:6px;
   border:1px solid #e2e8f0;
   height:32px; display:flex; align-items:center;
   box-sizing:border-box;
 }
 .lockButton{ 
-  padding:6px 30px; font-size:12px; font-weight:600;
-  height:32px; border-radius:6px;
+  padding:6px 30px; font-size:13px; font-weight:600;
+  height:35px; border-radius:6px;
   display:flex; align-items:center;
   box-sizing:border-box;
   margin-left:-10px;
   transition:all 0.2s ease;
 }
 .lockButton:hover{
-  animation: lockPulse 1s ease-in-out infinite;
+  animation: lockPulseFaded 1.5s ease-in-out infinite;
 }
 .lockButton:active{
   animation: lockShake 0.3s ease-in-out;
@@ -214,8 +214,9 @@ function FXStyles(){
 .shieldIcon{ 
   height:26px; width:26px; 
   display:flex; align-items:center; justify-content:center;
-  background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px;
+  background:transparent; border:1px solid #e2e8f0; border-radius:6px;
   box-sizing:border-box;
+  margin-left:-10px;
 }
 
 /* Mobile lock overlay */
@@ -242,6 +243,10 @@ function FXStyles(){
 @keyframes lockPulse {
   0%, 100% { transform: scale(1); opacity: 0.7; }
   50% { transform: scale(1.05); opacity: 1; }
+}
+@keyframes lockPulseFaded {
+  0%, 100% { transform: scale(1); opacity: 0.4; }
+  50% { transform: scale(1.02); opacity: 0.6; }
 }
 @keyframes lockShake {
   0%, 100% { transform: translateX(0); }

@@ -55,7 +55,12 @@ export async function POST(req: Request) {
         .single();
       
       if (!configError && configData?.value) {
-        speedMs = parseInt(configData.value) || 800;
+        // Handle both string and number values
+        const value = typeof configData.value === 'string' ? configData.value : configData.value.toString();
+        speedMs = parseInt(value) || 800;
+        console.log('Using config speed_ms:', speedMs);
+      } else {
+        console.log('No config found, using default speed_ms:', speedMs);
       }
     } catch (error) {
       console.log('Could not fetch config, using default speed_ms:', error);
@@ -83,8 +88,8 @@ export async function POST(req: Request) {
       
       if (error) {
         console.error('Error updating round:', error);
-        console.error('Update details:', { roundId: currentRound.id, roundData });
-        return NextResponse.json({ error: `Failed to update round: ${error.message}` }, { status: 500 });
+        console.error('Update details:', { roundId: currentRound.id, roundData, errorCode: error.code, errorMessage: error.message });
+        return NextResponse.json({ error: `Failed to update round: ${error.message}`, details: error }, { status: 500 });
       }
       result = data;
       console.log('Round updated successfully:', result);
@@ -99,8 +104,8 @@ export async function POST(req: Request) {
       
       if (error) {
         console.error('Error creating round:', error);
-        console.error('Create details:', { roundData });
-        return NextResponse.json({ error: `Failed to create round: ${error.message}` }, { status: 500 });
+        console.error('Create details:', { roundData, errorCode: error.code, errorMessage: error.message });
+        return NextResponse.json({ error: `Failed to create round: ${error.message}`, details: error }, { status: 500 });
       }
       result = data;
       console.log('Round created successfully:', result);

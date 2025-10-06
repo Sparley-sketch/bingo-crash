@@ -276,20 +276,22 @@ function FXStyles(){
   display:inline-flex; align-items:center; justify-content:center;
   width:40px; height:40px; border-radius:50%;
   background:linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #b91c1c 100%);
-  border:2px solid #991b1b; box-shadow:0 4px 8px rgba(0,0,0,0.2);
+  border:2px solid #991b1b; 
+  box-shadow:0 6px 12px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3);
   font-size:16px; font-weight:700; color:#000;
   margin:2px; position:relative;
 }
 .bingoBall::before{
-  content:''; position:absolute; top:6px; left:50%; transform:translateX(-50%);
-  width:18px; height:18px; border-radius:50%;
-  background:radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.4) 60%, transparent 100%);
+  content:''; position:absolute; top:4px; left:50%; transform:translateX(-50%);
+  width:20px; height:20px; border-radius:50%;
+  background:radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.6) 40%, rgba(255,255,255,0.2) 70%, transparent 100%);
   pointer-events:none;
 }
 .bingoBall::after{
   content:''; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
   width:28px; height:28px; border-radius:50%;
   background:#fff; border:2px solid #dc2626;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.2);
   pointer-events:none; z-index:1;
 }
 .bingoBall span{
@@ -297,26 +299,29 @@ function FXStyles(){
   display:inline-flex; align-items:center; justify-content:center;
   width:20px; height:20px; border-radius:50%;
   background:#fff; border:1px solid #dc2626;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,0.1);
 }
 
 .bingoBallMain{
   display:inline-flex; align-items:center; justify-content:center;
   width:80px; height:80px; border-radius:50%;
   background:linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%);
-  border:3px solid #1e40af; box-shadow:0 6px 12px rgba(0,0,0,0.25);
+  border:3px solid #1e40af; 
+  box-shadow:0 8px 16px rgba(0,0,0,0.4), 0 4px 8px rgba(0,0,0,0.3), inset 0 2px 0 rgba(255,255,255,0.4);
   font-size:32px; font-weight:900; color:#000;
   position:relative;
 }
 .bingoBallMain::before{
-  content:''; position:absolute; top:12px; left:50%; transform:translateX(-50%);
-  width:36px; height:36px; border-radius:50%;
-  background:radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.4) 60%, transparent 100%);
+  content:''; position:absolute; top:8px; left:50%; transform:translateX(-50%);
+  width:40px; height:40px; border-radius:50%;
+  background:radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.6) 40%, rgba(255,255,255,0.2) 70%, transparent 100%);
   pointer-events:none;
 }
 .bingoBallMain::after{
   content:''; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
   width:56px; height:56px; border-radius:50%;
   background:#fff; border:3px solid #2563eb;
+  box-shadow:inset 0 3px 6px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.3);
   pointer-events:none; z-index:1;
 }
 .bingoBallMain span{
@@ -324,6 +329,7 @@ function FXStyles(){
   display:inline-flex; align-items:center; justify-content:center;
   width:40px; height:40px; border-radius:50%;
   background:#fff; border:2px solid #2563eb;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,0.1);
 }
 
 /* Different colored bingo balls - 5 colors based on number ranges */
@@ -357,6 +363,18 @@ function FXStyles(){
 
 .bingoBallMain.pink{ background:linear-gradient(135deg, #ec4899 0%, #db2777 50%, #be185d 100%); border-color:#9d174d; }
 .bingoBallMain.pink::after{ border-color:#db2777; }
+
+/* Enhanced 3D hover effects */
+.bingoBall:hover{
+  transform:translateY(-2px);
+  box-shadow:0 8px 16px rgba(0,0,0,0.4), 0 4px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.4);
+  transition:all 0.2s ease;
+}
+.bingoBallMain:hover{
+  transform:translateY(-3px);
+  box-shadow:0 12px 24px rgba(0,0,0,0.5), 0 6px 12px rgba(0,0,0,0.4), inset 0 2px 0 rgba(255,255,255,0.4);
+  transition:all 0.2s ease;
+}
 
 /* Phase sizing (desktop/base) */
 .phase-live .cell .num{ --cell-font:15px; }

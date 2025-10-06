@@ -189,18 +189,25 @@ function FXStyles(){
 /* Explosion overlay */
 .explosion-img{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; z-index:5; pointer-events:none; }
 
-/* Card UI improvements */
+/* Card UI improvements - aligned heights */
 .daubsCounter{ 
   font-size:16px; font-weight:600; color:#1e293b; 
-  background:#f1f5f9; padding:6px 12px; border-radius:8px;
+  background:#f1f5f9; padding:8px 12px; border-radius:8px;
   border:1px solid #e2e8f0;
+  height:40px; display:flex; align-items:center;
+  box-sizing:border-box;
 }
 .lockButton{ 
   padding:8px 16px; font-size:14px; font-weight:600;
-  min-height:40px; border-radius:8px;
+  height:40px; border-radius:8px;
+  display:flex; align-items:center;
+  box-sizing:border-box;
 }
 .shieldIcon{ 
-  height:24px; width:24px; 
+  height:40px; width:40px; 
+  display:flex; align-items:center; justify-content:center;
+  background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px;
+  box-sizing:border-box;
 }
 
 /* Phase sizing (desktop/base) */
@@ -225,9 +232,9 @@ function FXStyles(){
   .phase-live .bomb{ --bomb-font: clamp(7px, 2.3vw, 9.5px); }
   .priceTag{ font-size:11px; padding:2px 6px; }
   .shieldCtl{ font-size:11px; }
-  .shieldIcon{ height:18px; width:18px; }
-  .daubsCounter{ font-size:14px; padding:4px 8px; }
-  .lockButton{ padding:6px 12px; font-size:12px; min-height:32px; }
+  .shieldIcon{ height:32px; width:32px; }
+  .daubsCounter{ font-size:14px; padding:4px 8px; height:32px; }
+  .lockButton{ padding:6px 12px; font-size:12px; height:32px; }
 }
 
 /* Small phones (401–480px) */
@@ -241,9 +248,9 @@ function FXStyles(){
   .bomb{ --bomb-font: clamp(8.5px, 2.3vw, 11px); top:2px; left:50%; transform:translateX(-50%); }
   .phase-live .cell .num{ --cell-font: clamp(10px, 2.8vw, 13px); }
   .phase-live .bomb{ --bomb-font: clamp(8px, 2.1vw, 10.5px); }
-  .shieldIcon{ height:20px; width:20px; }
-  .daubsCounter{ font-size:15px; padding:5px 10px; }
-  .lockButton{ padding:7px 14px; font-size:13px; min-height:36px; }
+  .shieldIcon{ height:36px; width:36px; }
+  .daubsCounter{ font-size:15px; padding:5px 10px; height:36px; }
+  .lockButton{ padding:7px 14px; font-size:13px; height:36px; }
 }
 
 /* Larger phones & small tablets */
@@ -309,13 +316,9 @@ function CardView({
           {phase === 'setup' && !selectable && card.wantsShield && (
 		  <img src={SHIELD_ICON} alt="Shield active" className="shieldIcon" />
 		)}
-          {/* Live phase shield */}
-          {phase === 'live' && card.wantsShield && !card.shieldUsed && (
-			  <img src={SHIELD_ICON} alt="Shield active" className="shieldIcon" />
-			)}
         </div>
 
-        {/* RIGHT: lock button (live phase only) */}
+        {/* CENTER: lock button (live phase only) */}
         <div className="row" style={{gap:8, alignItems:'center'}}>
           {showLock && (
             <button className="btn gray lockButton"
@@ -327,6 +330,13 @@ function CardView({
               </span>
             </button>
           )}
+        </div>
+
+        {/* RIGHT: shield (live phase only) */}
+        <div className="row" style={{gap:8, alignItems:'center'}}>
+          {phase === 'live' && card.wantsShield && !card.shieldUsed && (
+			  <img src={SHIELD_ICON} alt="Shield active" className="shieldIcon" />
+			)}
         </div>
       </div>
 

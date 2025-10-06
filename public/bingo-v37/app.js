@@ -220,8 +220,8 @@ function FXStyles(){
   margin-left:0px;
 }
 .lockedText{
-  font-size:12px; font-weight:600; color:#dc2626;
-  background:transparent; padding:4px 8px; border-radius:4px;
+  font-size:13px; font-weight:600; color:#dc2626;
+  background:transparent; padding:6px 10px; border-radius:6px;
   border:1px solid #dc2626; height:32px; display:flex; align-items:center;
   box-sizing:border-box;
 }
@@ -245,7 +245,7 @@ function FXStyles(){
 .mobileLockOverlay.locked .mobileLockIcon{
   color:#1e293b; font-size:58px;
   animation: lockShake 0.5s ease-in-out;
-  opacity:0.4;
+  opacity:0.8;
 }
 
 /* Lock animations */

@@ -183,7 +183,7 @@ function FXStyles(){
 .cell.daub{ background:#dcfce7; border-color:#86efac; }
 .cell.hl{ background:#fef9c3; border-color:#fde047; }
 .bomb{
-  position:absolute; top:6px; right:6px; font-size:var(--bomb-font,12px); line-height:1; pointer-events:none; z-index:2;
+  position:absolute; top:2px; left:50%; transform:translateX(-50%); font-size:var(--bomb-font,12px); line-height:1; pointer-events:none; z-index:2;
 }
 
 /* Explosion overlay */
@@ -206,7 +206,7 @@ function FXStyles(){
   .cell{ --cell-radius:7px; }
   /* numbers & bombs respond to viewport so 2 columns always fit */
   .cell .num{ --cell-font: clamp(9px, 3.1vw, 12px); }
-  .bomb{ --bomb-font: clamp(7.5px, 2.5vw, 10px); top:3px; right:3px; }
+  .bomb{ --bomb-font: clamp(7.5px, 2.5vw, 10px); top:1px; left:50%; transform:translateX(-50%); }
   .phase-live .cell .num{ --cell-font: clamp(9px, 3.0vw, 12px); }
   .phase-live .bomb{ --bomb-font: clamp(7px, 2.3vw, 9.5px); }
   .priceTag{ font-size:11px; padding:2px 6px; }
@@ -222,7 +222,7 @@ function FXStyles(){
   .gridCard{ --cell-gap:6px; }
   .cell{ --cell-radius:8px; }
   .cell .num{ --cell-font: clamp(10px, 2.9vw, 13px); }
-  .bomb{ --bomb-font: clamp(8.5px, 2.3vw, 11px); top:4px; right:4px; }
+  .bomb{ --bomb-font: clamp(8.5px, 2.3vw, 11px); top:2px; left:50%; transform:translateX(-50%); }
   .phase-live .cell .num{ --cell-font: clamp(10px, 2.8vw, 13px); }
   .phase-live .bomb{ --bomb-font: clamp(8px, 2.1vw, 10.5px); }
 }

@@ -241,11 +241,18 @@ function FXStyles(){
   transition:all 0.2s ease;
   animation: lockPulseFaded 2s ease-in-out infinite;
   opacity:0.05;
+  display:flex; align-items:center; justify-content:center;
+}
+.mobileLockIcon img{
+  width:58px; height:58px;
 }
 .mobileLockOverlay.locked .mobileLockIcon{
   color:#1e293b; font-size:58px;
   animation: lockShake 0.5s ease-in-out;
   opacity:0.8;
+}
+.mobileLockOverlay.locked .mobileLockIcon img{
+  width:58px; height:58px;
 }
 
 /* Lock animations */
@@ -290,6 +297,7 @@ function FXStyles(){
   .lockButton{ display:none; }
   .mobileLockOverlay{ display:flex; }
   .mobileLockIcon{ font-size:35px; }
+  .mobileLockIcon img{ width:35px; height:35px; }
 }
 
 /* Small phones (401–480px) */
@@ -308,6 +316,7 @@ function FXStyles(){
   .lockButton{ display:none; }
   .mobileLockOverlay{ display:flex; }
   .mobileLockIcon{ font-size:35px; }
+  .mobileLockIcon img{ width:35px; height:35px; }
 }
 
 /* Larger phones & small tablets */
@@ -402,7 +411,9 @@ function CardView({
       {showLock && (
         <div className={`mobileLockOverlay ${card.paused ? 'locked' : ''}`}
              onClick={(e)=>{ e.stopPropagation(); onPause(card.id); }}>
-          <div className="mobileLockIcon">{card.paused ? '🔒' : '🔓'}</div>
+          <div className="mobileLockIcon">
+            <img src={card.paused ? ICON_LOCK_CLOSED : ICON_LOCK_OPEN} alt="" />
+          </div>
         </div>
       )}
     </div>

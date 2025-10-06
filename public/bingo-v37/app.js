@@ -219,15 +219,15 @@ function FXStyles(){
   margin-left:-10px;
 }
 
-/* Mobile lock overlay */
+/* Lock overlay - always behind numbers */
 .mobileLockOverlay{
-  position:absolute; inset:0; z-index:5;
+  position:absolute; inset:0; z-index:1;
   display:flex; align-items:center; justify-content:center;
-  background:rgba(0,0,0,0.1); border-radius:inherit;
+  background:transparent; border-radius:inherit;
   cursor:pointer; transition:all 0.2s ease;
 }
 .mobileLockOverlay.locked{
-  background:rgba(0,0,0,0.1); z-index:15;
+  background:transparent; z-index:1;
 }
 .mobileLockIcon{
   font-size:58px; color:#1e293b;
@@ -366,18 +366,8 @@ function CardView({
 		)}
         </div>
 
-        {/* CENTER: lock button (live phase only) */}
+        {/* CENTER: empty space (lock button removed) */}
         <div className="row" style={{gap:8, alignItems:'center'}}>
-          {showLock && (
-            <button className="btn gray lockButton"
-                    onClick={(e)=>{ e.stopPropagation(); onPause(card.id); }}
-                    disabled={card.paused || card.exploded}>
-              <span className="row" style={{gap:8, alignItems:'center'}}>
-                <img src={card.paused ? ICON_LOCK_CLOSED : ICON_LOCK_OPEN} alt="" />
-                {card.paused || card.exploded ? 'Locked' : 'Lock'}
-              </span>
-            </button>
-          )}
         </div>
 
         {/* RIGHT: shield (live phase only) */}
@@ -395,7 +385,7 @@ function CardView({
         ))}
       </div>
 
-      {/* Mobile lock overlay (live phase only) */}
+      {/* Lock overlay (live phase only) - always behind numbers */}
       {showLock && (
         <div className={`mobileLockOverlay ${card.paused ? 'locked' : ''}`}
              onClick={(e)=>{ e.stopPropagation(); onPause(card.id); }}>

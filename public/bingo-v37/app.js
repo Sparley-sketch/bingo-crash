@@ -203,6 +203,13 @@ function FXStyles(){
   display:flex; align-items:center;
   box-sizing:border-box;
   margin-left:-10px;
+  transition:all 0.2s ease;
+}
+.lockButton:hover{
+  animation: lockPulse 1s ease-in-out infinite;
+}
+.lockButton:active{
+  animation: lockShake 0.3s ease-in-out;
 }
 .shieldIcon{ 
   height:26px; width:26px; 
@@ -213,7 +220,7 @@ function FXStyles(){
 
 /* Mobile lock overlay */
 .mobileLockOverlay{
-  position:absolute; inset:0; z-index:10;
+  position:absolute; inset:0; z-index:5;
   display:flex; align-items:center; justify-content:center;
   background:rgba(0,0,0,0.1); border-radius:inherit;
   cursor:pointer; transition:all 0.2s ease;
@@ -222,11 +229,24 @@ function FXStyles(){
   background:rgba(0,0,0,0.1); z-index:15;
 }
 .mobileLockIcon{
-  font-size:96px; color:#1e293b;
+  font-size:58px; color:#1e293b;
   transition:all 0.2s ease;
+  animation: lockPulse 2s ease-in-out infinite;
 }
 .mobileLockOverlay.locked .mobileLockIcon{
-  color:#1e293b; font-size:96px;
+  color:#1e293b; font-size:58px;
+  animation: lockShake 0.5s ease-in-out;
+}
+
+/* Lock animations */
+@keyframes lockPulse {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.05); opacity: 1; }
+}
+@keyframes lockShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
 }
 
 /* Phase sizing (desktop/base) */
@@ -255,6 +275,7 @@ function FXStyles(){
   .daubsCounter{ font-size:11px; padding:3px 6px; height:26px; }
   .lockButton{ display:none; }
   .mobileLockOverlay{ display:flex; }
+  .mobileLockIcon{ font-size:35px; }
 }
 
 /* Small phones (401–480px) */
@@ -272,6 +293,7 @@ function FXStyles(){
   .daubsCounter{ font-size:12px; padding:4px 8px; height:29px; }
   .lockButton{ display:none; }
   .mobileLockOverlay{ display:flex; }
+  .mobileLockIcon{ font-size:35px; }
 }
 
 /* Larger phones & small tablets */

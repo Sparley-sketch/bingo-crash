@@ -198,7 +198,7 @@ function FXStyles(){
   box-sizing:border-box;
 }
 .lockButton{ 
-  padding:6px 20px; font-size:12px; font-weight:600;
+  padding:6px 30px; font-size:12px; font-weight:600;
   height:32px; border-radius:6px;
   display:flex; align-items:center;
   box-sizing:border-box;
@@ -209,6 +209,24 @@ function FXStyles(){
   display:flex; align-items:center; justify-content:center;
   background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px;
   box-sizing:border-box;
+}
+
+/* Mobile lock overlay */
+.mobileLockOverlay{
+  position:absolute; inset:0; z-index:10;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(0,0,0,0.1); border-radius:inherit;
+  cursor:pointer; transition:all 0.2s ease;
+}
+.mobileLockOverlay.locked{
+  background:rgba(34,197,94,0.9); z-index:15;
+}
+.mobileLockIcon{
+  font-size:48px; opacity:0.3; color:#1e293b;
+  transition:all 0.2s ease;
+}
+.mobileLockOverlay.locked .mobileLockIcon{
+  opacity:1; color:white; font-size:64px;
 }
 
 /* Phase sizing (desktop/base) */
@@ -235,7 +253,8 @@ function FXStyles(){
   .shieldCtl{ font-size:11px; }
   .shieldIcon{ height:21px; width:21px; }
   .daubsCounter{ font-size:11px; padding:3px 6px; height:26px; }
-  .lockButton{ padding:5px 16px; font-size:11px; height:26px; margin-left:-8px; }
+  .lockButton{ display:none; }
+  .mobileLockOverlay{ display:flex; }
 }
 
 /* Small phones (401–480px) */
@@ -251,7 +270,8 @@ function FXStyles(){
   .phase-live .bomb{ --bomb-font: clamp(8px, 2.1vw, 10.5px); }
   .shieldIcon{ height:23px; width:23px; }
   .daubsCounter{ font-size:12px; padding:4px 8px; height:29px; }
-  .lockButton{ padding:6px 18px; font-size:11px; height:29px; margin-left:-9px; }
+  .lockButton{ display:none; }
+  .mobileLockOverlay{ display:flex; }
 }
 
 /* Larger phones & small tablets */
@@ -347,6 +367,14 @@ function CardView({
           <Cell key={r+'-'+c} cell={cell} highlight={lastCalled===cell.n && !cell.daubed} />
         ))}
       </div>
+
+      {/* Mobile lock overlay (live phase only) */}
+      {showLock && (
+        <div className={`mobileLockOverlay ${card.paused ? 'locked' : ''}`}
+             onClick={(e)=>{ e.stopPropagation(); onPause(card.id); }}>
+          <div className="mobileLockIcon">🔒</div>
+        </div>
+      )}
     </div>
   );
 }

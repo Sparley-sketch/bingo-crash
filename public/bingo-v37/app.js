@@ -189,24 +189,24 @@ function FXStyles(){
 /* Explosion overlay */
 .explosion-img{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; z-index:5; pointer-events:none; }
 
-/* Card UI improvements - aligned heights */
+/* Card UI improvements - aligned heights (reduced by 20%) */
 .daubsCounter{ 
-  font-size:16px; font-weight:600; color:#1e293b; 
-  background:#f1f5f9; padding:8px 12px; border-radius:8px;
+  font-size:13px; font-weight:600; color:#1e293b; 
+  background:#f1f5f9; padding:6px 10px; border-radius:6px;
   border:1px solid #e2e8f0;
-  height:40px; display:flex; align-items:center;
+  height:32px; display:flex; align-items:center;
   box-sizing:border-box;
 }
 .lockButton{ 
-  padding:8px 16px; font-size:14px; font-weight:600;
-  height:40px; border-radius:8px;
+  padding:6px 13px; font-size:11px; font-weight:600;
+  height:32px; border-radius:6px;
   display:flex; align-items:center;
   box-sizing:border-box;
 }
 .shieldIcon{ 
-  height:40px; width:40px; 
+  height:32px; width:32px; 
   display:flex; align-items:center; justify-content:center;
-  background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px;
+  background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px;
   box-sizing:border-box;
 }
 
@@ -232,9 +232,9 @@ function FXStyles(){
   .phase-live .bomb{ --bomb-font: clamp(7px, 2.3vw, 9.5px); }
   .priceTag{ font-size:11px; padding:2px 6px; }
   .shieldCtl{ font-size:11px; }
-  .shieldIcon{ height:32px; width:32px; }
-  .daubsCounter{ font-size:14px; padding:4px 8px; height:32px; }
-  .lockButton{ padding:6px 12px; font-size:12px; height:32px; }
+  .shieldIcon{ height:26px; width:26px; }
+  .daubsCounter{ font-size:11px; padding:3px 6px; height:26px; }
+  .lockButton{ padding:5px 10px; font-size:10px; height:26px; }
 }
 
 /* Small phones (401–480px) */
@@ -248,9 +248,9 @@ function FXStyles(){
   .bomb{ --bomb-font: clamp(8.5px, 2.3vw, 11px); top:2px; left:50%; transform:translateX(-50%); }
   .phase-live .cell .num{ --cell-font: clamp(10px, 2.8vw, 13px); }
   .phase-live .bomb{ --bomb-font: clamp(8px, 2.1vw, 10.5px); }
-  .shieldIcon{ height:36px; width:36px; }
-  .daubsCounter{ font-size:15px; padding:5px 10px; height:36px; }
-  .lockButton{ padding:7px 14px; font-size:13px; height:36px; }
+  .shieldIcon{ height:29px; width:29px; }
+  .daubsCounter{ font-size:12px; padding:4px 8px; height:29px; }
+  .lockButton{ padding:6px 11px; font-size:10px; height:29px; }
 }
 
 /* Larger phones & small tablets */

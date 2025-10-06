@@ -616,12 +616,13 @@ function App(){
         }	
 		
         // Poll current winner (same for everyone) - only if game is live
-        if (s.id && newPhase === 'live') {
-          fetch(`/api/round/winner?round_id=${encodeURIComponent(s.id)}&ts=${Date.now()}`, { cache:'no-store' })
-            .then(r=>r.json())
-            .then(w=>{ if (w?.alias) setSyncedWinner({ alias:w.alias, daubs:w.daubs }); })
-            .catch(()=>{});
-        }
+        // REMOVED: This was causing winner popup to appear during live games
+        // if (s.id && newPhase === 'live') {
+        //   fetch(`/api/round/winner?round_id=${encodeURIComponent(s.id)}&ts=${Date.now()}`, { cache:'no-store' })
+        //     .then(r=>r.json())
+        //     .then(w=>{ if (w?.alias) setSyncedWinner({ alias:w.alias, daubs:w.daubs }); })
+        //     .catch(()=>{});
+        // }
 
         lastPhase = newPhase; lastCount = newCalls.length;
         setPhase(newPhase);

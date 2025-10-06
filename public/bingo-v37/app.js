@@ -287,17 +287,12 @@ function FXStyles(){
   background:#fff; /* White ring */
   pointer-events:none; z-index:1;
 }
-.bingoBall::after{
-  content:''; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
-  width:24px; height:24px; border-radius:50%;
-  background:#16a34a; /* Green inner ring, will be overridden by color classes */
-  pointer-events:none; z-index:2;
-}
 .bingoBall span{
   position:relative; z-index:3; color:#000; font-weight:900;
   display:inline-flex; align-items:center; justify-content:center;
-  width:18px; height:18px; border-radius:50%;
-  background:#fff; /* White center circle */
+  width:24px; height:24px; border-radius:50%;
+  background:#000; /* Black center circle */
+  color:#ff6600; /* Orange text */
   text-shadow: 
     -1px -1px 0 #0066ff, /* Blue glitch effect */
     1px 1px 0 #ff6600; /* Orange glitch effect */
@@ -318,17 +313,12 @@ function FXStyles(){
   background:#fff; /* White ring */
   pointer-events:none; z-index:1;
 }
-.bingoBallMain::after{
-  content:''; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
-  width:48px; height:48px; border-radius:50%;
-  background:#16a34a; /* Green inner ring, will be overridden by color classes */
-  pointer-events:none; z-index:2;
-}
 .bingoBallMain span{
   position:relative; z-index:3; color:#000; font-weight:900;
   display:inline-flex; align-items:center; justify-content:center;
-  width:36px; height:36px; border-radius:50%;
-  background:#fff; /* White center circle */
+  width:48px; height:48px; border-radius:50%;
+  background:#000; /* Black center circle */
+  color:#ff6600; /* Orange text */
   text-shadow: 
     -2px -2px 0 #0066ff, /* Blue glitch effect */
     2px 2px 0 #ff6600; /* Orange glitch effect */
@@ -336,35 +326,25 @@ function FXStyles(){
 
 /* Different colored bingo balls - 5 colors based on number ranges */
 .bingoBall.red{ background:#dc2626; }
-.bingoBall.red::after{ background:#dc2626; }
 
 .bingoBall.green{ background:#16a34a; }
-.bingoBall.green::after{ background:#16a34a; }
 
 .bingoBall.purple{ background:#9333ea; }
-.bingoBall.purple::after{ background:#9333ea; }
 
 .bingoBall.orange{ background:#ea580c; }
-.bingoBall.orange::after{ background:#ea580c; }
 
 .bingoBall.pink{ background:#db2777; }
-.bingoBall.pink::after{ background:#db2777; }
 
 /* Main bingo ball colors - 5 colors based on number ranges */
 .bingoBallMain.red{ background:#dc2626; }
-.bingoBallMain.red::after{ background:#dc2626; }
 
 .bingoBallMain.green{ background:#16a34a; }
-.bingoBallMain.green::after{ background:#16a34a; }
 
 .bingoBallMain.purple{ background:#9333ea; }
-.bingoBallMain.purple::after{ background:#9333ea; }
 
 .bingoBallMain.orange{ background:#ea580c; }
-.bingoBallMain.orange::after{ background:#ea580c; }
 
 .bingoBallMain.pink{ background:#db2777; }
-.bingoBallMain.pink::after{ background:#db2777; }
 
 /* Enhanced 3D hover effects */
 .bingoBall:hover{

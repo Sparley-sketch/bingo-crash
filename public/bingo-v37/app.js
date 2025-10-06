@@ -220,24 +220,26 @@ function FXStyles(){
   margin-left:0px;
 }
 
-/* Lock overlay - always behind numbers */
+/* Lock overlay - in front but very faded */
 .mobileLockOverlay{
-  position:absolute; inset:0; z-index:0;
+  position:absolute; inset:0; z-index:3;
   display:flex; align-items:center; justify-content:center;
   background:transparent; border-radius:inherit;
   cursor:pointer; transition:all 0.2s ease;
 }
 .mobileLockOverlay.locked{
-  background:transparent; z-index:0;
+  background:transparent; z-index:3;
 }
 .mobileLockIcon{
   font-size:58px; color:#1e293b;
   transition:all 0.2s ease;
-  animation: lockPulse 2s ease-in-out infinite;
+  animation: lockPulseFaded 2s ease-in-out infinite;
+  opacity:0.15;
 }
 .mobileLockOverlay.locked .mobileLockIcon{
   color:#1e293b; font-size:58px;
   animation: lockShake 0.5s ease-in-out;
+  opacity:0.15;
 }
 
 /* Lock animations */

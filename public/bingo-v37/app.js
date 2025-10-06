@@ -283,21 +283,21 @@ function FXStyles(){
   overflow:hidden; /* Ensure inner elements are clipped */
 }
 .bingoBall::before{
-  content:''; position:absolute; top:4px; left:50%; transform:translateX(-50%);
-  width:20px; height:20px; border-radius:50%;
+  content:''; position:absolute; top:3px; left:50%; transform:translateX(-50%);
+  width:18px; height:18px; border-radius:50%;
   background:radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.6) 40%, rgba(255,255,255,0.2) 70%, transparent 100%);
   pointer-events:none; z-index:4; /* Highlight */
 }
 .bingoBall::after{
   content:''; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
-  width:36px; height:36px; border-radius:50%;
+  width:34px; height:34px; border-radius:50%;
   background:#fff; border:1px solid #000; /* Outer white ring with gap */
   pointer-events:none; z-index:1;
 }
 .bingoBall span{
   position:relative; z-index:3; color:#000; font-weight:900;
   display:inline-flex; align-items:center; justify-content:center;
-  width:24px; height:24px; border-radius:50%;
+  width:22px; height:22px; border-radius:50%;
   background:#fff; border:1px solid #000; /* Inner white circle with number */
 }
 
@@ -312,21 +312,21 @@ function FXStyles(){
   overflow:hidden; /* Ensure inner elements are clipped */
 }
 .bingoBallMain::before{
-  content:''; position:absolute; top:8px; left:50%; transform:translateX(-50%);
-  width:40px; height:40px; border-radius:50%;
+  content:''; position:absolute; top:6px; left:50%; transform:translateX(-50%);
+  width:36px; height:36px; border-radius:50%;
   background:radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.6) 40%, rgba(255,255,255,0.2) 70%, transparent 100%);
   pointer-events:none; z-index:4; /* Highlight */
 }
 .bingoBallMain::after{
   content:''; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
-  width:72px; height:72px; border-radius:50%;
+  width:68px; height:68px; border-radius:50%;
   background:#fff; border:2px solid #000; /* Outer white ring with gap */
   pointer-events:none; z-index:1;
 }
 .bingoBallMain span{
   position:relative; z-index:3; color:#000; font-weight:900;
   display:inline-flex; align-items:center; justify-content:center;
-  width:48px; height:48px; border-radius:50%;
+  width:44px; height:44px; border-radius:50%;
   background:#fff; border:2px solid #000; /* Inner white circle with number */
 }
 
@@ -380,32 +380,24 @@ function FXStyles(){
     transform: translateX(0) translateY(0) rotate(0deg) scale(1); 
     opacity: 1; 
   }
-  15% { 
-    transform: translateX(15vw) translateY(-20px) rotate(45deg) scale(1.1); 
+  20% { 
+    transform: translateX(80px) translateY(-15px) rotate(72deg) scale(1.05); 
     opacity: 0.95; 
   }
-  30% { 
-    transform: translateX(30vw) translateY(-10px) rotate(90deg) scale(1.05); 
+  40% { 
+    transform: translateX(160px) translateY(-25px) rotate(144deg) scale(1.1); 
     opacity: 0.9; 
   }
-  45% { 
-    transform: translateX(45vw) translateY(-15px) rotate(135deg) scale(1.1); 
+  60% { 
+    transform: translateX(240px) translateY(-20px) rotate(216deg) scale(1.05); 
     opacity: 0.85; 
   }
-  60% { 
-    transform: translateX(60vw) translateY(-5px) rotate(180deg) scale(1.05); 
+  80% { 
+    transform: translateX(320px) translateY(-10px) rotate(288deg) scale(1.02); 
     opacity: 0.8; 
   }
-  75% { 
-    transform: translateX(75vw) translateY(-10px) rotate(225deg) scale(1.1); 
-    opacity: 0.7; 
-  }
-  90% { 
-    transform: translateX(90vw) translateY(-5px) rotate(270deg) scale(1.05); 
-    opacity: 0.5; 
-  }
   100% { 
-    transform: translateX(100vw) translateY(0) rotate(360deg) scale(1); 
+    transform: translateX(400px) translateY(0) rotate(360deg) scale(1); 
     opacity: 0; 
   }
 }

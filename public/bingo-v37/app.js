@@ -198,13 +198,14 @@ function FXStyles(){
   box-sizing:border-box;
 }
 .lockButton{ 
-  padding:6px 13px; font-size:11px; font-weight:600;
+  padding:6px 20px; font-size:12px; font-weight:600;
   height:32px; border-radius:6px;
   display:flex; align-items:center;
   box-sizing:border-box;
+  margin-left:-10px;
 }
 .shieldIcon{ 
-  height:32px; width:32px; 
+  height:26px; width:26px; 
   display:flex; align-items:center; justify-content:center;
   background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px;
   box-sizing:border-box;
@@ -232,9 +233,9 @@ function FXStyles(){
   .phase-live .bomb{ --bomb-font: clamp(7px, 2.3vw, 9.5px); }
   .priceTag{ font-size:11px; padding:2px 6px; }
   .shieldCtl{ font-size:11px; }
-  .shieldIcon{ height:26px; width:26px; }
+  .shieldIcon{ height:21px; width:21px; }
   .daubsCounter{ font-size:11px; padding:3px 6px; height:26px; }
-  .lockButton{ padding:5px 10px; font-size:10px; height:26px; }
+  .lockButton{ padding:5px 16px; font-size:11px; height:26px; margin-left:-8px; }
 }
 
 /* Small phones (401–480px) */
@@ -248,9 +249,9 @@ function FXStyles(){
   .bomb{ --bomb-font: clamp(8.5px, 2.3vw, 11px); top:2px; left:50%; transform:translateX(-50%); }
   .phase-live .cell .num{ --cell-font: clamp(10px, 2.8vw, 13px); }
   .phase-live .bomb{ --bomb-font: clamp(8px, 2.1vw, 10.5px); }
-  .shieldIcon{ height:29px; width:29px; }
+  .shieldIcon{ height:23px; width:23px; }
   .daubsCounter{ font-size:12px; padding:4px 8px; height:29px; }
-  .lockButton{ padding:6px 11px; font-size:10px; height:29px; }
+  .lockButton{ padding:6px 18px; font-size:11px; height:29px; margin-left:-9px; }
 }
 
 /* Larger phones & small tablets */

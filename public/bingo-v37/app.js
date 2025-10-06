@@ -275,76 +275,39 @@ function FXStyles(){
 .bingoBall{
   display:inline-flex; align-items:center; justify-content:center;
   width:40px; height:40px; border-radius:50%;
-  background:#16a34a; /* Green background, will be overridden by color classes */
-  box-shadow:0 4px 8px rgba(0,0,0,0.3);
-  font-size:16px; font-weight:700; color:#000;
+  background:linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #e2e8f0 100%);
+  border:2px solid #1e293b; box-shadow:0 4px 8px rgba(0,0,0,0.15);
+  font-size:16px; font-weight:700; color:#1e293b;
   margin:2px; position:relative;
-  overflow:hidden; /* Ensure inner elements are clipped */
 }
 .bingoBall::before{
-  content:''; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
-  width:32px; height:32px; border-radius:50%;
-  background:#fff; /* White ring */
-  pointer-events:none; z-index:1;
+  content:''; position:absolute; top:8px; left:50%; transform:translateX(-50%);
+  width:20px; height:20px; border-radius:50%;
+  background:radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.3) 70%, transparent 100%);
+  pointer-events:none;
 }
 .bingoBall span{
-  position:relative; z-index:3; color:#000; font-weight:900;
-  display:inline-flex; align-items:center; justify-content:center;
-  width:24px; height:24px; border-radius:50%;
-  background:#000; /* Black center circle */
-  color:#ff6600; /* Orange text */
-  text-shadow: 
-    -1px -1px 0 #0066ff, /* Blue glitch effect */
-    1px 1px 0 #ff6600; /* Orange glitch effect */
+  position:relative; z-index:2; color:#000; font-weight:900;
 }
 
 .bingoBallMain{
   display:inline-flex; align-items:center; justify-content:center;
   width:80px; height:80px; border-radius:50%;
-  background:#16a34a; /* Green background, will be overridden by color classes */
-  box-shadow:0 6px 12px rgba(0,0,0,0.4);
-  font-size:32px; font-weight:900; color:#000;
+  background:linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #e2e8f0 100%);
+  border:3px solid #1e293b; box-shadow:0 6px 12px rgba(0,0,0,0.2);
+  font-size:32px; font-weight:900; color:#1e293b;
   position:relative;
-  overflow:hidden; /* Ensure inner elements are clipped */
 }
 .bingoBallMain::before{
-  content:''; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
-  width:64px; height:64px; border-radius:50%;
-  background:#fff; /* White ring */
-  pointer-events:none; z-index:1;
+  content:''; position:absolute; top:15px; left:50%; transform:translateX(-50%);
+  width:40px; height:40px; border-radius:50%;
+  background:radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.3) 70%, transparent 100%);
+  pointer-events:none;
 }
 .bingoBallMain span{
-  position:relative; z-index:3; color:#000; font-weight:900;
-  display:inline-flex; align-items:center; justify-content:center;
-  width:48px; height:48px; border-radius:50%;
-  background:#000; /* Black center circle */
-  color:#ff6600; /* Orange text */
-  text-shadow: 
-    -2px -2px 0 #0066ff, /* Blue glitch effect */
-    2px 2px 0 #ff6600; /* Orange glitch effect */
+  position:relative; z-index:2; color:#000; font-weight:900;
 }
 
-/* Different colored bingo balls - 5 colors based on number ranges */
-.bingoBall.red{ background:#dc2626; }
-
-.bingoBall.green{ background:#16a34a; }
-
-.bingoBall.purple{ background:#9333ea; }
-
-.bingoBall.orange{ background:#ea580c; }
-
-.bingoBall.pink{ background:#db2777; }
-
-/* Main bingo ball colors - 5 colors based on number ranges */
-.bingoBallMain.red{ background:#dc2626; }
-
-.bingoBallMain.green{ background:#16a34a; }
-
-.bingoBallMain.purple{ background:#9333ea; }
-
-.bingoBallMain.orange{ background:#ea580c; }
-
-.bingoBallMain.pink{ background:#db2777; }
 
 /* Enhanced 3D hover effects */
 .bingoBall:hover{
@@ -795,24 +758,9 @@ function App(){
           {phase==='live'
             ? (<>
                 <div className="muted">Caller</div>
-                <div className={`bingoBallMain ${lastCalled ? (() => {
-                  if (lastCalled >= 1 && lastCalled <= 5) return 'red';
-                  if (lastCalled >= 6 && lastCalled <= 10) return 'green';
-                  if (lastCalled >= 11 && lastCalled <= 15) return 'purple';
-                  if (lastCalled >= 16 && lastCalled <= 20) return 'orange';
-                  if (lastCalled >= 21 && lastCalled <= 25) return 'pink';
-                  return 'red'; // fallback
-                })() : ''}`}><span>{lastCalled ?? '—'}</span></div>
+                <div className="bingoBallMain"><span>{lastCalled ?? '—'}</span></div>
                 <div className="muted" style={{marginTop:6}}>Speed: {(speedMs/1000).toFixed(1)}s · History</div>
-                <div className="list" style={{marginTop:8}}>{called.map(n=>{
-                  let colorClass = 'red'; // fallback
-                  if (n >= 1 && n <= 5) colorClass = 'red';
-                  else if (n >= 6 && n <= 10) colorClass = 'green';
-                  else if (n >= 11 && n <= 15) colorClass = 'purple';
-                  else if (n >= 16 && n <= 20) colorClass = 'orange';
-                  else if (n >= 21 && n <= 25) colorClass = 'pink';
-                  return <span key={n} className={`bingoBall ${colorClass}`}><span>{n}</span></span>;
-                })}</div>
+                <div className="list" style={{marginTop:8}}>{called.map(n=><span key={n} className="bingoBall"><span>{n}</span></span>)}</div>
               </>)
             : (<>
                 <div className="row" style={{flexWrap:'wrap', gap:8}}>

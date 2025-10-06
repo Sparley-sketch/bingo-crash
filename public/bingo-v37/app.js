@@ -205,6 +205,7 @@ function FXStyles(){
   box-sizing:border-box;
   margin-left:-10px;
   transition:all 0.2s ease;
+  background:#f97316; color:#fff; border:1px solid #ea580c;
 }
 .lockButton:hover{
   animation: lockPulseFaded 1.5s ease-in-out infinite;

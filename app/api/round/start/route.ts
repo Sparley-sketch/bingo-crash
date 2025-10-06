@@ -45,11 +45,27 @@ export async function POST(req: Request) {
       );
     }
 
+    // Get speed_ms from config
+    let speedMs = 800; // default
+    try {
+      const { data: configData, error: configError } = await supabaseAdmin
+        .from('config')
+        .select('value')
+        .eq('key', 'round.duration_ms')
+        .single();
+      
+      if (!configError && configData?.value) {
+        speedMs = parseInt(configData.value) || 800;
+      }
+    } catch (error) {
+      console.log('Could not fetch config, using default speed_ms:', error);
+    }
+
     // Start new round - update existing round or create new one
     const roundData = {
       phase: 'live',
       called: [],
-      speed_ms: 800
+      speed_ms: speedMs
     };
 
     console.log('Starting round with data:', roundData);

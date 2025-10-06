@@ -105,29 +105,21 @@ export async function GET() {
         }
       }
       
-      // End the round and start consecutive games cycle
-      const now = new Date();
-      const prebuyEndsAt = new Date(now.getTime() + 30 * 1000); // 30 seconds from now
-      const roundStartsAt = new Date(now.getTime() + 35 * 1000); // 35 seconds from now
-      
+      // End the round with winner information
       const { error: endError } = await supabaseAdmin
         .from('rounds')
         .update({ 
-          phase: 'prebuy',
-          ended_at: now.toISOString(),
-          winner: winner,
-          prebuy_ends_at: prebuyEndsAt.toISOString(),
-          round_starts_at: roundStartsAt.toISOString()
+          phase: 'ended',
+          ended_at: new Date().toISOString(),
+          winner: winner
         })
         .eq('id', round.id);
 
       if (!endError) {
         // Update the round object for the response
-        round.phase = 'prebuy';
-        round.ended_at = now.toISOString();
+        round.phase = 'ended';
+        round.ended_at = new Date().toISOString();
         round.winner = winner;
-        round.prebuy_ends_at = prebuyEndsAt.toISOString();
-        round.round_starts_at = roundStartsAt.toISOString();
       }
     }
 
@@ -139,9 +131,7 @@ export async function GET() {
       speed_ms: round.speed_ms || 800,
       live_cards_count: liveCardsCount,
       player_count: playerCount,
-      winner: round.winner || null,
-      prebuy_ends_at: round.prebuy_ends_at || null,
-      round_starts_at: round.round_starts_at || null
+      winner: round.winner || null
     }, { headers: { 'Cache-Control': 'no-store' }});
   } catch (error) {
     console.error('Unexpected error in state endpoint:', error);

@@ -1,5 +1,6 @@
 // Bingo + Crash — Multiplayer client (light theme)
 // React (UMD) + Babel — no build step
+// Cache bust: 2025-01-07-17:30
 
 const { useEffect, useState, useRef } = React;
 
@@ -50,6 +51,7 @@ function applyCallToCards(cards, n, audioOn, volume){
     let daubs = card.daubs;
     let justExploded = false;
     let justSaved = false;
+    let bombWriggling = false;
 
     const grid = card.grid.map(row => row.map(cell=>{
       if(cell.n!==n || cell.daubed) return cell;
@@ -60,6 +62,7 @@ function applyCallToCards(cards, n, audioOn, volume){
           daubs += 1;
           return {...cell, daubed:true};
         }else{
+          bombWriggling = true;
           exploded = true;
           return cell;
         }
@@ -73,7 +76,7 @@ function applyCallToCards(cards, n, audioOn, volume){
       anyBoom = true;
       justExploded = true;
     }
-    return {...card, grid, exploded, daubs, shieldUsed, justExploded, justSaved};
+    return {...card, grid, exploded, daubs, shieldUsed, justExploded, justSaved, bombWriggling};
   });
 
   // Update database for any cards that changed status
@@ -117,12 +120,19 @@ const ICON_LOCK_CLOSED= 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2
 const EXPLOSION_SRC = '/bingo-v37/explosion.gif';
 const SHIELD_ICON = '/bingo-v37/shield.png';
 
-function Cell({cell, highlight}){
-  const cls=['cell']; if(cell.daubed) cls.push('daub'); else if(highlight) cls.push('hl');
+function Cell({cell, highlight, bombWriggling}){
+  const cls=['cell']; 
+  if(cell.daubed) {
+    cls.push('daub'); 
+  } else if(highlight) {
+    cls.push('hl');
+  }
   return (
     <div className={cls.join(' ')}>
       <span className="num">{cell.n}</span>
-      {cell.bomb && <div className="bomb">💣</div>}
+      {cell.bomb && (
+        <div className={`bomb ${bombWriggling ? 'wriggling' : ''}`}>💣</div>
+      )}
     </div>
   );
 }
@@ -165,6 +175,21 @@ function FXStyles(){
 .shieldCtl input{ vertical-align:middle; }
 .shieldIcon{ height:16px; width:auto; display:inline-block; vertical-align:middle; }
 
+/* Shield container with S icon */
+.shieldContainer{
+  position:relative; display:inline-block; vertical-align:middle;
+}
+
+.shieldSIcon{
+  position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
+  pointer-events:none; z-index:1;
+  display:flex; align-items:center; justify-content:center;
+}
+
+.shieldSIcon svg{
+  filter:drop-shadow(0 0 2px rgba(0,0,0,0.8));
+}
+
 
 /* Grid of 5 columns */
 .gridCard{
@@ -188,11 +213,39 @@ function FXStyles(){
 }
 
 /* Explosion overlay */
-.explosion-img{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; z-index:5; pointer-events:none; }
+.explosion-img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:5; pointer-events:none; }
+
+/* Delayed explosion animation */
+.delayed-explosion{
+  animation: delayed-explosion 1s ease-in-out forwards;
+}
+
+@keyframes delayed-explosion{
+  0%{ opacity:0; transform:scale(0.8); }
+  50%{ opacity:0.5; transform:scale(0.9); }
+  100%{ opacity:1; transform:scale(1); }
+}
+
+/* Bomb wriggling animation */
+.bomb.wriggling{
+  animation: bomb-wriggle 1s ease-in-out infinite;
+}
+
+@keyframes bomb-wriggle{
+  0%{ transform:translateX(0) rotate(0deg) scale(1); }
+  15%{ transform:translateX(-2px) rotate(-5deg) scale(1.1); }
+  30%{ transform:translateX(2px) rotate(5deg) scale(0.9); }
+  45%{ transform:translateX(-1px) rotate(-3deg) scale(1.05); }
+  60%{ transform:translateX(1px) rotate(3deg) scale(0.95); }
+  75%{ transform:translateX(-0.5px) rotate(-2deg) scale(1.02); }
+  90%{ transform:translateX(0.5px) rotate(2deg) scale(0.98); }
+  100%{ transform:translateX(0) rotate(0deg) scale(1); }
+}
+
 
 /* Card UI improvements - aligned heights (reduced by 20%) */
 .daubsCounter{ 
-  font-size:13px; font-weight:600; color:#1e293b; 
+  font-size:13px; font-weight:700; color:#1e293b; 
   background:transparent; padding:6px 10px; border-radius:6px;
   border:1px solid #e2e8f0;
   height:32px; display:flex; align-items:center;
@@ -226,6 +279,82 @@ function FXStyles(){
   border:1px solid #dc2626; height:32px; display:flex; align-items:center;
   box-sizing:border-box;
 }
+
+/* Exploded card styles */
+.daubsCounter.exploded{ color:#fff !important; border-color:#666 !important; }
+
+.explodedText{
+  font-size:13px; font-weight:700; color:#FF9700;
+  background:transparent; padding:6px 10px; border-radius:6px;
+  border:1px solid #FF9700; height:32px; display:flex; align-items:center;
+  box-sizing:border-box; position:relative; overflow:visible;
+}
+
+/* Smoke animation for exploded cards */
+.card-smoke-effect{
+  position:absolute; inset:0; pointer-events:none; z-index:10;
+}
+
+.smoke-cloud{
+  position:absolute; background:#666; opacity:0.7; 
+  animation:smoke-cloud-rise 4s infinite ease-out;
+  border-radius:50px;
+}
+
+.smoke1{ 
+  width:20px; height:12px; left:15%; top:85%; 
+  animation-delay:0s; 
+}
+.smoke2{ 
+  width:25px; height:15px; left:35%; top:80%; 
+  animation-delay:0.8s; 
+}
+.smoke3{ 
+  width:18px; height:10px; left:55%; top:90%; 
+  animation-delay:1.6s; 
+}
+.smoke4{ 
+  width:22px; height:13px; left:75%; top:75%; 
+  animation-delay:2.4s; 
+}
+.smoke5{ 
+  width:16px; height:9px; left:25%; top:70%; 
+  animation-delay:3.2s; 
+}
+.smoke6{ 
+  width:24px; height:14px; left:85%; top:85%; 
+  animation-delay:0.4s; 
+}
+
+@keyframes smoke-cloud-rise{
+  0%{ 
+    transform:translateY(0) scale(0.5) rotate(0deg); 
+    opacity:0.7; 
+    filter:blur(0px);
+  }
+  25%{ 
+    transform:translateY(-15px) scale(0.8) rotate(5deg); 
+    opacity:0.8; 
+    filter:blur(1px);
+  }
+  50%{ 
+    transform:translateY(-30px) scale(1.2) rotate(-3deg); 
+    opacity:0.6; 
+    filter:blur(2px);
+  }
+  75%{ 
+    transform:translateY(-45px) scale(1.5) rotate(2deg); 
+    opacity:0.4; 
+    filter:blur(3px);
+  }
+  100%{ 
+    transform:translateY(-60px) scale(2.0) rotate(-1deg); 
+    opacity:0; 
+    filter:blur(4px);
+  }
+}
+
+
 
 /* Lock overlay - in front but very faded */
 .mobileLockOverlay{
@@ -364,15 +493,17 @@ function FXStyles(){
   .priceTag{ font-size:11px; padding:2px 6px; }
   .shieldCtl{ font-size:11px; }
   .shieldIcon{ height:21px; width:21px; }
+  .shieldSIcon svg{ width:10px; height:10px; }
   .daubsCounter{ font-size:11px; padding:3px 6px; height:26px; }
+  .explodedText{ font-size:11px; padding:3px 6px; height:26px; }
   .lockButton{ display:none; }
   .mobileLockOverlay{ display:flex; }
   .mobileLockIcon{ font-size:35px; }
   .mobileLockIcon img{ width:35px; height:35px; }
   .bingoBall{ width:32px; height:32px; font-size:14px; }
   .bingoBallMain{ width:60px; height:60px; font-size:24px; }
-  .bingoBall{ width:32px; height:32px; font-size:14px; }
-  .bingoBallMain{ width:60px; height:60px; font-size:24px; }
+  .rollingBall{ width:60px; height:60px; font-size:24px; }
+  .rollingBall span{ width:42px; height:42px; }
 }
 
 /* Small phones (401–480px) */
@@ -387,13 +518,17 @@ function FXStyles(){
   .phase-live .cell .num{ --cell-font: clamp(10px, 2.8vw, 13px); }
   .phase-live .bomb{ --bomb-font: clamp(8px, 2.1vw, 10.5px); }
   .shieldIcon{ height:23px; width:23px; }
+  .shieldSIcon svg{ width:11px; height:11px; }
   .daubsCounter{ font-size:12px; padding:4px 8px; height:29px; }
+  .explodedText{ font-size:12px; padding:4px 8px; height:29px; }
   .lockButton{ display:none; }
   .mobileLockOverlay{ display:flex; }
   .mobileLockIcon{ font-size:35px; }
   .mobileLockIcon img{ width:35px; height:35px; }
   .bingoBall{ width:32px; height:32px; font-size:14px; }
   .bingoBallMain{ width:60px; height:60px; font-size:24px; }
+  .rollingBall{ width:60px; height:60px; font-size:24px; }
+  .rollingBall span{ width:42px; height:42px; }
 }
 
 /* Larger phones & small tablets */
@@ -432,14 +567,37 @@ function CardView({
     >
       <FXStyles />
 
-      {/* Explosion GIF overlay */}
-      {card.justExploded && <img src={EXPLOSION_SRC} className="explosion-img" alt="boom" />}
+      {/* Explosion GIF overlay - delayed by 1 second */}
+      {card.justExploded && (
+        <img src={EXPLOSION_SRC} className="explosion-img delayed-explosion" alt="boom" />
+      )}
+
+      {/* Smoke effect for exploded cards */}
+      {card.exploded && (
+        <div className="card-smoke-effect">
+          <div className="smoke-cloud smoke1"></div>
+          <div className="smoke-cloud smoke2"></div>
+          <div className="smoke-cloud smoke3"></div>
+          <div className="smoke-cloud smoke4"></div>
+          <div className="smoke-cloud smoke5"></div>
+          <div className="smoke-cloud smoke6"></div>
+        </div>
+      )}
 
       <div className="row" style={{justifyContent:'space-between', alignItems:'center'}}>
         {/* LEFT: daubs counter (live phase) or price + shield (setup phase) */}
         <div className="row" style={{gap:8, alignItems:'center'}}>
           {phase === 'live' && (
-            <span className="daubsCounter">Daubs: <b>{card.daubs}</b></span>
+            <>
+              <span className={`daubsCounter ${card.exploded ? 'exploded' : ''}`}>
+                Daubs: <b> {card.daubs}</b>
+              </span>
+              {card.exploded && (
+                <span className="explodedText">
+                  EXPLODED
+                </span>
+              )}
+            </>
           )}
           {phase === 'setup' && selectable && (
             <>
@@ -457,7 +615,15 @@ function CardView({
           )}
           {/* Purchased (not selectable) & still in setup -> show "Shield active" */}
           {phase === 'setup' && !selectable && card.wantsShield && (
-		  <img src={SHIELD_ICON} alt="Shield active" className="shieldIcon" />
+		  <div className="shieldContainer">
+		    <img src={SHIELD_ICON} alt="Shield active" className="shieldIcon" />
+		    <div className="shieldSIcon">
+		      <svg width="8" height="8" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+		        <path d="M20 20 Q30 10 40 20 Q50 30 40 40 Q30 50 40 60 Q50 70 60 60 Q70 50 60 40 Q50 30 60 20 Q70 10 80 20" 
+		              fill="white" stroke="none" stroke-width="2"/>
+		      </svg>
+		    </div>
+		  </div>
 		)}
           {/* LOCKED text when card is locked */}
           {phase === 'live' && card.paused && (
@@ -472,7 +638,15 @@ function CardView({
         {/* RIGHT: shield (live phase only) */}
         <div className="row" style={{gap:8, alignItems:'center'}}>
           {phase === 'live' && card.wantsShield && !card.shieldUsed && (
-			  <img src={SHIELD_ICON} alt="Shield active" className="shieldIcon" />
+			  <div className="shieldContainer">
+			    <img src={SHIELD_ICON} alt="Shield active" className="shieldIcon" />
+			    <div className="shieldSIcon">
+			      <svg width="8" height="8" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+			        <path d="M20 20 Q30 10 40 20 Q50 30 40 40 Q30 50 40 60 Q50 70 60 60 Q70 50 60 40 Q50 30 60 20 Q70 10 80 20" 
+			              fill="white" stroke="none" stroke-width="2"/>
+			      </svg>
+			    </div>
+			  </div>
 			)}
         </div>
       </div>
@@ -480,12 +654,12 @@ function CardView({
       {/* Grid */}
       <div className="gridCard" style={{marginTop:10}}>
         {card.grid.flatMap((row,r)=>row.map((cell,c)=>
-          <Cell key={r+'-'+c} cell={cell} highlight={lastCalled===cell.n && !cell.daubed} />
+          <Cell key={r+'-'+c} cell={cell} highlight={lastCalled===cell.n && !cell.daubed} bombWriggling={card.bombWriggling && cell.bomb && lastCalled===cell.n} />
         ))}
       </div>
 
-      {/* Lock overlay (live phase only) - always behind numbers */}
-      {showLock && (
+      {/* Lock overlay (live phase only) - always behind numbers - hidden for exploded cards */}
+      {showLock && !card.exploded && (
         <div className={`mobileLockOverlay ${card.paused ? 'locked' : ''}`}
              onClick={(e)=>{ e.stopPropagation(); onPause(card.id); }}>
           <div className="mobileLockIcon">
@@ -498,13 +672,24 @@ function CardView({
 }
 
 // Simple modal
-function Modal({open, onClose, children, title, primaryText='Got it', onPrimary}){
+function Modal({open, onClose, children, title, primaryText='Got it', onPrimary, showDontShowAgain=false, onDontShowAgain}){
   if(!open) return null;
   return (
     <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,.35)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:50}}>
       <div className="card" style={{maxWidth:560, width:'92%', borderRadius:16}}>
         {title && <h3 className="title" style={{marginBottom:8}}>{title}</h3>}
         <div className="muted" style={{whiteSpace:'pre-line'}}>{children}</div>
+        
+        {/* Don't show again checkbox */}
+        {showDontShowAgain && (
+          <div style={{marginTop:12, marginBottom:8}}>
+            <label style={{display:'flex', alignItems:'center', gap:8, fontSize:'14px', cursor:'pointer'}}>
+              <input type="checkbox" onChange={onDontShowAgain} />
+              Do not show this message again
+            </label>
+          </div>
+        )}
+        
         <div className="row" style={{justifyContent:'flex-end', marginTop:12}}>
           <button className="btn" onClick={onClose}>Close</button>
           <button className="btn primary" onClick={onPrimary || onClose}>{primaryText}</button>
@@ -541,12 +726,23 @@ function App(){
   const [called,setCalled] = useState([]);
 
   // Popups
-  const [showHowTo, setShowHowTo] = useState(true);
+  const [showHowTo, setShowHowTo] = useState(() => {
+    // Check localStorage to see if user previously chose not to show this message
+    return localStorage.getItem('bingo-crash-hide-how-to') !== 'true';
+  });
   const [syncedWinner, setSyncedWinner] = useState(null); // {alias, daubs} | null
   const [liveCardsCount, setLiveCardsCount] = useState(0); // Total live cards in the game
 
   // ensure we only end once
   const endPostedRef = useRef(false);
+
+  // Handle "don't show again" checkbox
+  function handleDontShowAgain(event) {
+    if (event.target.checked) {
+      localStorage.setItem('bingo-crash-hide-how-to', 'true');
+    }
+  }
+
 
   // ---------- Pre-buy actions (include shields) ----------
   function toggleSelectPool(id){ setSelectedPool(s=>{ const n=new Set(s); n.has(id)?n.delete(id):n.add(id); return n; }); }
@@ -679,6 +875,20 @@ function App(){
           news.forEach(n => { next = applyCallToCards(next, n, audio, volume); });
           setPlayer(p=>({...p, cards: next}));
 
+          // Trigger rolling ball animation for the latest called number
+          if (news.length > 0) {
+            const latestNumber = news[news.length - 1];
+            const colorClass = (() => {
+              if (latestNumber >= 1 && latestNumber <= 5) return 'red';
+              if (latestNumber >= 6 && latestNumber <= 10) return 'green';
+              if (latestNumber >= 11 && latestNumber <= 15) return 'purple';
+              if (latestNumber >= 16 && latestNumber <= 20) return 'orange';
+              if (latestNumber >= 21 && latestNumber <= 25) return 'pink';
+              return 'red';
+            })();
+            
+          }
+
           const hasProgress = newCalls.length > 0;
           if (newPhase === 'live' && hasProgress && ownedAtStartRef.current > 0) {
             const liveMine = next.filter(c => !c.exploded && !c.paused).length;
@@ -773,7 +983,7 @@ function App(){
       {/* Body */}
       <div className="grid twoCol">
         {/* Left: Purchase Panel (setup) / Caller (live) */}
-        <div className="card">
+        <div className="card" style={{position: 'relative', overflow: 'hidden'}}>
           {phase==='live'
             ? (<>
                 <div className="muted">Caller</div>
@@ -785,6 +995,7 @@ function App(){
                   if (lastCalled >= 21 && lastCalled <= 25) return 'pink';
                   return 'red'; // fallback
                 })() : ''}`}><span>{lastCalled ?? '—'}</span></div>
+                
                 <div className="muted" style={{marginTop:6}}>Speed: {(speedMs/1000).toFixed(1)}s · History</div>
                 <div className="list" style={{marginTop:8}}>{called.map(n=>{
                   let colorClass = 'red'; // fallback
@@ -900,6 +1111,8 @@ function App(){
         onClose={()=>setShowHowTo(false)}
         title="How to Play"
         primaryText="Got it, start"
+        showDontShowAgain={true}
+        onDontShowAgain={handleDontShowAgain}
       >
         • Tap the <b>Lock</b> button to lockin your card.
         {'\n'}• If a called number has a <b>bomb</b>, your card explodes <i>(unless shielded)</i>.

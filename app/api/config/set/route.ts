@@ -1,35 +1,38 @@
-/* @ts-nocheck */
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { tableNames } from '@/lib/config';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  try {
+    const body = await req.json().catch(() => ({}));
+    const key = String(body?.key ?? 'round.duration_ms');
+    const valRaw = String(body?.value ?? '1500');
 
-  const body = await req.json().catch(() => ({}));
-  const key  = String(body?.key ?? 'round.duration_ms');
-  const valRaw = String(body?.value ?? '1500');
+    // Normalize to integer milliseconds (100..5000 guard, adjust as you like)
+    let value = parseInt(valRaw, 10);
+    if (!Number.isFinite(value)) value = 1500;
+    value = Math.max(100, Math.min(5000, value));
 
-  // Normalize to integer milliseconds (100..5000 guard, adjust as you like)
-  let value = parseInt(valRaw, 10);
-  if (!Number.isFinite(value)) value = 1500;
-  value = Math.max(100, Math.min(5000, value));
+    const { data, error } = await supabaseAdmin
+      .from(tableNames.config)
+      .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+      .select('key,value,updated_at')
+      .single();
 
-  const { data, error } = await supabase
-    .from('config')
-    .upsert({ key, value })
-    .select('key,value,updated_at')
-    .single();
+    if (error) {
+      console.error('Error saving config:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  return NextResponse.json(
-    { key: data.key, value: data.value, updated_at: data.updated_at },
-    { headers: { 'Cache-Control': 'no-store' } }
-  );
+    return NextResponse.json(
+      { key: data.key, value: data.value, updated_at: data.updated_at },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
+  } catch (error) {
+    console.error('Unexpected error in config/set endpoint:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }

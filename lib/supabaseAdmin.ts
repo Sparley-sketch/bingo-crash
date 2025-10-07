@@ -1,9 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
+import { supabaseConfig, isDevelopment } from './config';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-export const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
+export const supabaseAdmin = createClient(supabaseConfig.url, supabaseConfig.serviceKey, {
   auth: { persistSession: false },
-  global: { headers: { 'X-Client-Info': 'bingo-crash-admin' } }
+  global: { headers: { 'X-Client-Info': isDevelopment ? 'bingo-crash-admin-dev' : 'bingo-crash-admin' } }
 });

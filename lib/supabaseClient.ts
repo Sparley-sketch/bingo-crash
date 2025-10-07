@@ -1,7 +1,5 @@
 'use client';
 import { createClient } from '@supabase/supabase-js';
+import { supabaseConfig } from './config';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-export const supabase = createClient(supabaseUrl, supabaseAnon);
+export const supabase = createClient(supabaseConfig.url, supabaseConfig.anonKey);

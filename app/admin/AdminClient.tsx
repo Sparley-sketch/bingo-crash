@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import ClientOnly from '@/components/ClientOnly';
 
 type ConfigItem = { key: string; value: any; updated_at?: string };
 
@@ -279,8 +278,7 @@ export default function AdminClient({ canWrite }: { canWrite: boolean }) {
   // Updated with Simple Admin logic - v2
 
   return (
-    <ClientOnly fallback={<main className="wrap">Loading...</main>}>
-      <main className="wrap">
+    <main className="wrap">
       <div className="card">
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <h2>Admin — Config {canWrite ? '' : '(read-only)'}</h2>
@@ -385,7 +383,6 @@ export default function AdminClient({ canWrite }: { canWrite: boolean }) {
           <span className="muted small">Speed: {round?.speed_ms ?? '—'} ms</span>
         </div>
       </div>
-      </main>
-    </ClientOnly>
+    </main>
   );
 }

@@ -50,26 +50,94 @@ export async function POST(req: Request) {
         // Time to start the game!
         console.log('Auto-starting game via scheduler - time reached!');
         
-        // Instead of complex database operations, just call the existing start round API
-        console.log('Calling start round API...');
+        // Start the round directly (avoid internal HTTP calls in production)
+        console.log('Starting round directly...');
         try {
-          const startResponse = await fetch(`http://localhost:3000/api/round/start`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ isScheduledStart: true })
-          });
+          // Get current round
+          const { data: currentRound, error: roundError } = await supabaseAdmin
+            .from(tableNames.rounds)
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
-          if (!startResponse.ok) {
-            const errorText = await startResponse.text();
-            console.error('Failed to start round:', startResponse.status, errorText);
-            return NextResponse.json({ error: `Failed to start round: ${errorText}` }, { status: 500 });
+          if (roundError && roundError.code !== 'PGRST116') {
+            console.error('Error fetching current round:', roundError);
+            return NextResponse.json({ error: 'Failed to fetch current round' }, { status: 500 });
           }
 
-          const startResult = await startResponse.json();
-          console.log('Round started successfully:', startResult);
-        } catch (fetchError) {
-          console.error('Error calling start round API:', fetchError);
-          return NextResponse.json({ error: 'Failed to call start round API' }, { status: 500 });
+          // Get speed_ms from config
+          let speedMs = 800; // default
+          try {
+            const { data: configData, error: configError } = await supabaseAdmin
+              .from(tableNames.config)
+              .select('value')
+              .eq('key', 'round.duration_ms')
+              .single();
+            
+            if (!configError && configData?.value) {
+              speedMs = parseInt(configData.value) || 800;
+            }
+          } catch (error) {
+            console.log('Could not fetch config, using default speed_ms:', error);
+          }
+
+          if (!currentRound || currentRound.phase === 'ended') {
+            // Create a new round
+            const { data: newRound, error: insertError } = await supabaseAdmin
+              .from(tableNames.rounds)
+              .insert([{
+                phase: 'live',
+                called: [],
+                speed_ms: speedMs,
+                prize_pool: 0,
+                total_collected: 0
+              }])
+              .select()
+              .single();
+
+            if (insertError) {
+              console.error('Error creating new round:', insertError);
+              return NextResponse.json({ error: 'Failed to create new round' }, { status: 500 });
+            }
+            console.log('New round created:', newRound.id);
+          } else {
+            // Update existing round
+            const { error: updateError } = await supabaseAdmin
+              .from(tableNames.rounds)
+              .update({ 
+                phase: 'live',
+                called: [],
+                speed_ms: speedMs
+              })
+              .eq('id', currentRound.id);
+
+            if (updateError) {
+              console.error('Error updating round:', updateError);
+              return NextResponse.json({ error: 'Failed to update round' }, { status: 500 });
+            }
+            console.log('Round updated to live:', currentRound.id);
+          }
+
+          // Update scheduler config to mark game as started
+          const updatedSchedulerConfig = {
+            ...schedulerConfig,
+            currentPhase: 'live',
+            nextGameStart: null // Clear next game start since we're starting now
+          };
+
+          await supabaseAdmin
+            .from(tableNames.config)
+            .upsert({ 
+              key: 'scheduler', 
+              value: updatedSchedulerConfig, 
+              updated_at: new Date().toISOString() 
+            }, { onConflict: 'key' });
+
+          console.log('Scheduler updated to live phase');
+        } catch (dbError) {
+          console.error('Error starting round directly:', dbError);
+          return NextResponse.json({ error: 'Failed to start round' }, { status: 500 });
         }
 
         return NextResponse.json({ 

@@ -149,20 +149,80 @@ export async function POST() {
           // Time to start the next game
           console.log('Starting next game from setup phase');
           
-          // Call the start round API with correct port
-          const startResponse = await fetch(`http://localhost:3001/api/round/start`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ isScheduledStart: true })
-          });
+          // Start the round directly (avoid internal HTTP calls in production)
+          console.log('Starting round directly from cycle endpoint...');
+          try {
+            // Get current round
+            const { data: currentRound, error: roundError } = await supabaseAdmin
+              .from(tableNames.rounds)
+              .select('*')
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
 
-          if (!startResponse.ok) {
-            const errorText = await startResponse.text();
-            console.error('Failed to start round:', startResponse.status, errorText);
-            return NextResponse.json({ error: `Failed to start round: ${errorText}` }, { status: 500 });
+            if (roundError && roundError.code !== 'PGRST116') {
+              console.error('Error fetching current round:', roundError);
+              return NextResponse.json({ error: 'Failed to fetch current round' }, { status: 500 });
+            }
+
+            // Get speed_ms from config
+            let speedMs = 800; // default
+            try {
+              const { data: configData, error: configError } = await supabaseAdmin
+                .from(tableNames.config)
+                .select('value')
+                .eq('key', 'round.duration_ms')
+                .single();
+              
+              if (!configError && configData?.value) {
+                speedMs = parseInt(configData.value) || 800;
+              }
+            } catch (error) {
+              console.log('Could not fetch config, using default speed_ms:', error);
+            }
+
+            if (!currentRound || currentRound.phase === 'ended') {
+              // Create a new round
+              const { data: newRound, error: insertError } = await supabaseAdmin
+                .from(tableNames.rounds)
+                .insert([{
+                  phase: 'live',
+                  called: [],
+                  speed_ms: speedMs,
+                  prize_pool: currentRound?.prize_pool || 0,
+                  total_collected: currentRound?.total_collected || 0
+                }])
+                .select()
+                .single();
+
+              if (insertError) {
+                console.error('Error creating new round:', insertError);
+                return NextResponse.json({ error: 'Failed to create new round' }, { status: 500 });
+              }
+              console.log('New round created:', newRound.id);
+            } else {
+              // Update existing round
+              const { error: updateError } = await supabaseAdmin
+                .from(tableNames.rounds)
+                .update({ 
+                  phase: 'live',
+                  called: [],
+                  speed_ms: speedMs
+                })
+                .eq('id', currentRound.id);
+
+              if (updateError) {
+                console.error('Error updating round:', updateError);
+                return NextResponse.json({ error: 'Failed to update round' }, { status: 500 });
+              }
+              console.log('Round updated to live:', currentRound.id);
+            }
+
+            console.log('Round started successfully via direct database call');
+          } catch (dbError) {
+            console.error('Error starting round directly:', dbError);
+            return NextResponse.json({ error: 'Failed to start round' }, { status: 500 });
           }
-
-          console.log('Round started successfully via HTTP call');
 
           // Update scheduler to mark game as started
           const updatedSchedulerConfig = {

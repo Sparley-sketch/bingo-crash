@@ -8,3 +8,5 @@ export const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
   auth: { persistSession: false },
   global: { headers: { 'X-Client-Info': 'bingo-crash-admin-dev' } }
 });
+
+

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { tableNames } from '@/lib/config';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,7 +10,7 @@ export async function POST() {
     let speedMs = 800; // default
     try {
       const { data: configData, error: configError } = await supabaseAdmin
-        .from('config')
+        .from(tableNames.config)
         .select('value')
         .eq('key', 'round.duration_ms')
         .single();
@@ -21,13 +22,15 @@ export async function POST() {
       console.log('Could not fetch config, using default speed_ms:', error);
     }
 
-    // Create a new round with setup phase
+    // Create a new round with setup phase and reset prize pool
     const { data: newRound, error: insertError } = await supabaseAdmin
-      .from('rounds')
+      .from(tableNames.rounds)
       .insert([{
         phase: 'setup',
         called: [],
-        speed_ms: speedMs
+        speed_ms: speedMs,
+        prize_pool: 0,
+        total_collected: 0
       }])
       .select()
       .single();

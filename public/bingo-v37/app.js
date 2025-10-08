@@ -552,7 +552,9 @@ function CardView({
   owned = false,
   showShield = false,       // pre-buy only (available pool)
   onShieldToggle = () => {},
-  showLock = false          // live only
+  showLock = false,          // live only
+  cardPrice = 10,
+  shieldPricePercent = 50
 }){
   const wrapperCls=['card'];
   if(selectable && selected) wrapperCls.push('isSelected');
@@ -601,7 +603,9 @@ function CardView({
           )}
           {phase === 'setup' && selectable && (
             <>
-              <span className="priceTag">1 coin</span>
+              <span className="priceTag">
+                {cardPrice} {card.wantsShield && `+ ${(cardPrice * (shieldPricePercent / 100)).toFixed(1)}`} coins
+              </span>
               <label className="row shieldCtl" style={{gap:6}}
                      onClick={(e)=>e.stopPropagation()}>
                 <input
@@ -703,12 +707,31 @@ function App(){
   // Alias + wallet (with localStorage persistence)
   const [alias, setAlias]     = useState(() => localStorage.getItem('bingo-alias') || '');
   const [askAlias, setAsk]    = useState(() => !localStorage.getItem('bingo-alias'));
-  const [wallet, setWallet]   = useState(100);
+  const [wallet, setWallet]   = useState(null); // Will be updated from server
   const [resetKey, setResetKey] = useState(0);
 
   // useRef hooks MUST be inside a component:
   const ownedAtStartRef = useRef(0);
   const postedOutRef    = useRef(false);
+
+  // Fetch wallet balance when component mounts or alias changes
+  useEffect(() => {
+    if (alias) {
+      console.log('Fetching wallet balance for alias:', alias);
+      fetch(`/api/player/wallet?alias=${encodeURIComponent(alias)}&ts=${Date.now()}`, { cache: 'no-store' })
+        .then(r => r.json())
+        .then(data => {
+          console.log('Wallet API response:', data);
+          if (data.balance !== undefined) {
+            setWallet(data.balance);
+            console.log('Wallet balance loaded on mount/alias change:', data.balance);
+          }
+        })
+        .catch(err => console.error('Failed to fetch wallet balance:', err));
+    } else {
+      console.log('No alias set, wallet will remain null');
+    }
+  }, [alias]);
 
   // Available (pre-buy) vs Owned (purchased)
   const freshAvail = () => Array.from({length:4},()=>makeCard(uid('pool'),'', 3)); // start with 4 visible
@@ -733,8 +756,35 @@ function App(){
   const [syncedWinner, setSyncedWinner] = useState(null); // {alias, daubs} | null
   const [liveCardsCount, setLiveCardsCount] = useState(0); // Total live cards in the game
 
+  // Scheduler state
+  const [schedulerStatus, setSchedulerStatus] = useState(null);
+  const [timeUntilNextGame, setTimeUntilNextGame] = useState(null);
+  const [canPurchaseCards, setCanPurchaseCards] = useState(true);
+
+  // Pricing and prize pool
+  const [prizePool, setPrizePool] = useState(0);
+  const [cardPrice, setCardPrice] = useState(10);
+  const [shieldPricePercent, setShieldPricePercent] = useState(50);
+
   // ensure we only end once
   const endPostedRef = useRef(false);
+
+  // Load pricing configuration on mount
+  useEffect(() => {
+    async function loadPricing() {
+      try {
+        const r = await fetch('/api/pricing', { cache: 'no-store' });
+        if (r.ok) {
+          const data = await r.json();
+          setCardPrice(data.cardPrice || 10);
+          setShieldPricePercent(data.shieldPricePercent || 50);
+        }
+      } catch (error) {
+        console.error('Failed to load pricing:', error);
+      }
+    }
+    loadPricing();
+  }, []);
 
   // Handle "don't show again" checkbox
   function handleDontShowAgain(event) {
@@ -742,6 +792,76 @@ function App(){
       localStorage.setItem('bingo-crash-hide-how-to', 'true');
     }
   }
+
+  // Format time until next game (MM:SS)
+  function formatTimeUntilNextGame(seconds) {
+    if (seconds === null || seconds === undefined) return '—';
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  }
+
+  // Poll scheduler status with prize pool updates
+  useEffect(() => {
+    let mounted = true;
+    let lastPrizePoolUpdate = 0;
+    
+    async function pullSchedulerStatus() {
+      try {
+        const r = await fetch('/api/scheduler/status?ts=' + Date.now(), { 
+          cache: 'no-store', 
+          headers: { Accept: 'application/json' } 
+        });
+        const status = await r.json();
+        if (mounted) {
+          setSchedulerStatus(status);
+          setTimeUntilNextGame(status.timeUntilNextGame);
+          setCanPurchaseCards(status.canPurchaseCards);
+          
+          // Update prize pool during setup phase with specific timing
+          const now = Date.now();
+          const timeSinceLastUpdate = now - lastPrizePoolUpdate;
+          
+          // Update prize pool every 5 seconds during pre-buy, or 2 seconds before game starts
+          if (status.enabled && status.currentPhase === 'setup' && status.timeUntilNextGame !== null) {
+            const shouldUpdate = 
+              timeSinceLastUpdate >= 5000 || // Every 5 seconds
+              status.timeUntilNextGame <= 2; // 2 seconds before game starts
+              
+            if (shouldUpdate) {
+              try {
+                const prizeResponse = await fetch('/api/round/state?ts=' + now, { 
+                  cache: 'no-store',
+                  headers: { Accept: 'application/json' }
+                });
+                if (prizeResponse.ok) {
+                  const roundData = await prizeResponse.json();
+                  if (roundData.prize_pool !== undefined) {
+                    const pool = Number(roundData.prize_pool) || 0;
+                    setPrizePool(pool);
+                    lastPrizePoolUpdate = now;
+                    console.log(`Prize pool updated during setup: ${pool} (timeUntilNext: ${status.timeUntilNextGame}s)`);
+                  }
+                }
+              } catch (error) {
+                console.error('Failed to fetch prize pool during setup:', error);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch scheduler status:', error);
+      }
+    }
+    
+    pullSchedulerStatus();
+    const interval = setInterval(pullSchedulerStatus, 1000);
+    
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
 
   // ---------- Pre-buy actions (include shields) ----------
@@ -751,12 +871,26 @@ function App(){
     setAvailable(a=>[...a, ...Array.from({length:n},()=>makeCard(uid('pool'),'', 3))]);
   }
   function buySelected(){
-    const price = 1;
+    // Check if purchases are blocked by scheduler
+    if (!canPurchaseCards) {
+      alert('Card purchases are blocked. Next game starting soon!');
+      return;
+    }
+    
     const picks = available.filter(c=>selectedPool.has(c.id));
-    const cost  = picks.length * price;
     if (picks.length === 0) return;
-    if (wallet < cost) { alert(`Not enough coins. Need ${cost}.`); return; }
-    setWallet(w=>w - cost);
+    
+    // Calculate total cost based on real pricing with proper rounding
+    const shieldCost = Math.round(cardPrice * (shieldPricePercent / 100) * 100) / 100;
+    const totalCost = picks.reduce((sum, card) => {
+      const cardCost = Math.round((cardPrice + (card.wantsShield ? shieldCost : 0)) * 100) / 100;
+      return Math.round((sum + cardCost) * 100) / 100;
+    }, 0);
+    
+    if (wallet === null || wallet < totalCost) { 
+      alert(`Not enough coins. Need ${totalCost.toFixed(2)}, have ${wallet !== null ? wallet.toFixed(2) : 'unknown'}.`); 
+      return; 
+    }
 
     // Move selected available -> owned preserving wantsShield; refresh ids
     const ownedAdd = picks.map(c => ({ ...c, id: uid('c') }));
@@ -777,13 +911,19 @@ function App(){
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ 
                 alias: alias,
-                cardName: card.name || 'Bingo Card'
+                cardName: card.name || 'Bingo Card',
+                wantsShield: card.wantsShield || false
               })
             });
             
             const result = await response.json();
             
             if (response.ok && result.ok && result.cardId) {
+              // Update wallet with actual balance from server
+              if (result.newBalance !== undefined) {
+                setWallet(result.newBalance);
+              }
+              
               // Update the local card with the database UUID
               setPlayer(p => ({
                 ...p, 
@@ -791,6 +931,15 @@ function App(){
                   c.id === card.id ? { ...c, id: result.cardId } : c
                 )
               }));
+            } else if (!response.ok) {
+              // Handle error (e.g., insufficient balance)
+              alert(result.error || 'Failed to purchase card');
+              // Revert the optimistic update
+              setPlayer(p => ({
+                ...p,
+                cards: p.cards.filter(c => c.id !== card.id)
+              }));
+              setAvailable(a => [...a, { ...card, id: uid('pool') }]);
             }
           } catch (error) {
             console.error('Card creation failed:', error);
@@ -855,6 +1004,13 @@ function App(){
         const newPhase = s.phase || 'setup';
         const newCalls = Array.isArray(s.called) ? s.called : [];
         setRoundId(s.id || null);
+        
+        // Update prize pool
+        if (s.prize_pool !== undefined) {
+          const pool = Number(s.prize_pool) || 0;
+          setPrizePool(pool);
+          console.log('Prize pool updated from server:', pool);
+        }
 
         // RESET TO SETUP: clear purchases & selections, regenerate Available and force paint
         if ((lastPhase !== 'setup' && newPhase === 'setup') || (newCalls.length < lastCount)) {
@@ -866,6 +1022,29 @@ function App(){
           setAsk(true);
           endPostedRef.current = false;
           setResetKey(k => k + 1);     // <- forces a repaint
+          
+          // Fetch wallet balance from server when entering setup phase
+          if (alias) {
+            fetch(`/api/player/wallet?alias=${encodeURIComponent(alias)}&ts=${Date.now()}`, { cache: 'no-store' })
+              .then(r => r.json())
+              .then(data => {
+                if (data.balance !== undefined) {
+                  setWallet(data.balance);
+                  console.log('Wallet balance loaded from server:', data.balance);
+                }
+              })
+              .catch(err => console.error('Failed to fetch wallet balance:', err));
+          }
+          
+          // Refresh pricing configuration when entering setup phase
+          fetch('/api/pricing', { cache: 'no-store' })
+            .then(r => r.json())
+            .then(data => {
+              setCardPrice(data.cardPrice || 10);
+              setShieldPricePercent(data.shieldPricePercent || 50);
+              console.log('Pricing loaded from server:', data);
+            })
+            .catch(err => console.error('Failed to fetch pricing:', err));
         }
 
         // Apply new calls to owned cards
@@ -935,12 +1114,61 @@ function App(){
           // Use winner from state response if available, otherwise fetch separately
           if (s.winner && s.winner.alias) {
             setSyncedWinner({ alias: s.winner.alias, daubs: s.winner.daubs });
+            
+            // Award prize money to winner (POST to winner API)
+            console.log('Attempting to award prize - Round ID:', s.id, 'Prize Pool:', s.prize_pool, 'Winner:', s.winner);
+            if (s.id && s.prize_pool > 0) {
+              fetch(`/api/round/winner`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  alias: s.winner.alias,
+                  daubs: s.winner.daubs,
+                  prizePool: s.prize_pool
+                })
+              })
+              .then(r => r.json())
+              .then(result => {
+                console.log('Prize awarded to winner:', result);
+              })
+              .catch(err => {
+                console.error('Failed to award prize to winner:', err);
+              });
+            } else {
+              console.log('Skipping prize award - Round ID:', s.id, 'Prize Pool:', s.prize_pool);
+            }
           } else if (s.id) {
             fetch(`/api/round/winner?round_id=${encodeURIComponent(s.id)}&ts=${Date.now()}`, { cache:'no-store' })
               .then(r => r.json())
               .then(w => {
-                if (w?.alias) setSyncedWinner({ alias: w.alias, daubs: w.daubs });
-                else setSyncedWinner({ alias: '—', daubs: 0 });
+                if (w?.alias) {
+                  setSyncedWinner({ alias: w.alias, daubs: w.daubs });
+                  
+                // Award prize money to winner (POST to winner API)
+                console.log('Attempting to award prize (fetch) - Prize Pool:', s.prize_pool, 'Winner:', w);
+                if (s.prize_pool > 0) {
+                  fetch(`/api/round/winner`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      alias: w.alias,
+                      daubs: w.daubs,
+                      prizePool: s.prize_pool
+                    })
+                  })
+                    .then(r => r.json())
+                    .then(result => {
+                      console.log('Prize awarded to winner (fetch):', result);
+                    })
+                    .catch(err => {
+                      console.error('Failed to award prize to winner (fetch):', err);
+                    });
+                  } else {
+                    console.log('Skipping prize award (fetch) - Prize Pool:', s.prize_pool);
+                  }
+                } else {
+                  setSyncedWinner({ alias: '—', daubs: 0 });
+                }
               })
               .catch(() => setSyncedWinner({ alias: '—', daubs: 0 }));
           } else {
@@ -969,13 +1197,17 @@ function App(){
       <div className="row" style={{justifyContent:'space-between'}}>
         <div>
           <h2 className="title">Bingo + Crash — Multiplayer</h2>
-          <div className="muted">Wallet: <b>{wallet}</b> coins · Alias: <b>{alias || '—'}</b></div>
+          <div className="muted">
+            Wallet: <b>{wallet !== null ? wallet : 'Loading...'}</b> coins · Alias: <b>{alias || '—'}</b>
+          </div>
         </div>
-        <div className="row">
-          {!audio
-            ? <button className="btn primary" onClick={async()=>{ if(await enableAudio()){ setAudio(true); boom(0.6);} }}>Enable Sound</button>
-            : (<div className="row"><span className="muted">Vol</span><input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e)=>setVolume(Number(e.target.value))}/></div>)
-          }
+        <div className="row" style={{gap: 12}}>
+          <div className="row">
+            {!audio
+              ? <button className="btn primary" onClick={async()=>{ if(await enableAudio()){ setAudio(true); boom(0.6);} }}>Enable Sound</button>
+              : (<div className="row"><span className="muted">Vol</span><input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e)=>setVolume(Number(e.target.value))}/></div>)
+            }
+          </div>
         </div>
       </div>
 
@@ -1008,6 +1240,120 @@ function App(){
                 })}</div>
               </>)
             : (<>
+                {/* Scheduler Countdown Timer in Purchase Panel - Circular Progress Style */}
+                {schedulerStatus?.enabled && timeUntilNextGame !== null && (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '24px',
+                    background: timeUntilNextGame <= 5 
+                      ? 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)' 
+                      : 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                    border: `3px solid ${timeUntilNextGame <= 5 ? '#ef4444' : '#3b82f6'}`,
+                    borderRadius: '20px',
+                    marginBottom: '16px',
+                    boxShadow: timeUntilNextGame <= 5 
+                      ? '0 8px 24px rgba(239, 68, 68, 0.3), 0 0 0 1px rgba(239, 68, 68, 0.1)' 
+                      : '0 8px 24px rgba(59, 130, 246, 0.3), 0 0 0 1px rgba(59, 130, 246, 0.1)',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    animation: timeUntilNextGame <= 5 ? 'pulse-urgent 1s ease-in-out infinite' : 'none'
+                  }}>
+                    {/* Animated background effect */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '-50%',
+                      left: '-50%',
+                      width: '200%',
+                      height: '200%',
+                      background: timeUntilNextGame <= 5
+                        ? 'radial-gradient(circle, rgba(239, 68, 68, 0.1) 0%, transparent 70%)'
+                        : 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)',
+                      animation: 'rotate-gradient 8s linear infinite',
+                      pointerEvents: 'none'
+                    }}></div>
+                    
+                    {/* Circular Progress Ring */}
+                    <div style={{ position: 'relative', display: 'inline-block', marginBottom: '12px' }}>
+                      <svg width="140" height="140" style={{ transform: 'rotate(-90deg)' }}>
+                        {/* Background circle */}
+                        <circle
+                          cx="70"
+                          cy="70"
+                          r="60"
+                          fill="none"
+                          stroke={timeUntilNextGame <= 5 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)'}
+                          strokeWidth="8"
+                        />
+                        {/* Progress circle */}
+                        <circle
+                          cx="70"
+                          cy="70"
+                          r="60"
+                          fill="none"
+                          stroke={timeUntilNextGame <= 5 ? '#ef4444' : '#3b82f6'}
+                          strokeWidth="8"
+                          strokeLinecap="round"
+                          strokeDasharray={`${2 * Math.PI * 60}`}
+                          strokeDashoffset={`${2 * Math.PI * 60 * (1 - (timeUntilNextGame / ((schedulerStatus?.preBuyMinutes || 1) * 60)))}`}
+                          style={{
+                            transition: 'stroke-dashoffset 1s linear',
+                            filter: timeUntilNextGame <= 5 ? 'drop-shadow(0 0 8px rgba(239, 68, 68, 0.6))' : 'drop-shadow(0 0 8px rgba(59, 130, 246, 0.4))'
+                          }}
+                        />
+                      </svg>
+                      
+                      {/* Timer text in center */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        textAlign: 'center'
+                      }}>
+                        <div style={{ 
+                          fontSize: '36px', 
+                          fontWeight: 'bold', 
+                          color: timeUntilNextGame <= 5 ? '#dc2626' : '#1e40af',
+                          fontFamily: 'system-ui, -apple-system, sans-serif',
+                          lineHeight: '1',
+                          textShadow: timeUntilNextGame <= 5 
+                            ? '0 2px 8px rgba(220, 38, 38, 0.3)' 
+                            : '0 2px 8px rgba(30, 64, 175, 0.3)',
+                          letterSpacing: '2px'
+                        }}>
+                          {formatTimeUntilNextGame(timeUntilNextGame)}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div style={{ 
+                      fontSize: '16px', 
+                      fontWeight: '600',
+                      color: timeUntilNextGame <= 5 ? '#991b1b' : '#1e40af',
+                      textTransform: 'uppercase',
+                      letterSpacing: '1.5px',
+                      marginBottom: '8px'
+                    }}>
+                      {timeUntilNextGame <= 5 ? '🔥 Starting Soon!' : '⏰ Next Game'}
+                    </div>
+                    
+                    {!canPurchaseCards && (
+                      <div style={{ 
+                        fontSize: '13px', 
+                        color: '#dc2626', 
+                        fontWeight: 'bold',
+                        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        display: 'inline-block',
+                        animation: 'blink-warning 1s ease-in-out infinite'
+                      }}>
+                        🚫 Purchases Blocked
+                      </div>
+                    )}
+                  </div>
+                )}
+                
                 <div className="row" style={{flexWrap:'wrap', gap:8}}>
                   <div className="muted" style={{marginRight:'auto'}}>Purchase Panel</div>
                   <input id="genN" className="chip" style={{padding:'8px 10px'}} type="number" min="1" max="12" defaultValue="2"/>
@@ -1015,8 +1361,25 @@ function App(){
                   {/* bulk shields for SELECTED AVAILABLE */}
                   <button className="btn" onClick={()=>shieldSelectedAvailable(true)} disabled={selectedPool.size===0}>Shield selected</button>
                   <button className="btn" onClick={()=>shieldSelectedAvailable(false)} disabled={selectedPool.size===0}>Unshield selected</button>
-                  <button className="btn primary" onClick={buySelected} disabled={selectedPool.size===0}>Buy selected</button>
+                  <button className="btn primary" onClick={buySelected} disabled={selectedPool.size===0 || wallet === null}>Buy selected</button>
                 </div>
+                
+                {/* Prize Badge below all buttons in Purchase Panel during Setup */}
+                {(prizePool > 0 || (phase === 'setup' && schedulerStatus?.enabled)) && (
+                  <div style={{
+                    padding: '8px 16px',
+                    background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                    borderRadius: '8px',
+                    color: '#78350f',
+                    fontWeight: 'bold',
+                    fontSize: '14px',
+                    boxShadow: '0 2px 8px rgba(251, 191, 36, 0.3)',
+                    marginTop: '12px',
+                    textAlign: 'center'
+                  }}>
+                    🏆 Prize Pool: <b>{prizePool.toFixed(2)}</b> coins
+                  </div>
+                )}
               </>)
           }
         </div>
@@ -1043,6 +1406,8 @@ function App(){
                         showShield={false}
                         onShieldToggle={()=>{}}
                         showLock={false}
+                        cardPrice={cardPrice}
+                        shieldPricePercent={shieldPricePercent}
                       />
                     )}
                   </div>
@@ -1069,6 +1434,8 @@ function App(){
                         showShield={true}
                         onShieldToggle={toggleShieldAvailable}
                         showLock={false}
+                        cardPrice={cardPrice}
+                        shieldPricePercent={shieldPricePercent}
                       />
                     )}
                   </div>
@@ -1076,8 +1443,22 @@ function App(){
             </>
           ) : (
             <>
-              <div className="row" style={{justifyContent:'space-between'}}>
+              <div className="row" style={{justifyContent:'space-between', alignItems:'center'}}>
                 <div className="muted">My Cards ({player.cards.length})</div>
+                {phase === 'live' && (
+                  <div style={{
+                    padding: '8px 16px',
+                    background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                    borderRadius: '12px',
+                    color: '#78350f',
+                    fontWeight: 'bold',
+                    fontSize: '16px',
+                    boxShadow: '0 4px 12px rgba(251, 191, 36, 0.4)',
+                    border: '2px solid #fbbf24'
+                  }}>
+                    🏆 Prize Pool: <span style={{fontSize:'18px'}}>{prizePool.toFixed(2)}</span> coins
+                  </div>
+                )}
               </div>
               {player.cards.length===0
                 ? <div className="muted" style={{marginTop:8}}>No cards owned.</div>
@@ -1096,6 +1477,8 @@ function App(){
                         showShield={false}
                         onShieldToggle={()=>{}}
                         showLock={true}
+                        cardPrice={cardPrice}
+                        shieldPricePercent={shieldPricePercent}
                       />
                     )}
                   </div>
@@ -1123,14 +1506,51 @@ function App(){
       {/* Winner modal (synced across players) */}
       <Modal
         open={!!syncedWinner}
-        onClose={()=>location.reload()}
+        onClose={()=>{
+          // Refresh wallet before reloading page
+          if (alias) {
+            fetch(`/api/player/wallet?alias=${encodeURIComponent(alias)}&ts=${Date.now()}`, { cache: 'no-store' })
+              .then(r => r.json())
+              .then(data => {
+                if (data.balance !== undefined) {
+                  setWallet(data.balance);
+                  console.log('Wallet refreshed before reload:', data.balance);
+                }
+              })
+              .catch(err => console.error('Failed to refresh wallet:', err))
+              .finally(() => location.reload());
+          } else {
+            location.reload();
+          }
+        }}
         title="Game Over"
         primaryText="OK"
-        onPrimary={()=>location.reload()}
+        onPrimary={()=>{
+          // Refresh wallet before reloading page
+          if (alias) {
+            fetch(`/api/player/wallet?alias=${encodeURIComponent(alias)}&ts=${Date.now()}`, { cache: 'no-store' })
+              .then(r => r.json())
+              .then(data => {
+                if (data.balance !== undefined) {
+                  setWallet(data.balance);
+                  console.log('Wallet refreshed before reload:', data.balance);
+                }
+              })
+              .catch(err => console.error('Failed to refresh wallet:', err))
+              .finally(() => location.reload());
+          } else {
+            location.reload();
+          }
+        }}
       >
         {syncedWinner ? (
           <>
-            Winner: <b>{syncedWinner.alias}</b> with <b>{syncedWinner.daubs}</b> daubs.
+            🏆 Winner: <b>{syncedWinner.alias}</b> with <b>{syncedWinner.daubs}</b> daubs!
+            {prizePool > 0 && (
+              <>
+                {'\n\n'}💰 Prize Won: <b style={{color: '#f59e0b', fontSize: '18px'}}>{prizePool.toFixed(2)} coins</b>
+              </>
+            )}
             {'\n\n'}Live cards remaining: <b>{liveCardsCount}</b>
           </>
         ) : '—'}

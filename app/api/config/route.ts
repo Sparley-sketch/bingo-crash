@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
+import { tableNames } from '@/lib/config';
 
 const PUTSchema = z.object({
   key: z.string().min(1),
@@ -10,7 +11,7 @@ const PUTSchema = z.object({
 
 export async function GET() {
   const supabase = createRouteHandlerClient({ cookies });
-  const { data, error } = await supabase.from('config').select('*').order('key');
+  const { data, error } = await supabase.from(tableNames.config).select('*').order('key');
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ items: data || [] });
 }
@@ -32,12 +33,12 @@ export async function PUT(req: NextRequest) {
 
   // RLS enforces admin permissions (see SQL). No service role key needed.
   const { error } = await supabase
-    .from('config')
+    .from(tableNames.config)
     .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 403 });
 
-  const { data: items, error: e2 } = await supabase.from('config').select('*').order('key');
+  const { data: items, error: e2 } = await supabase.from(tableNames.config).select('*').order('key');
   if (e2) return NextResponse.json({ error: e2.message }, { status: 500 });
   return NextResponse.json({ ok: true, items });
 }

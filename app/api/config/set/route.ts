@@ -11,10 +11,10 @@ export async function POST(req: Request) {
     const key = String(body?.key ?? 'round.duration_ms');
     const valRaw = String(body?.value ?? '1500');
 
-    // Normalize to integer milliseconds (100..5000 guard, adjust as you like)
+    // Normalize to integer milliseconds (100..10000 guard, adjust as you like)
     let value = parseInt(valRaw, 10);
-    if (!Number.isFinite(value)) value = 1500;
-    value = Math.max(100, Math.min(5000, value));
+    if (!Number.isFinite(value)) value = 800;
+    value = Math.max(100, Math.min(10000, value));
 
     const { data, error } = await supabaseAdmin
       .from(tableNames.config)

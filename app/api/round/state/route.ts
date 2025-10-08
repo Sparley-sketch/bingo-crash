@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { tableNames } from '@/lib/config';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,7 +8,7 @@ export async function GET() {
   try {
     // Get current round
     const { data: round, error: roundError } = await supabaseAdmin
-      .from('rounds')
+      .from(tableNames.rounds)
       .select('*')
       .order('created_at', { ascending: false })
       .limit(1)
@@ -31,7 +32,7 @@ export async function GET() {
 
     // Get live cards count
     const { data: liveCardsData, error: liveCardsError } = await supabaseAdmin
-      .from('cards')
+      .from(tableNames.cards)
       .select('id')
       .eq('round_id', round.id)
       .eq('exploded', false)
@@ -43,7 +44,7 @@ export async function GET() {
 
     // Get player count
     const { data: playersData, error: playersError } = await supabaseAdmin
-      .from('players')
+      .from(tableNames.players)
       .select('id')
       .eq('round_id', round.id);
 
@@ -61,12 +62,13 @@ export async function GET() {
       if (playerCount > 0) {
         // Get all cards with their daubs count to find the winner
         const { data: allCardsData, error: allCardsError } = await supabaseAdmin
-          .from('cards')
+          .from(tableNames.cards)
           .select('player_id, daubs, exploded, paused')
           .eq('round_id', round.id);
 
         if (!allCardsError && allCardsData) {
           // Group by player and find the best daubs count from NON-EXPLODED cards only
+          // Only live cards should count for winner determination
           const playerStats = new Map();
           allCardsData.forEach(card => {
             // Only count non-exploded cards for winner determination
@@ -80,7 +82,7 @@ export async function GET() {
             }
           });
 
-          // Find the player(s) with the highest daubs from non-exploded cards
+          // Find the player(s) with the highest daubs from non-exploded cards only
           let bestDaubs = -1;
           let bestPlayerIds = [];
           for (const [playerId, stats] of playerStats) {
@@ -97,7 +99,7 @@ export async function GET() {
             if (bestPlayerIds.length === 1) {
               // Single winner
               const { data: winnerPlayer, error: winnerError } = await supabaseAdmin
-                .from('players')
+                .from(tableNames.players)
                 .select('alias')
                 .eq('id', bestPlayerIds[0])
                 .single();
@@ -108,7 +110,7 @@ export async function GET() {
             } else {
               // Multiple winners (tie)
               const { data: winnerPlayers, error: winnerError } = await supabaseAdmin
-                .from('players')
+                .from(tableNames.players)
                 .select('alias')
                 .in('id', bestPlayerIds);
 
@@ -118,7 +120,7 @@ export async function GET() {
               }
             }
           } else {
-            // All cards exploded - no winner
+            // All cards exploded - no winner (all cards were exploded)
             winner = { alias: '—', daubs: 0 };
           }
         }
@@ -126,11 +128,12 @@ export async function GET() {
       
       // End the round with winner information
       const { error: endError } = await supabaseAdmin
-        .from('rounds')
+        .from(tableNames.rounds)
         .update({ 
           phase: 'ended',
           ended_at: new Date().toISOString(),
-          winner: winner
+          winner_alias: winner?.alias || null,
+          winner_daubs: winner?.daubs || 0
         })
         .eq('id', round.id);
 
@@ -138,11 +141,18 @@ export async function GET() {
         // Update the round object for the response
         round.phase = 'ended';
         round.ended_at = new Date().toISOString();
-        round.winner = winner;
+        round.winner_alias = winner?.alias || null;
+        round.winner_daubs = winner?.daubs || 0;
       }
     }
 
     
+    // Construct winner object from separate fields
+    const winner = round.winner_alias ? {
+      alias: round.winner_alias,
+      daubs: round.winner_daubs || 0
+    } : null;
+
     return NextResponse.json({
       id: round.id,
       phase: round.phase,
@@ -150,7 +160,9 @@ export async function GET() {
       speed_ms: round.speed_ms || 800,
       live_cards_count: liveCardsCount,
       player_count: playerCount,
-      winner: round.winner || null
+      winner: winner,
+      prize_pool: round.prize_pool || 0,
+      total_collected: round.total_collected || 0
     }, { headers: { 'Cache-Control': 'no-store' }});
   } catch (error) {
     console.error('Unexpected error in state endpoint:', error);

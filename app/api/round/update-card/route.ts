@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { tableNames } from '@/lib/config';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
     if (shieldUsed !== undefined) updateData.shield_used = shieldUsed;
 
     const { error: updateError } = await supabaseAdmin
-      .from('cards')
+      .from(tableNames.cards)
       .update(updateData)
       .eq('id', cardId);
 

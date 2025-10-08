@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { tableNames } from '@/lib/config';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,7 +8,7 @@ export async function POST(req: Request) {
   try {
     // Get current round
     const { data: round, error: roundError } = await supabaseAdmin
-      .from('rounds')
+      .from(tableNames.rounds)
       .select('*')
       .order('created_at', { ascending: false })
       .limit(1)
@@ -48,7 +49,7 @@ export async function POST(req: Request) {
       
       // Update the round with the new called number
       const { error: updateError } = await supabaseAdmin
-        .from('rounds')
+        .from(tableNames.rounds)
         .update({ called: newCalledNumbers })
         .eq('id', round.id);
 

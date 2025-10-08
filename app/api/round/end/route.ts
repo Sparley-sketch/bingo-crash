@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { tableNames } from '@/lib/config';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +19,7 @@ export async function POST(req: Request) {
     
     // Get current round
     const { data: round, error: roundError } = await supabaseAdmin
-      .from('rounds')
+      .from(tableNames.rounds)
       .select('*')
       .order('created_at', { ascending: false })
       .limit(1)
@@ -42,8 +43,11 @@ export async function POST(req: Request) {
       console.log('Ending round...');
       // End the round
       const { error: updateError } = await supabaseAdmin
-        .from('rounds')
-        .update({ phase: 'ended' })
+        .from(tableNames.rounds)
+        .update({ 
+          phase: 'ended',
+          ended_at: new Date().toISOString()
+        })
         .eq('id', round.id);
 
       if (updateError) {
@@ -51,9 +55,79 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Failed to end round' }, { status: 500 });
       }
 
-      console.log(`Round ${round.id} ended manually`);
+      console.log(`Round ${round.id} ended successfully`);
     } else {
       console.log(`Round is not live (phase: ${round.phase}), not ending`);
+    }
+
+    // Always check scheduler after ending a round (regardless of phase)
+    console.log('Checking scheduler after ending round...');
+    const { data: schedulerData, error: schedulerError } = await supabaseAdmin
+      .from(tableNames.config)
+      .select('value')
+      .eq('key', 'scheduler')
+      .maybeSingle();
+
+    if (schedulerError) {
+      console.error('Error fetching scheduler config in round/end:', schedulerError);
+    }
+
+    if (!schedulerError && schedulerData?.value) {
+      const schedulerConfig = schedulerData.value;
+      console.log('Scheduler config found:', schedulerConfig);
+      console.log('Scheduler enabled:', schedulerConfig.enabled);
+      
+      if (schedulerConfig.enabled) {
+        // Set phase to 'winner_display' immediately
+        const now = new Date();
+        const updatedSchedulerConfig = {
+          ...schedulerConfig,
+          currentPhase: 'winner_display',
+          nextGameStart: null // Clear next game start for now
+        };
+
+        console.log('Updating scheduler config to winner_display:', updatedSchedulerConfig);
+
+        const { error: updateError } = await supabaseAdmin
+          .from(tableNames.config)
+          .upsert({ 
+            key: 'scheduler', 
+            value: updatedSchedulerConfig, 
+            updated_at: new Date().toISOString() 
+          }, { onConflict: 'key' });
+
+        if (updateError) {
+          console.error('Error updating scheduler config:', updateError);
+        } else {
+          console.log('Scheduler set to winner_display phase');
+          
+          // Automatically transition to setup phase after 3 seconds
+          setTimeout(async () => {
+            console.log('Auto-transitioning from winner_display to setup phase');
+            
+            const nextGameStart = new Date(Date.now() + (schedulerConfig.preBuyMinutes || 2) * 60 * 1000);
+            const finalSchedulerConfig = {
+              ...schedulerConfig,
+              currentPhase: 'setup',
+              nextGameStart: nextGameStart.toISOString()
+            };
+
+            await supabaseAdmin
+              .from(tableNames.config)
+              .upsert({ 
+                key: 'scheduler', 
+                value: finalSchedulerConfig, 
+                updated_at: new Date().toISOString() 
+              }, { onConflict: 'key' });
+
+            console.log(`Auto-transitioned to setup phase. Next game scheduled for: ${nextGameStart.toISOString()}`);
+          }, (schedulerConfig.winnerDisplaySeconds || 3) * 1000);
+        }
+      } else {
+        console.log('Scheduler is disabled, not updating phase');
+      }
+    } else {
+      console.log('No scheduler config found or error occurred');
     }
 
     return NextResponse.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' }});

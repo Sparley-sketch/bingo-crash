@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { tableNames } from '@/lib/config';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +11,7 @@ export async function POST(req: Request) {
 
     // Get current round
     const { data: round, error: roundError } = await supabaseAdmin
-      .from('rounds')
+      .from(tableNames.rounds)
       .select('id, phase')
       .order('created_at', { ascending: false })
       .limit(1)
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
 
     // Check if player exists
     const { data: player, error: playerError } = await supabaseAdmin
-      .from('players')
+      .from(tableNames.players)
       .select('id')
       .eq('round_id', round.id)
       .eq('alias', alias)
@@ -42,7 +43,7 @@ export async function POST(req: Request) {
 
     // Update player's posted_out status (telemetry only)
     const { error: updateError } = await supabaseAdmin
-      .from('players')
+      .from(tableNames.players)
       .update({ posted_out: true })
       .eq('id', player.id);
 
@@ -53,17 +54,90 @@ export async function POST(req: Request) {
     // Check if game should end (when live cards = 0)
     if (round.phase === 'live') {
       const { data: liveCardsData, error: liveCardsError } = await supabaseAdmin
-        .from('cards')
+        .from(tableNames.cards)
         .select('id')
         .eq('round_id', round.id)
         .eq('exploded', false)
         .eq('paused', false);
 
       if (!liveCardsError && liveCardsData?.length === 0) {
-        // End the game
+        // Determine winner before ending the game
+        let winner = null;
+        
+        // Get all cards with their daubs count to find the winner
+        const { data: allCardsData, error: allCardsError } = await supabaseAdmin
+          .from(tableNames.cards)
+          .select('player_id, daubs, exploded, paused')
+          .eq('round_id', round.id);
+
+        if (!allCardsError && allCardsData) {
+             // Group by player and find the best daubs count from NON-EXPLODED cards only
+             // Only live cards should count for winner determination
+             const playerStats = new Map();
+             allCardsData.forEach(card => {
+               // Only count non-exploded cards for winner determination
+               if (!card.exploded) {
+                 const playerId = card.player_id;
+                 if (!playerStats.has(playerId)) {
+                   playerStats.set(playerId, { maxDaubs: 0, alias: null });
+                 }
+                 const stats = playerStats.get(playerId);
+                 stats.maxDaubs = Math.max(stats.maxDaubs, card.daubs);
+               }
+             });
+
+          // Find the player(s) with the highest daubs from non-exploded cards only
+          let bestDaubs = -1;
+          let bestPlayerIds = [];
+          for (const [playerId, stats] of playerStats) {
+            if (stats.maxDaubs > bestDaubs) {
+              bestDaubs = stats.maxDaubs;
+              bestPlayerIds = [playerId];
+            } else if (stats.maxDaubs === bestDaubs && bestDaubs >= 0) {
+              bestPlayerIds.push(playerId);
+            }
+          }
+
+          // Get the winner(s) alias (only if there are non-exploded cards)
+          if (bestPlayerIds.length > 0 && bestDaubs >= 0) {
+            if (bestPlayerIds.length === 1) {
+              // Single winner
+              const { data: winnerPlayer, error: winnerError } = await supabaseAdmin
+                .from(tableNames.players)
+                .select('alias')
+                .eq('id', bestPlayerIds[0])
+                .single();
+
+              if (!winnerError && winnerPlayer) {
+                winner = { alias: winnerPlayer.alias, daubs: bestDaubs };
+              }
+            } else {
+              // Multiple winners (tie)
+              const { data: winnerPlayers, error: winnerError } = await supabaseAdmin
+                .from(tableNames.players)
+                .select('alias')
+                .in('id', bestPlayerIds);
+
+              if (!winnerError && winnerPlayers && winnerPlayers.length > 0) {
+                const aliases = winnerPlayers.map(p => p.alias).join(' and ');
+                winner = { alias: `DRAW between ${aliases}`, daubs: bestDaubs };
+              }
+            }
+          } else {
+            // All cards exploded - no winner
+            winner = { alias: '—', daubs: 0 };
+          }
+        }
+
+        // End the game with winner information
         const { error: endError } = await supabaseAdmin
-          .from('rounds')
-          .update({ phase: 'ended' })
+          .from(tableNames.rounds)
+          .update({ 
+            phase: 'ended',
+            ended_at: new Date().toISOString(),
+            winner_alias: winner?.alias || null,
+            winner_daubs: winner?.daubs || 0
+          })
           .eq('id', round.id);
 
         if (endError) {

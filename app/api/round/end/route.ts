@@ -17,7 +17,40 @@ export async function POST(req: Request) {
       // No body or invalid JSON, continue without roundId
     }
     
-    // Get current round
+    // First, check if there are any stuck live rounds
+    const { data: stuckRounds, error: stuckError } = await supabaseAdmin
+      .from(tableNames.rounds)
+      .select('*')
+      .eq('phase', 'live');
+
+    console.log('Stuck live rounds:', stuckRounds);
+
+    if (stuckRounds && stuckRounds.length > 0) {
+      console.log(`Found ${stuckRounds.length} stuck live rounds, ending them all`);
+      
+      // End all stuck live rounds
+      const { error: endAllError } = await supabaseAdmin
+        .from(tableNames.rounds)
+        .update({ 
+          phase: 'ended',
+          ended_at: new Date().toISOString()
+        })
+        .eq('phase', 'live');
+
+      if (endAllError) {
+        console.error('Error ending stuck rounds:', endAllError);
+        return NextResponse.json({ error: `Failed to end stuck rounds: ${endAllError.message}` }, { status: 500 });
+      }
+
+      console.log('Successfully ended all stuck live rounds');
+      return NextResponse.json({ 
+        message: 'Ended stuck live rounds', 
+        endedCount: stuckRounds.length,
+        rounds: stuckRounds.map(r => ({ id: r.id, phase: 'ended' }))
+      }, { headers: { 'Cache-Control': 'no-store' } });
+    }
+    
+    // Get current round (latest)
     const { data: round, error: roundError } = await supabaseAdmin
       .from(tableNames.rounds)
       .select('*')

@@ -83,22 +83,30 @@ export async function POST(req: Request) {
           }
 
           if (!currentRound || currentRound.phase === 'ended') {
-            // Create a new round
+            // Create a new round with fallback for missing columns
+            const roundData: any = {
+              phase: 'live',
+              called: [],
+              speed_ms: speedMs
+            };
+            
+            // Only add pricing columns if they exist (for backward compatibility)
+            if (currentRound?.prize_pool !== undefined) {
+              roundData.prize_pool = currentRound.prize_pool || 0;
+            }
+            if (currentRound?.total_collected !== undefined) {
+              roundData.total_collected = currentRound.total_collected || 0;
+            }
+
             const { data: newRound, error: insertError } = await supabaseAdmin
               .from(tableNames.rounds)
-              .insert([{
-                phase: 'live',
-                called: [],
-                speed_ms: speedMs,
-                prize_pool: 0,
-                total_collected: 0
-              }])
+              .insert([roundData])
               .select()
               .single();
 
             if (insertError) {
               console.error('Error creating new round:', insertError);
-              return NextResponse.json({ error: 'Failed to create new round' }, { status: 500 });
+              return NextResponse.json({ error: `Failed to create new round: ${insertError.message}` }, { status: 500 });
             }
             console.log('New round created:', newRound.id);
           } else {
@@ -114,7 +122,7 @@ export async function POST(req: Request) {
 
             if (updateError) {
               console.error('Error updating round:', updateError);
-              return NextResponse.json({ error: 'Failed to update round' }, { status: 500 });
+              return NextResponse.json({ error: `Failed to update round: ${updateError.message}` }, { status: 500 });
             }
             console.log('Round updated to live:', currentRound.id);
           }

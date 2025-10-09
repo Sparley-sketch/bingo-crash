@@ -747,6 +747,9 @@ function App(){
   const [phase,setPhase] = useState('setup');
   const [speedMs,setSpeedMs] = useState(800);
   const [called,setCalled] = useState([]);
+  
+  // Track which rounds have had their prize awarded (prevent duplicate awards)
+  const awardedRoundsRef = useRef(new Set());
 
   // Popups
   const [showHowTo, setShowHowTo] = useState(() => {
@@ -1111,61 +1114,55 @@ function App(){
         // If server says round ended, sequence winner popup and stop any local auto-caller
         if (newPhase === 'ended') {
           if (typeof setAutoRun === 'function') setAutoRun(false);
+          
+          // Helper function to award prize (only called once per round)
+          const awardPrize = (winner) => {
+            if (!winner?.alias || !s.id || s.prize_pool <= 0) return;
+            
+            // Check if we've already awarded this round (prevent duplicate calls from polling)
+            if (awardedRoundsRef.current.has(s.id)) {
+              console.log('Prize already awarded for round', s.id, '- skipping duplicate call');
+              return;
+            }
+            
+            // Mark this round as awarded immediately (before the API call)
+            awardedRoundsRef.current.add(s.id);
+            console.log('Awarding prize - Round ID:', s.id, 'Prize Pool:', s.prize_pool, 'Winner:', winner);
+            
+            fetch(`/api/round/winner`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                alias: winner.alias,
+                daubs: winner.daubs,
+                prizePool: s.prize_pool
+              })
+            })
+            .then(r => r.json())
+            .then(result => {
+              console.log('Prize awarded to winner:', result);
+              if (result.alreadyAwarded) {
+                console.log('Prize was already awarded for this round (server-side check)');
+              }
+            })
+            .catch(err => {
+              console.error('Failed to award prize to winner:', err);
+              // Remove from set on error so it can be retried
+              awardedRoundsRef.current.delete(s.id);
+            });
+          };
+          
           // Use winner from state response if available, otherwise fetch separately
           if (s.winner && s.winner.alias) {
             setSyncedWinner({ alias: s.winner.alias, daubs: s.winner.daubs });
-            
-            // Award prize money to winner (POST to winner API)
-            console.log('Attempting to award prize - Round ID:', s.id, 'Prize Pool:', s.prize_pool, 'Winner:', s.winner);
-            if (s.id && s.prize_pool > 0) {
-              fetch(`/api/round/winner`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  alias: s.winner.alias,
-                  daubs: s.winner.daubs,
-                  prizePool: s.prize_pool
-                })
-              })
-              .then(r => r.json())
-              .then(result => {
-                console.log('Prize awarded to winner:', result);
-              })
-              .catch(err => {
-                console.error('Failed to award prize to winner:', err);
-              });
-            } else {
-              console.log('Skipping prize award - Round ID:', s.id, 'Prize Pool:', s.prize_pool);
-            }
+            awardPrize(s.winner);
           } else if (s.id) {
             fetch(`/api/round/winner?round_id=${encodeURIComponent(s.id)}&ts=${Date.now()}`, { cache:'no-store' })
               .then(r => r.json())
               .then(w => {
                 if (w?.alias) {
                   setSyncedWinner({ alias: w.alias, daubs: w.daubs });
-                  
-                // Award prize money to winner (POST to winner API)
-                console.log('Attempting to award prize (fetch) - Prize Pool:', s.prize_pool, 'Winner:', w);
-                if (s.prize_pool > 0) {
-                  fetch(`/api/round/winner`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      alias: w.alias,
-                      daubs: w.daubs,
-                      prizePool: s.prize_pool
-                    })
-                  })
-                    .then(r => r.json())
-                    .then(result => {
-                      console.log('Prize awarded to winner (fetch):', result);
-                    })
-                    .catch(err => {
-                      console.error('Failed to award prize to winner (fetch):', err);
-                    });
-                  } else {
-                    console.log('Skipping prize award (fetch) - Prize Pool:', s.prize_pool);
-                  }
+                  awardPrize(w);
                 } else {
                   setSyncedWinner({ alias: '—', daubs: 0 });
                 }

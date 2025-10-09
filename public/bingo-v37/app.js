@@ -1196,7 +1196,7 @@ function App(){
       {/* Header */}
       <div className="row" style={{justifyContent:'space-between'}}>
         <div>
-          <h2 className="title">Bingo + Crash — Multiplayer</h2>
+          <h2 className="title">Crashingo</h2>
           <div className="muted">
             Wallet: <b>{wallet !== null ? wallet : 'Loading...'}</b> coins · Alias: <b>{alias || '—'}</b>
           </div>
@@ -1204,7 +1204,7 @@ function App(){
         <div className="row" style={{gap: 12}}>
           <div className="row">
             {!audio
-              ? <button className="btn primary" onClick={async()=>{ if(await enableAudio()){ setAudio(true); boom(0.6);} }}>Enable Sound</button>
+              ? <button className="btn primary" onClick={async()=>{ if(await enableAudio()){ setAudio(true); boom(0.6);} }} title="Enable Sound">🔊</button>
               : (<div className="row"><span className="muted">Vol</span><input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e)=>setVolume(Number(e.target.value))}/></div>)
             }
           </div>
@@ -1243,61 +1243,78 @@ function App(){
                 {/* Scheduler Countdown Timer in Purchase Panel - Circular Progress Style */}
                 {schedulerStatus?.enabled && timeUntilNextGame !== null && (
                   <div style={{
-                    textAlign: 'center',
-                    padding: '24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '8px 12px',
                     background: timeUntilNextGame <= 5 
                       ? 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)' 
                       : 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
-                    border: `3px solid ${timeUntilNextGame <= 5 ? '#ef4444' : '#3b82f6'}`,
-                    borderRadius: '20px',
-                    marginBottom: '16px',
+                    border: `2px solid ${timeUntilNextGame <= 5 ? '#ef4444' : '#3b82f6'}`,
+                    borderRadius: '8px',
+                    marginBottom: '8px',
                     boxShadow: timeUntilNextGame <= 5 
-                      ? '0 8px 24px rgba(239, 68, 68, 0.3), 0 0 0 1px rgba(239, 68, 68, 0.1)' 
-                      : '0 8px 24px rgba(59, 130, 246, 0.3), 0 0 0 1px rgba(59, 130, 246, 0.1)',
+                      ? '0 2px 8px rgba(239, 68, 68, 0.3)' 
+                      : '0 2px 8px rgba(59, 130, 246, 0.3)',
                     position: 'relative',
                     overflow: 'hidden',
                     animation: timeUntilNextGame <= 5 ? 'pulse-urgent 1s ease-in-out infinite' : 'none'
                   }}>
-                    {/* Animated background effect */}
-                    <div style={{
-                      position: 'absolute',
-                      top: '-50%',
-                      left: '-50%',
-                      width: '200%',
-                      height: '200%',
-                      background: timeUntilNextGame <= 5
-                        ? 'radial-gradient(circle, rgba(239, 68, 68, 0.1) 0%, transparent 70%)'
-                        : 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)',
-                      animation: 'rotate-gradient 8s linear infinite',
-                      pointerEvents: 'none'
-                    }}></div>
+                    {/* Text content - now on the left */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ 
+                        fontSize: '14px', 
+                        fontWeight: '600',
+                        color: timeUntilNextGame <= 5 ? '#991b1b' : '#1e40af',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        marginBottom: '2px'
+                      }}>
+                        {timeUntilNextGame <= 5 ? '🔥 Starting Soon!' : '⏰ Next Game'}
+                      </div>
                     
-                    {/* Circular Progress Ring */}
-                    <div style={{ position: 'relative', display: 'inline-block', marginBottom: '12px' }}>
-                      <svg width="140" height="140" style={{ transform: 'rotate(-90deg)' }}>
+                      {!canPurchaseCards && (
+                        <div style={{ 
+                          fontSize: '12px', 
+                          color: '#dc2626', 
+                          fontWeight: 'bold',
+                          backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          display: 'inline-block',
+                          animation: 'blink-warning 1s ease-in-out infinite'
+                        }}>
+                          🚫 Blocked
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Compact Circular Progress Ring - now on the right and slightly bigger */}
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      <svg width="60" height="60" style={{ transform: 'rotate(-90deg)' }}>
                         {/* Background circle */}
                         <circle
-                          cx="70"
-                          cy="70"
-                          r="60"
+                          cx="30"
+                          cy="30"
+                          r="24"
                           fill="none"
                           stroke={timeUntilNextGame <= 5 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)'}
-                          strokeWidth="8"
+                          strokeWidth="4"
                         />
                         {/* Progress circle */}
                         <circle
-                          cx="70"
-                          cy="70"
-                          r="60"
+                          cx="30"
+                          cy="30"
+                          r="24"
                           fill="none"
                           stroke={timeUntilNextGame <= 5 ? '#ef4444' : '#3b82f6'}
-                          strokeWidth="8"
+                          strokeWidth="4"
                           strokeLinecap="round"
-                          strokeDasharray={`${2 * Math.PI * 60}`}
-                          strokeDashoffset={`${2 * Math.PI * 60 * (1 - (timeUntilNextGame / ((schedulerStatus?.preBuyMinutes || 1) * 60)))}`}
+                          strokeDasharray={`${2 * Math.PI * 24}`}
+                          strokeDashoffset={`${2 * Math.PI * 24 * (1 - (timeUntilNextGame / ((schedulerStatus?.preBuyMinutes || 1) * 60)))}`}
                           style={{
                             transition: 'stroke-dashoffset 1s linear',
-                            filter: timeUntilNextGame <= 5 ? 'drop-shadow(0 0 8px rgba(239, 68, 68, 0.6))' : 'drop-shadow(0 0 8px rgba(59, 130, 246, 0.4))'
+                            filter: timeUntilNextGame <= 5 ? 'drop-shadow(0 0 4px rgba(239, 68, 68, 0.6))' : 'drop-shadow(0 0 4px rgba(59, 130, 246, 0.4))'
                           }}
                         />
                       </svg>
@@ -1311,46 +1328,16 @@ function App(){
                         textAlign: 'center'
                       }}>
                         <div style={{ 
-                          fontSize: '36px', 
+                          fontSize: '14px', 
                           fontWeight: 'bold', 
                           color: timeUntilNextGame <= 5 ? '#dc2626' : '#1e40af',
                           fontFamily: 'system-ui, -apple-system, sans-serif',
-                          lineHeight: '1',
-                          textShadow: timeUntilNextGame <= 5 
-                            ? '0 2px 8px rgba(220, 38, 38, 0.3)' 
-                            : '0 2px 8px rgba(30, 64, 175, 0.3)',
-                          letterSpacing: '2px'
+                          lineHeight: '1'
                         }}>
                           {formatTimeUntilNextGame(timeUntilNextGame)}
                         </div>
                       </div>
                     </div>
-                    
-                    <div style={{ 
-                      fontSize: '16px', 
-                      fontWeight: '600',
-                      color: timeUntilNextGame <= 5 ? '#991b1b' : '#1e40af',
-                      textTransform: 'uppercase',
-                      letterSpacing: '1.5px',
-                      marginBottom: '8px'
-                    }}>
-                      {timeUntilNextGame <= 5 ? '🔥 Starting Soon!' : '⏰ Next Game'}
-                    </div>
-                    
-                    {!canPurchaseCards && (
-                      <div style={{ 
-                        fontSize: '13px', 
-                        color: '#dc2626', 
-                        fontWeight: 'bold',
-                        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                        padding: '6px 12px',
-                        borderRadius: '8px',
-                        display: 'inline-block',
-                        animation: 'blink-warning 1s ease-in-out infinite'
-                      }}>
-                        🚫 Purchases Blocked
-                      </div>
-                    )}
                   </div>
                 )}
                 
@@ -1368,16 +1355,13 @@ function App(){
                 {(prizePool > 0 || (phase === 'setup' && schedulerStatus?.enabled)) && (
                   <div style={{
                     padding: '8px 16px',
-                    background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
-                    borderRadius: '8px',
-                    color: '#78350f',
-                    fontWeight: 'bold',
-                    fontSize: '14px',
-                    boxShadow: '0 2px 8px rgba(251, 191, 36, 0.3)',
                     marginTop: '12px',
-                    textAlign: 'center'
+                    textAlign: 'center',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    color: '#1f2937'
                   }}>
-                    🏆 Prize Pool: <b>{prizePool.toFixed(2)}</b> coins
+                    🏆 {prizePool.toFixed(2)} coins
                   </div>
                 )}
               </>)
@@ -1448,15 +1432,11 @@ function App(){
                 {phase === 'live' && (
                   <div style={{
                     padding: '8px 16px',
-                    background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
-                    borderRadius: '12px',
-                    color: '#78350f',
                     fontWeight: 'bold',
-                    fontSize: '16px',
-                    boxShadow: '0 4px 12px rgba(251, 191, 36, 0.4)',
-                    border: '2px solid #fbbf24'
+                    fontSize: '18px',
+                    color: '#1f2937'
                   }}>
-                    🏆 Prize Pool: <span style={{fontSize:'18px'}}>{prizePool.toFixed(2)}</span> coins
+                    🏆 {prizePool.toFixed(2)} coins
                   </div>
                 )}
               </div>

@@ -51,81 +51,101 @@ export async function POST(req: Request) {
         console.log('Auto-starting game via scheduler - time reached!');
         
         // Start the round directly (avoid internal HTTP calls in production)
-        console.log('Starting round directly...');
-        try {
-          // Get current round
-          const { data: currentRound, error: roundError } = await supabaseAdmin
-            .from(tableNames.rounds)
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (roundError && roundError.code !== 'PGRST116') {
-            console.error('Error fetching current round:', roundError);
-            return NextResponse.json({ error: 'Failed to fetch current round' }, { status: 500 });
-          }
-
-          // Get speed_ms from config
-          let speedMs = 800; // default
+          console.log('Starting round directly...');
           try {
-            const { data: configData, error: configError } = await supabaseAdmin
-              .from(tableNames.config)
-              .select('value')
-              .eq('key', 'round.duration_ms')
-              .single();
-            
-            if (!configError && configData?.value) {
-              speedMs = parseInt(configData.value) || 800;
-            }
-          } catch (error) {
-            console.log('Could not fetch config, using default speed_ms:', error);
-          }
-
-          if (!currentRound || currentRound.phase === 'ended') {
-            // Create a new round with fallback for missing columns
-            const roundData: any = {
-              phase: 'live',
-              called: [],
-              speed_ms: speedMs
-            };
-            
-            // Only add pricing columns if they exist (for backward compatibility)
-            if (currentRound?.prize_pool !== undefined) {
-              roundData.prize_pool = currentRound.prize_pool || 0;
-            }
-            if (currentRound?.total_collected !== undefined) {
-              roundData.total_collected = currentRound.total_collected || 0;
-            }
-
-            const { data: newRound, error: insertError } = await supabaseAdmin
+            // First check if there's already a live round
+            const { data: liveRound, error: liveRoundError } = await supabaseAdmin
               .from(tableNames.rounds)
-              .insert([roundData])
-              .select()
-              .single();
+              .select('*')
+              .eq('phase', 'live')
+              .maybeSingle();
 
-            if (insertError) {
-              console.error('Error creating new round:', insertError);
-              return NextResponse.json({ error: `Failed to create new round: ${insertError.message}` }, { status: 500 });
+            if (liveRoundError && liveRoundError.code !== 'PGRST116') {
+              console.error('Error checking for live round:', liveRoundError);
+              return NextResponse.json({ error: 'Failed to check for live round' }, { status: 500 });
             }
-            console.log('New round created:', newRound.id);
-          } else {
-            // Update existing round
-            const { error: updateError } = await supabaseAdmin
+
+            if (liveRound) {
+              console.log('Live round already exists:', liveRound.id, 'skipping creation');
+              return NextResponse.json({ 
+                message: 'Live round already exists',
+                roundId: liveRound.id 
+              }, { headers: { 'Cache-Control': 'no-store' } });
+            }
+
+            // Get current round (latest)
+            const { data: currentRound, error: roundError } = await supabaseAdmin
               .from(tableNames.rounds)
-              .update({ 
+              .select('*')
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            if (roundError && roundError.code !== 'PGRST116') {
+              console.error('Error fetching current round:', roundError);
+              return NextResponse.json({ error: 'Failed to fetch current round' }, { status: 500 });
+            }
+
+            // Get speed_ms from config
+            let speedMs = 800; // default
+            try {
+              const { data: configData, error: configError } = await supabaseAdmin
+                .from(tableNames.config)
+                .select('value')
+                .eq('key', 'round.duration_ms')
+                .single();
+              
+              if (!configError && configData?.value) {
+                speedMs = parseInt(configData.value) || 800;
+              }
+            } catch (error) {
+              console.log('Could not fetch config, using default speed_ms:', error);
+            }
+
+            if (!currentRound || currentRound.phase === 'ended') {
+              // Create a new round with fallback for missing columns
+              const roundData: any = {
                 phase: 'live',
                 called: [],
                 speed_ms: speedMs
-              })
-              .eq('id', currentRound.id);
+              };
+              
+              // Only add pricing columns if they exist (for backward compatibility)
+              if (currentRound?.prize_pool !== undefined) {
+                roundData.prize_pool = currentRound.prize_pool || 0;
+              }
+              if (currentRound?.total_collected !== undefined) {
+                roundData.total_collected = currentRound.total_collected || 0;
+              }
 
-            if (updateError) {
-              console.error('Error updating round:', updateError);
-              return NextResponse.json({ error: `Failed to update round: ${updateError.message}` }, { status: 500 });
+              const { data: newRound, error: insertError } = await supabaseAdmin
+                .from(tableNames.rounds)
+                .insert([roundData])
+                .select()
+                .single();
+
+              if (insertError) {
+                console.error('Error creating new round:', insertError);
+                return NextResponse.json({ error: `Failed to create new round: ${insertError.message}` }, { status: 500 });
+              }
+              console.log('New round created:', newRound.id);
+            } else {
+              // Update existing round
+              const { error: updateError } = await supabaseAdmin
+                .from(tableNames.rounds)
+                .update({ 
+                  phase: 'live',
+                  called: [],
+                  speed_ms: speedMs
+                })
+                .eq('id', currentRound.id);
+
+              if (updateError) {
+                console.error('Error updating round:', updateError);
+                return NextResponse.json({ error: `Failed to update round: ${updateError.message}` }, { status: 500 });
+              }
+              console.log('Round updated to live:', currentRound.id);
             }
-            console.log('Round updated to live:', currentRound.id);
-          }
 
           // Update scheduler config to mark game as started
           const updatedSchedulerConfig = {

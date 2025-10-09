@@ -152,7 +152,27 @@ export async function POST() {
           // Start the round directly (avoid internal HTTP calls in production)
           console.log('Starting round directly from cycle endpoint...');
           try {
-            // Get current round
+            // First check if there's already a live round
+            const { data: liveRound, error: liveRoundError } = await supabaseAdmin
+              .from(tableNames.rounds)
+              .select('*')
+              .eq('phase', 'live')
+              .maybeSingle();
+
+            if (liveRoundError && liveRoundError.code !== 'PGRST116') {
+              console.error('Error checking for live round:', liveRoundError);
+              return NextResponse.json({ error: 'Failed to check for live round' }, { status: 500 });
+            }
+
+            if (liveRound) {
+              console.log('Live round already exists:', liveRound.id, 'skipping creation');
+              return NextResponse.json({ 
+                message: 'Live round already exists',
+                roundId: liveRound.id 
+              }, { headers: { 'Cache-Control': 'no-store' } });
+            }
+
+            // Get current round (latest)
             const { data: currentRound, error: roundError } = await supabaseAdmin
               .from(tableNames.rounds)
               .select('*')

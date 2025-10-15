@@ -16,6 +16,7 @@ export default function AdminPage() {
   const [cardPrice, setCardPrice] = useState(10);
   const [shieldPricePercent, setShieldPricePercent] = useState(50);
   const [isEditingPrice, setIsEditingPrice] = useState(false);
+  const [gameEnabled, setGameEnabled] = useState(true);
   const isEditingRef = useRef(false);
 
   useEffect(() => {
@@ -155,10 +156,38 @@ export default function AdminPage() {
           setShieldPricePercent(pricingData.shieldPricePercent || 50);
         }
       }
+
+      // Load game access status
+      const gameAccessRes = await fetch('/api/game-access?ts=' + Date.now(), { cache: 'no-store' });
+      if (gameAccessRes.ok) {
+        const gameAccessData = await gameAccessRes.json();
+        setGameEnabled(gameAccessData.enabled !== false);
+      }
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function toggleGameAccess() {
+    try {
+      const newState = !gameEnabled;
+      const res = await fetch('/api/game-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: newState })
+      });
+
+      if (res.ok) {
+        setGameEnabled(newState);
+        alert(`Game access ${newState ? 'ENABLED' : 'DISABLED'}. ${newState ? 'Players can now access the game.' : 'Game page will return 404 error.'}`);
+      } else {
+        alert('Failed to update game access');
+      }
+    } catch (error) {
+      console.error('Error toggling game access:', error);
+      alert('Error toggling game access');
     }
   }
 
@@ -315,6 +344,38 @@ export default function AdminPage() {
           <span>· Speed: <b>{speed}</b> ms</span>
         </div>
       </header>
+
+      {/* Game Access Control */}
+      <section className="card" style={{ 
+        background: gameEnabled ? '#dcfce7' : '#fee2e2',
+        border: gameEnabled ? '2px solid #22c55e' : '2px solid #ef4444'
+      }}>
+        <div className="row between" style={{ alignItems: 'center' }}>
+          <div>
+            <h3 style={{ margin: '0 0 8px 0', color: gameEnabled ? '#166534' : '#991b1b' }}>
+              🔒 Game Access Control
+            </h3>
+            <p style={{ margin: 0, fontSize: '14px', color: gameEnabled ? '#15803d' : '#b91c1c' }}>
+              {gameEnabled 
+                ? '✅ Game is PUBLIC - Players can access /play' 
+                : '❌ Game is BLOCKED - /play returns 404 error'}
+            </p>
+          </div>
+          <button 
+            className={gameEnabled ? 'btn' : 'btn primary'}
+            onClick={toggleGameAccess}
+            style={{ 
+              minWidth: '120px',
+              background: gameEnabled ? '#ef4444' : '#22c55e',
+              color: '#fff',
+              border: 'none',
+              fontWeight: 'bold'
+            }}
+          >
+            {gameEnabled ? '🔒 Disable Game' : '✅ Enable Game'}
+          </button>
+        </div>
+      </section>
 
       {/* Game Status Notification */}
       {phase === 'live' && (

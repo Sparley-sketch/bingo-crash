@@ -63,8 +63,8 @@ export default function GameDisabledPage() {
               fontWeight: '600',
               transition: 'background 0.2s'
             }}
-            onMouseOver={(e) => e.target.style.background = '#3b77ff'}
-            onMouseOut={(e) => e.target.style.background = '#2b6cff'}
+            onMouseOver={(e) => (e.target as HTMLButtonElement).style.background = '#3b77ff'}
+            onMouseOut={(e) => (e.target as HTMLButtonElement).style.background = '#2b6cff'}
           >
             Admin Panel
           </button>
@@ -80,8 +80,8 @@ export default function GameDisabledPage() {
               cursor: 'pointer',
               transition: 'background 0.2s'
             }}
-            onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,.12)'}
-            onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,.06)'}
+            onMouseOver={(e) => (e.target as HTMLButtonElement).style.background = 'rgba(255,255,255,.12)'}
+            onMouseOut={(e) => (e.target as HTMLButtonElement).style.background = 'rgba(255,255,255,.06)'}
           >
             Back to Game
           </button>

@@ -1,18 +1,15 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { tableNames, isDev } from '@/lib/config';
+import { getCertifiedShuffle } from '@/lib/certifiedRNG';
 
 export const dynamic = 'force-dynamic';
 
 // 5x3 grid, 15 numbers (1..25) with 3 bombs at random positions.
 function makeCard(id: string, name: string) {
   function shuffle(a: number[]) {
-    a = a.slice();
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
+    // Use certified RNG for shuffling
+    return getCertifiedShuffle(a);
   }
 
   const nums = shuffle(Array.from({ length: 25 }, (_, i) => i + 1)).slice(0, 15);

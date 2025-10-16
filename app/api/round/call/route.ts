@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { tableNames } from '@/lib/config';
+import { getCertifiedRandom } from '@/lib/certifiedRNG';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,13 +34,13 @@ export async function POST(req: Request) {
       const body = await req.json();
       n = body.n;
     } catch {
-      // If no body or invalid JSON, generate a random number
-      n = Math.floor(Math.random() * 25) + 1;
+      // If no body or invalid JSON, generate a certified random number
+      n = getCertifiedRandom(1, 25);
     }
 
-    // If no number provided or invalid, generate a random number
+    // If no number provided or invalid, generate a certified random number
     if (typeof n !== 'number' || n < 1 || n > 25) {
-      n = Math.floor(Math.random() * 25) + 1;
+      n = getCertifiedRandom(1, 25);
     }
 
     const calledNumbers = round.called || [];

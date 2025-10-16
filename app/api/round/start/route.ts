@@ -105,8 +105,8 @@ export async function POST(req: Request) {
       phase: 'live',
       called: [],
       speed_ms: speedMs,
-      prize_pool: currentRound?.prize_pool || 0,
-      total_collected: currentRound?.total_collected || 0
+      prize_pool: 0,  // Reset prize pool for new round
+      total_collected: 0  // Reset total collected for new round
     };
 
     console.log('Starting round with data:', roundData);

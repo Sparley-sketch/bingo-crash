@@ -1162,12 +1162,6 @@ function App(){
           endPostedRef.current = false;
           setResetKey(k => k + 1);     // <- forces a repaint
           
-          // Reset prize pool to 0 when transitioning to setup phase
-          if (lastPhase !== 'setup' && newPhase === 'setup') {
-            setPrizePool(0);
-            console.log('Prize pool reset to 0 for new game');
-          }
-          
           // Fetch wallet balance from server when entering setup phase
           if (alias) {
             fetch(`/api/player/wallet?alias=${encodeURIComponent(alias)}&ts=${Date.now()}`, { cache: 'no-store' })

@@ -16,6 +16,9 @@ export interface StatisticalTestResult {
   results: {
     pValue?: number;
     chiSquared?: number;
+    criticalValue?: number;
+    degreesOfFreedom?: number;
+    zScore?: number;
     passed: boolean;
     details: any;
   };

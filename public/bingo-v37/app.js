@@ -354,6 +354,128 @@ function FXStyles(){
   }
 }
 
+/* Shield breaking effect - flash + expanding rings + sparkles */
+.shieldBreakingEffect{
+  position:absolute; 
+  top:0; 
+  right:0; 
+  width:30px; 
+  height:30px; 
+  pointer-events:none; 
+  z-index:15;
+}
+
+/* Bright flash at center */
+.shieldFlash{
+  position:absolute;
+  top:50%; left:50%;
+  width:100%;
+  height:100%;
+  background:radial-gradient(circle, #fbbf24 0%, #f59e0b 30%, transparent 70%);
+  transform:translate(-50%, -50%);
+  animation:shieldFlashBurst 0.4s ease-out forwards;
+}
+
+@keyframes shieldFlashBurst{
+  0%{ 
+    opacity:0; 
+    transform:translate(-50%, -50%) scale(0.3);
+  }
+  30%{ 
+    opacity:1; 
+    transform:translate(-50%, -50%) scale(1.2);
+  }
+  100%{ 
+    opacity:0; 
+    transform:translate(-50%, -50%) scale(2);
+  }
+}
+
+/* Expanding ring waves */
+.shieldRing{
+  position:absolute;
+  top:50%; left:50%;
+  width:100%;
+  height:100%;
+  border:2px solid #f59e0b;
+  border-radius:50%;
+  transform:translate(-50%, -50%);
+  box-shadow:0 0 6px rgba(245, 158, 11, 0.8);
+}
+
+.ring1{
+  animation:shieldRingExpand 1.2s ease-out forwards;
+}
+
+.ring2{
+  animation:shieldRingExpand 1.2s ease-out 0.2s forwards;
+  opacity:0;
+}
+
+@keyframes shieldRingExpand{
+  0%{ 
+    opacity:1; 
+    transform:translate(-50%, -50%) scale(0.5);
+  }
+  50%{
+    opacity:0.8;
+  }
+  100%{ 
+    opacity:0; 
+    transform:translate(-50%, -50%) scale(3);
+  }
+}
+
+/* Flying sparkles */
+.shieldSparkle{
+  position:absolute;
+  top:50%; left:50%;
+  width:4px;
+  height:4px;
+  background:#fbbf24;
+  border-radius:50%;
+  box-shadow:0 0 6px #f59e0b, 0 0 3px #fff;
+}
+
+.sparkle1{
+  animation:sparklefly 1s ease-out forwards;
+  --sx:-20px; --sy:-20px;
+}
+.sparkle2{
+  animation:sparklefly 1s ease-out 0.1s forwards;
+  --sx:20px; --sy:-20px;
+}
+.sparkle3{
+  animation:sparklefly 1s ease-out 0.05s forwards;
+  --sx:-20px; --sy:20px;
+}
+.sparkle4{
+  animation:sparklefly 1s ease-out 0.15s forwards;
+  --sx:20px; --sy:20px;
+}
+.sparkle5{
+  animation:sparklefly 1s ease-out 0.08s forwards;
+  --sx:0px; --sy:-25px;
+}
+.sparkle6{
+  animation:sparklefly 1s ease-out 0.12s forwards;
+  --sx:0px; --sy:25px;
+}
+
+@keyframes sparklefly{
+  0%{ 
+    opacity:1; 
+    transform:translate(-50%, -50%) translate(0, 0) scale(1);
+  }
+  70%{
+    opacity:1;
+  }
+  100%{ 
+    opacity:0; 
+    transform:translate(-50%, -50%) translate(var(--sx), var(--sy)) scale(0.3);
+  }
+}
+
 
 
 /* Lock overlay - in front but very faded */
@@ -652,6 +774,20 @@ function CardView({
 			    </div>
 			  </div>
 			)}
+          {/* Shield breaking effect when just saved */}
+          {phase === 'live' && card.justSaved && (
+            <div className="shieldBreakingEffect">
+              <div className="shieldFlash"></div>
+              <div className="shieldRing ring1"></div>
+              <div className="shieldRing ring2"></div>
+              <div className="shieldSparkle sparkle1"></div>
+              <div className="shieldSparkle sparkle2"></div>
+              <div className="shieldSparkle sparkle3"></div>
+              <div className="shieldSparkle sparkle4"></div>
+              <div className="shieldSparkle sparkle5"></div>
+              <div className="shieldSparkle sparkle6"></div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1026,6 +1162,12 @@ function App(){
           endPostedRef.current = false;
           setResetKey(k => k + 1);     // <- forces a repaint
           
+          // Reset prize pool to 0 when transitioning to setup phase
+          if (lastPhase !== 'setup' && newPhase === 'setup') {
+            setPrizePool(0);
+            console.log('Prize pool reset to 0 for new game');
+          }
+          
           // Fetch wallet balance from server when entering setup phase
           if (alias) {
             fetch(`/api/player/wallet?alias=${encodeURIComponent(alias)}&ts=${Date.now()}`, { cache: 'no-store' })
@@ -1108,7 +1250,20 @@ function App(){
         setPhase(newPhase);
         setSpeedMs(Number(s.speed_ms)||800);
         
-        setCalled(newCalls);
+        // Update called numbers, but preserve history during setup phase
+        // Only clear history when we detect a completely new round (different round ID)
+        const isNewRound = roundId !== s.id;
+        
+        if (newPhase !== 'setup') {
+          setCalled(newCalls);
+        } else if (isNewRound) {
+          // New round - clear history
+          setCalled(newCalls);
+          console.log('New round detected - clearing history');
+        } else {
+          // Same round, setup phase - preserve history
+          console.log('Preserving called numbers history during setup phase');
+        }
         setLiveCardsCount(Number(s.live_cards_count) || 0);
 
         // If server says round ended, sequence winner popup and stop any local auto-caller

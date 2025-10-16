@@ -16,3 +16,7 @@ UPDATE rounds_dev SET prize_awarded = FALSE WHERE prize_awarded IS NULL;
 -- Add comment for documentation
 COMMENT ON COLUMN rounds.prize_awarded IS 'Prevents duplicate prize crediting to winners';
 COMMENT ON COLUMN rounds_dev.prize_awarded IS 'Prevents duplicate prize crediting to winners';
+
+
+
+

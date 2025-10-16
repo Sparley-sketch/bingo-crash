@@ -11,9 +11,7 @@ import {
   generateDrawOrder, 
   verifyCommitReveal,
   generateSecureRandom,
-  generateSecureRandomArray,
-  storeRNGAuditLog,
-  logRNGOperation
+  generateSecureRandomArray
 } from './rng';
 import { 
   storeRNGCommit, 

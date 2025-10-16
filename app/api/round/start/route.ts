@@ -100,25 +100,22 @@ export async function POST(req: Request) {
       console.log('Could not fetch config, using default speed_ms:', error);
     }
 
-    // Start new round - create new round if previous was ended, otherwise update
-    const roundData = {
-      phase: 'live',
-      called: [],
-      speed_ms: speedMs,
-      prize_pool: 0,  // Reset prize pool for new round
-      total_collected: 0  // Reset total collected for new round
-    };
-
-    console.log('Starting round with data:', roundData);
-
     let result;
     // If current round is ended or doesn't exist, create a new round
     if (!currentRound || currentRound.phase === 'ended') {
       console.log('Creating new round (previous round was ended or no round exists)');
-      // Create new round
+      // Create new round - reset prize pool for truly new rounds
+      const newRoundData = {
+        phase: 'live',
+        called: [],
+        speed_ms: speedMs,
+        prize_pool: 0,  // Reset prize pool for new round
+        total_collected: 0  // Reset total collected for new round
+      };
+      
       const { data, error } = await supabaseAdmin
         .from(tableNames.rounds)
-        .insert([roundData])
+        .insert([newRoundData])
         .select()
         .single();
       
@@ -131,10 +128,17 @@ export async function POST(req: Request) {
       console.log('Round created successfully:', result);
     } else {
       console.log('Updating existing round:', currentRound.id);
-      // Update existing round (only if it's in setup phase)
+      // Update existing round (preserve prize pool built during setup)
+      const updateData = {
+        phase: 'live',
+        called: [],
+        speed_ms: speedMs
+        // Don't reset prize_pool and total_collected - preserve what was built during setup
+      };
+      
       const { data, error } = await supabaseAdmin
         .from(tableNames.rounds)
-        .update(roundData)
+        .update(updateData)
         .eq('id', currentRound.id)
         .select()
         .single();

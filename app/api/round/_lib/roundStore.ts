@@ -1,6 +1,8 @@
 // Centralized server-side state & helpers (in-memory).
 // Swap this to a DB if needed.
 
+import { getCertifiedRandom } from '@/lib/certifiedRNG';
+
 export type Card = { 
   id: string; 
   name: string;
@@ -27,7 +29,9 @@ export type RoundState = {
 };
 
 function generateId(): string {
-  return Math.random().toString(36).substring(2) + Date.now().toString(36);
+  // Use certified RNG for ID generation
+  const randomPart = getCertifiedRandom(0, 1000000).toString(36);
+  return randomPart + Date.now().toString(36);
 }
 
 let round: RoundState = {

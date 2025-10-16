@@ -66,11 +66,8 @@ export async function POST(req: Request) {
             }
 
             if (liveRound) {
-              console.log('Live round already exists:', liveRound.id, 'skipping creation');
-              return NextResponse.json({ 
-                message: 'Live round already exists',
-                roundId: liveRound.id 
-              }, { headers: { 'Cache-Control': 'no-store' } });
+              console.log('Live round already exists:', liveRound.id, 'checking if it should be ended');
+              // Don't return early - let the logic check if this round should be ended
             }
 
             // Get current round (latest)
@@ -102,21 +99,40 @@ export async function POST(req: Request) {
               console.log('Could not fetch config, using default speed_ms:', error);
             }
 
+            console.log('Scheduler auto-start - Current round check:', {
+              hasCurrentRound: !!currentRound,
+              currentRoundId: currentRound?.id,
+              currentPhase: currentRound?.phase,
+              willCreateNew: !currentRound || currentRound.phase === 'ended'
+            });
+
+            // If current round is live, end it first before creating new round
+            if (currentRound && currentRound.phase === 'live') {
+              console.log('Ending current live round before creating new round');
+              await supabaseAdmin
+                .from(tableNames.rounds)
+                .update({ 
+                  phase: 'ended',
+                  ended_at: new Date().toISOString()
+                })
+                .eq('id', currentRound.id);
+            }
+
+            // Always create a new round if the current round has ended
             if (!currentRound || currentRound.phase === 'ended') {
-              // Create a new round with fallback for missing columns
+              console.log('Creating NEW round (previous round ended or no round exists)');
+              // Create a new round in setup phase first (not live)
               const roundData: any = {
-                phase: 'live',
+                phase: 'setup',  // Start in setup phase to allow card purchases
                 called: [],
                 speed_ms: speedMs
               };
               
-              // Only add pricing columns if they exist (for backward compatibility)
-              if (currentRound?.prize_pool !== undefined) {
-                roundData.prize_pool = currentRound.prize_pool || 0;
-              }
-              if (currentRound?.total_collected !== undefined) {
-                roundData.total_collected = currentRound.total_collected || 0;
-              }
+              // Reset prize pool and total collected for new round
+              roundData.prize_pool = 0;
+              roundData.total_collected = 0;
+
+              console.log('Creating new round with data:', roundData);
 
               const { data: newRound, error: insertError } = await supabaseAdmin
                 .from(tableNames.rounds)
@@ -129,14 +145,22 @@ export async function POST(req: Request) {
                 return NextResponse.json({ error: `Failed to create new round: ${insertError.message}` }, { status: 500 });
               }
               console.log('New round created:', newRound.id);
-            } else {
-              // Update existing round
+              console.log('New round data:', {
+                id: newRound.id,
+                phase: newRound.phase,
+                prize_pool: newRound.prize_pool,
+                total_collected: newRound.total_collected
+              });
+            } else if (currentRound.phase === 'setup') {
+              console.log('UPDATING existing round from setup to live (preserve prize pool built during setup)');
+              // Update existing round from setup to live (preserve prize pool built during setup)
               const { error: updateError } = await supabaseAdmin
                 .from(tableNames.rounds)
                 .update({ 
                   phase: 'live',
                   called: [],
                   speed_ms: speedMs
+                  // Don't reset prize_pool and total_collected - preserve what was built during setup
                 })
                 .eq('id', currentRound.id);
 
@@ -145,6 +169,8 @@ export async function POST(req: Request) {
                 return NextResponse.json({ error: `Failed to update round: ${updateError.message}` }, { status: 500 });
               }
               console.log('Round updated to live:', currentRound.id);
+            } else {
+              console.log('Current round is in phase:', currentRound.phase, '- no action needed');
             }
 
           // Update scheduler config to mark game as started

@@ -107,24 +107,44 @@ export async function POST() {
               updated_at: new Date().toISOString() 
             }, { onConflict: 'key' });
 
-          // Also update the round phase to 'setup' so client can dismiss winner popup
-          const { data: currentRound, error: roundUpdateError } = await supabaseAdmin
-            .from(tableNames.rounds)
-            .select('id')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (!roundUpdateError && currentRound) {
-            await supabaseAdmin
-              .from(tableNames.rounds)
-              .update({ 
-                phase: 'setup',
-                called: []  // Clear called numbers for the new round
-              })
-              .eq('id', currentRound.id);
+          // Create a NEW round instead of updating the existing one
+          console.log('Creating NEW round for next game cycle');
+          
+          // Get speed_ms from config
+          let speedMs = 800; // default
+          try {
+            const { data: configData, error: configError } = await supabaseAdmin
+              .from(tableNames.config)
+              .select('value')
+              .eq('key', 'round.duration_ms')
+              .single();
             
-            console.log(`Updated round ${currentRound.id} phase to 'setup' and cleared called numbers`);
+            if (!configError && configData?.value) {
+              speedMs = parseInt(configData.value) || 800;
+            }
+          } catch (error) {
+            console.log('Could not fetch config, using default speed_ms:', error);
+          }
+
+          // Create new round with fresh prize pool
+          const newRoundData = {
+            phase: 'setup',
+            called: [],
+            speed_ms: speedMs,
+            prize_pool: 0,  // Reset prize pool for new round
+            total_collected: 0  // Reset total collected for new round
+          };
+
+          const { data: newRound, error: createError } = await supabaseAdmin
+            .from(tableNames.rounds)
+            .insert([newRoundData])
+            .select()
+            .single();
+
+          if (createError) {
+            console.error('Error creating new round:', createError);
+          } else {
+            console.log(`Created NEW round ${newRound.id} with fresh prize pool`);
           }
 
           return NextResponse.json({ 
@@ -201,21 +221,20 @@ export async function POST() {
               console.log('Could not fetch config, using default speed_ms:', error);
             }
 
+            // Always create a new round if the current round has ended
             if (!currentRound || currentRound.phase === 'ended') {
-              // Create a new round with fallback for missing columns
+              // Create a new round in setup phase first (not live)
               const roundData: any = {
-                phase: 'live',
+                phase: 'setup',  // Start in setup phase to allow card purchases
                 called: [],
                 speed_ms: speedMs
               };
               
-              // Only add pricing columns if they exist (for backward compatibility)
-              if (currentRound?.prize_pool !== undefined) {
-                roundData.prize_pool = currentRound.prize_pool || 0;
-              }
-              if (currentRound?.total_collected !== undefined) {
-                roundData.total_collected = currentRound.total_collected || 0;
-              }
+              // Reset prize pool and total collected for new round
+              roundData.prize_pool = 0;
+              roundData.total_collected = 0;
+
+              console.log('Creating new round with data:', roundData);
 
               const { data: newRound, error: insertError } = await supabaseAdmin
                 .from(tableNames.rounds)
@@ -228,14 +247,21 @@ export async function POST() {
                 return NextResponse.json({ error: `Failed to create new round: ${insertError.message}` }, { status: 500 });
               }
               console.log('New round created:', newRound.id);
+              console.log('New round data:', {
+                id: newRound.id,
+                phase: newRound.phase,
+                prize_pool: newRound.prize_pool,
+                total_collected: newRound.total_collected
+              });
             } else {
-              // Update existing round
+              // Update existing round (preserve prize pool built during setup)
               const { error: updateError } = await supabaseAdmin
                 .from(tableNames.rounds)
                 .update({ 
                   phase: 'live',
                   called: [],
                   speed_ms: speedMs
+                  // Don't reset prize_pool and total_collected - preserve what was built during setup
                 })
                 .eq('id', currentRound.id);
 

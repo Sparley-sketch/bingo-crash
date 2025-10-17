@@ -79,7 +79,8 @@ function applyCallToCards(cards, n, audioOn, volume){
     return {...card, grid, exploded, daubs, shieldUsed, justExploded, justSaved, bombWriggling};
   });
 
-  // Update database for any cards that changed status
+  // Batch card updates for better performance
+  const cardUpdates = [];
   next.forEach(card => {
     const originalCard = cards.find(c => c.id === card.id);
     if (originalCard && (
@@ -88,21 +89,34 @@ function applyCallToCards(cards, n, audioOn, volume){
       originalCard.daubs !== card.daubs ||
       originalCard.shieldUsed !== card.shieldUsed
     )) {
-      fetch('/api/round/update-card', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cardId: card.id,
-          exploded: card.exploded,
-          paused: card.paused,
-          daubs: card.daubs,
-          shieldUsed: card.shieldUsed
-        })
-      }).catch(error => {
-        console.error('Failed to update card:', error);
+      cardUpdates.push({
+        cardId: card.id,
+        exploded: card.exploded,
+        paused: card.paused,
+        daubs: card.daubs,
+        shieldUsed: card.shieldUsed
       });
     }
   });
+
+  // Send batched updates if any
+  if (cardUpdates.length > 0) {
+    fetch('/api/round/update-cards-batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updates: cardUpdates })
+    }).catch(error => {
+      console.error('Failed to update cards batch:', error);
+      // Fallback to individual updates if batch fails
+      cardUpdates.forEach(update => {
+        fetch('/api/round/update-card', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(update)
+        }).catch(err => console.error('Failed to update card:', err));
+      });
+    });
+  }
 
   if(anyBoom){
     vibrate([80,40,120]);
@@ -936,7 +950,8 @@ function App(){
     }
     
     pullSchedulerStatus();
-    const interval = setInterval(pullSchedulerStatus, 1000);
+    // Reduced scheduler polling frequency to improve performance
+    const interval = setInterval(pullSchedulerStatus, 3000); // 3s instead of 1s
     
     return () => {
       mounted = false;
@@ -1074,7 +1089,17 @@ function App(){
       }catch{}
     }
 
+    // Request throttling to prevent too many simultaneous requests
+    let lastRequestTime = 0;
+    const MIN_REQUEST_INTERVAL = 200; // Minimum 200ms between requests
+    
     async function pull(){
+      const now = Date.now();
+      if (now - lastRequestTime < MIN_REQUEST_INTERVAL) {
+        return; // Skip this request if too soon
+      }
+      lastRequestTime = now;
+      
       let s = null;
       try{
         const r=await fetch('/api/round/state?ts='+Date.now(), {cache:'no-store', headers:{Accept:'application/json'}});
@@ -1270,7 +1295,14 @@ function App(){
     }
 
     pull();
-    const id=setInterval(pull, 1000);
+    // Adaptive polling: faster during live games, slower during setup
+    const getPollingInterval = () => {
+      if (phase === 'live') return 500; // 500ms during live games for responsiveness
+      if (phase === 'setup') return 2000; // 2s during setup to reduce load
+      return 1000; // 1s default
+    };
+    
+    const id = setInterval(pull, getPollingInterval());
     return ()=>{ mounted=false; clearInterval(id); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player.cards, audio, volume, alias]);
@@ -1410,8 +1442,8 @@ function App(){
                     // Initial render
                     updateModal();
                     
-                    // Set up live updates - update every 500ms
-                    const updateInterval = setInterval(updateModal, 500);
+                    // Set up live updates - update every 1000ms (reduced frequency)
+                    const updateInterval = setInterval(updateModal, 1000);
                     
                     // Clean up interval when modal is closed
                     const cleanup = () => {

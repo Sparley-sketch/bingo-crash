@@ -119,6 +119,7 @@ const ICON_LOCK_CLOSED= 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2
 // Explosion image (animated GIF)
 const EXPLOSION_SRC = '/bingo-v37/explosion.gif';
 const SHIELD_ICON = '/bingo-v37/shield.png';
+const SHIELD_BREAKING_SRC = '/bingo-v37/shield_break.mp4'; // Your custom breaking shield MP4
 
 function Cell({cell, highlight, bombWriggling}){
   const cls=['cell']; 
@@ -365,115 +366,46 @@ function FXStyles(){
   z-index:15;
 }
 
-/* Bright flash at center */
-.shieldFlash{
+/* Breaking shield video - covers full card at 4x speed */
+.shieldBreakingVideoContainer{
   position:absolute;
-  top:50%; left:50%;
+  top:0;
+  left:0;
   width:100%;
   height:100%;
-  background:radial-gradient(circle, #fbbf24 0%, #f59e0b 30%, transparent 70%);
-  transform:translate(-50%, -50%);
-  animation:shieldFlashBurst 0.4s ease-out forwards;
+  z-index:20;
+  pointer-events:none;
 }
 
-@keyframes shieldFlashBurst{
-  0%{ 
-    opacity:0; 
-    transform:translate(-50%, -50%) scale(0.3);
-  }
-  30%{ 
-    opacity:1; 
-    transform:translate(-50%, -50%) scale(1.2);
-  }
-  100%{ 
-    opacity:0; 
-    transform:translate(-50%, -50%) scale(2);
-  }
-}
-
-/* Expanding ring waves */
-.shieldRing{
-  position:absolute;
-  top:50%; left:50%;
+.shieldBreakingVideo{
   width:100%;
   height:100%;
-  border:2px solid #f59e0b;
-  border-radius:50%;
-  transform:translate(-50%, -50%);
-  box-shadow:0 0 6px rgba(245, 158, 11, 0.8);
+  object-fit:cover;
+  animation:playbackSpeed 0.375s linear forwards; /* 8x speed = 0.375s duration */
 }
 
-.ring1{
-  animation:shieldRingExpand 1.2s ease-out forwards;
-}
-
-.ring2{
-  animation:shieldRingExpand 1.2s ease-out 0.2s forwards;
-  opacity:0;
-}
-
-@keyframes shieldRingExpand{
+@keyframes playbackSpeed{
   0%{ 
-    opacity:1; 
-    transform:translate(-50%, -50%) scale(0.5);
-  }
-  50%{
-    opacity:0.8;
-  }
-  100%{ 
-    opacity:0; 
-    transform:translate(-50%, -50%) scale(3);
-  }
-}
-
-/* Flying sparkles */
-.shieldSparkle{
-  position:absolute;
-  top:50%; left:50%;
-  width:4px;
-  height:4px;
-  background:#fbbf24;
-  border-radius:50%;
-  box-shadow:0 0 6px #f59e0b, 0 0 3px #fff;
-}
-
-.sparkle1{
-  animation:sparklefly 1s ease-out forwards;
-  --sx:-20px; --sy:-20px;
-}
-.sparkle2{
-  animation:sparklefly 1s ease-out 0.1s forwards;
-  --sx:20px; --sy:-20px;
-}
-.sparkle3{
-  animation:sparklefly 1s ease-out 0.05s forwards;
-  --sx:-20px; --sy:20px;
-}
-.sparkle4{
-  animation:sparklefly 1s ease-out 0.15s forwards;
-  --sx:20px; --sy:20px;
-}
-.sparkle5{
-  animation:sparklefly 1s ease-out 0.08s forwards;
-  --sx:0px; --sy:-25px;
-}
-.sparkle6{
-  animation:sparklefly 1s ease-out 0.12s forwards;
-  --sx:0px; --sy:25px;
-}
-
-@keyframes sparklefly{
-  0%{ 
-    opacity:1; 
-    transform:translate(-50%, -50%) translate(0, 0) scale(1);
-  }
-  70%{
     opacity:1;
   }
   100%{ 
-    opacity:0; 
-    transform:translate(-50%, -50%) translate(var(--sx), var(--sy)) scale(0.3);
+    opacity:1;
   }
+}
+
+/* Flash effect removed - using breaking image only */
+
+/* Ring effects removed - using breaking image only */
+
+/* Sparkle effects removed - using breaking image only */
+
+/* Counter styles */
+.counter{
+  transition: all 0.2s ease;
+}
+.counter:hover{
+  background: #374151 !important;
+  transform: scale(1.05);
 }
 
 
@@ -774,18 +706,18 @@ function CardView({
 			    </div>
 			  </div>
 			)}
-          {/* Shield breaking effect when just saved */}
+          {/* Shield breaking effect when just saved - VIDEO OVER FULL CARD */}
           {phase === 'live' && card.justSaved && (
-            <div className="shieldBreakingEffect">
-              <div className="shieldFlash"></div>
-              <div className="shieldRing ring1"></div>
-              <div className="shieldRing ring2"></div>
-              <div className="shieldSparkle sparkle1"></div>
-              <div className="shieldSparkle sparkle2"></div>
-              <div className="shieldSparkle sparkle3"></div>
-              <div className="shieldSparkle sparkle4"></div>
-              <div className="shieldSparkle sparkle5"></div>
-              <div className="shieldSparkle sparkle6"></div>
+            <div className="shieldBreakingVideoContainer">
+              <video 
+                src={SHIELD_BREAKING_SRC} 
+                className="shieldBreakingVideo"
+                autoPlay 
+                muted 
+                playsInline
+                onLoadedMetadata={(e) => e.target.playbackRate = 8}
+                onEnded={(e) => e.target.style.display = 'none'}
+              />
             </div>
           )}
         </div>
@@ -1336,6 +1268,9 @@ function App(){
 
 
   const lastCalled = called[called.length-1];
+  
+  // Expose current called balls to global scope for modal access
+  window.currentCalledBalls = called;
 
   return (
     <div key={resetKey} className={`grid ${phase === 'live' ? 'phase-live' : 'phase-setup'}`} style={{gap:14}} >
@@ -1375,7 +1310,7 @@ function App(){
                 })() : ''}`}><span>{lastCalled ?? '—'}</span></div>
                 
                 <div className="muted" style={{marginTop:6}}>Speed: {(speedMs/1000).toFixed(1)}s · History</div>
-                <div className="list" style={{marginTop:8}}>{called.map(n=>{
+                <div className="list" style={{marginTop:8}}>{called.slice(-8).map(n=>{
                   let colorClass = 'red'; // fallback
                   if (n >= 1 && n <= 5) colorClass = 'red';
                   else if (n >= 6 && n <= 10) colorClass = 'green';
@@ -1384,6 +1319,110 @@ function App(){
                   else if (n >= 21 && n <= 25) colorClass = 'pink';
                   return <span key={n} className={`bingoBall ${colorClass}`}><span>{n}</span></span>;
                 })}</div>
+                {/* X/25 Counter */}
+                <div 
+                  className="counter" 
+                  style={{
+                    marginTop: 8,
+                    padding: '4px 8px',
+                    background: '#1f2937',
+                    color: '#fff',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    display: 'inline-block',
+                    border: '1px solid #374151'
+                  }}
+                  onClick={() => {
+                    // Create modal to show all called balls with live updates
+                    const modal = document.createElement('div');
+                    modal.style.cssText = `
+                      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                      background: rgba(0,0,0,0.8); z-index: 1000; display: flex;
+                      align-items: center; justify-content: center;
+                    `;
+                    
+                    const content = document.createElement('div');
+                    content.style.cssText = `
+                      background: #1f2937; padding: 20px; border-radius: 12px;
+                      max-width: 90%; max-height: 80%; overflow-y: auto;
+                      border: 1px solid #374151;
+                    `;
+                    
+                    const title = document.createElement('div');
+                    title.style.cssText = `
+                      color: #fff; font-size: 18px; font-weight: bold;
+                      margin-bottom: 15px; text-align: center;
+                    `;
+                    
+                    const ballsContainer = document.createElement('div');
+                    ballsContainer.style.cssText = `
+                      display: flex; flex-wrap: wrap; gap: 8px;
+                      justify-content: center;
+                    `;
+                    
+                    const closeBtn = document.createElement('button');
+                    closeBtn.style.cssText = `
+                      margin-top: 15px; padding: 8px 16px;
+                      background: #374151; color: #fff; border: none;
+                      border-radius: 6px; cursor: pointer; width: 100%;
+                    `;
+                    closeBtn.textContent = 'Close';
+                    
+                    // Function to update the modal content
+                    const updateModal = () => {
+                      // Get the current called array from the React state
+                      // We need to access the current value, not the closure value
+                      const currentCalled = window.currentCalledBalls || called;
+                      
+                      // Update title with current count
+                      title.textContent = `All Called Balls (${currentCalled.length}/25)`;
+                      
+                      // Clear and rebuild balls container
+                      ballsContainer.innerHTML = '';
+                      
+                      currentCalled.forEach(n => {
+                        const ball = document.createElement('span');
+                        let colorClass = 'red';
+                        if (n >= 1 && n <= 5) colorClass = 'red';
+                        else if (n >= 6 && n <= 10) colorClass = 'green';
+                        else if (n >= 11 && n <= 15) colorClass = 'purple';
+                        else if (n >= 16 && n <= 20) colorClass = 'orange';
+                        else if (n >= 21 && n <= 25) colorClass = 'pink';
+                        
+                        ball.className = `bingoBall ${colorClass}`;
+                        ball.innerHTML = `<span>${n}</span>`;
+                        ballsContainer.appendChild(ball);
+                      });
+                    };
+                    
+                    // Initial render
+                    updateModal();
+                    
+                    // Set up live updates - update every 500ms
+                    const updateInterval = setInterval(updateModal, 500);
+                    
+                    // Clean up interval when modal is closed
+                    const cleanup = () => {
+                      clearInterval(updateInterval);
+                      document.body.removeChild(modal);
+                    };
+                    
+                    closeBtn.onclick = cleanup;
+                    modal.onclick = (e) => {
+                      if (e.target === modal) cleanup();
+                    };
+                    
+                    content.appendChild(title);
+                    content.appendChild(ballsContainer);
+                    content.appendChild(closeBtn);
+                    modal.appendChild(content);
+                    document.body.appendChild(modal);
+                  }}
+                >
+                  {called.length}/25
+                </div>
               </>)
             : (<>
                 {/* Scheduler Countdown Timer in Purchase Panel - Circular Progress Style */}

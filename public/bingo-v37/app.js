@@ -79,8 +79,7 @@ function applyCallToCards(cards, n, audioOn, volume){
     return {...card, grid, exploded, daubs, shieldUsed, justExploded, justSaved, bombWriggling};
   });
 
-  // Batch card updates for better performance
-  const cardUpdates = [];
+  // Update database for any cards that changed status
   next.forEach(card => {
     const originalCard = cards.find(c => c.id === card.id);
     if (originalCard && (
@@ -89,34 +88,21 @@ function applyCallToCards(cards, n, audioOn, volume){
       originalCard.daubs !== card.daubs ||
       originalCard.shieldUsed !== card.shieldUsed
     )) {
-      cardUpdates.push({
-        cardId: card.id,
-        exploded: card.exploded,
-        paused: card.paused,
-        daubs: card.daubs,
-        shieldUsed: card.shieldUsed
+      fetch('/api/round/update-card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cardId: card.id,
+          exploded: card.exploded,
+          paused: card.paused,
+          daubs: card.daubs,
+          shieldUsed: card.shieldUsed
+        })
+      }).catch(error => {
+        console.error('Failed to update card:', error);
       });
     }
   });
-
-  // Send batched updates if any
-  if (cardUpdates.length > 0) {
-    fetch('/api/round/update-cards-batch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ updates: cardUpdates })
-    }).catch(error => {
-      console.error('Failed to update cards batch:', error);
-      // Fallback to individual updates if batch fails
-      cardUpdates.forEach(update => {
-        fetch('/api/round/update-card', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(update)
-        }).catch(err => console.error('Failed to update card:', err));
-      });
-    });
-  }
 
   if(anyBoom){
     vibrate([80,40,120]);
@@ -855,6 +841,10 @@ function App(){
   const [schedulerStatus, setSchedulerStatus] = useState(null);
   const [timeUntilNextGame, setTimeUntilNextGame] = useState(null);
   const [canPurchaseCards, setCanPurchaseCards] = useState(true);
+  
+  // Client-side countdown timer for smooth updates
+  const [clientTimeUntilNextGame, setClientTimeUntilNextGame] = useState(null);
+  const countdownIntervalRef = useRef(null);
 
   // Pricing and prize pool
   const [prizePool, setPrizePool] = useState(0);
@@ -913,6 +903,32 @@ function App(){
           setTimeUntilNextGame(status.timeUntilNextGame);
           setCanPurchaseCards(status.canPurchaseCards);
           
+          // Start client-side countdown for smooth updates
+          if (status.timeUntilNextGame !== null && status.timeUntilNextGame > 0) {
+            setClientTimeUntilNextGame(status.timeUntilNextGame);
+            
+            // Clear existing interval
+            if (countdownIntervalRef.current) {
+              clearInterval(countdownIntervalRef.current);
+            }
+            
+            // Start new countdown
+            countdownIntervalRef.current = setInterval(() => {
+              setClientTimeUntilNextGame(prev => {
+                if (prev === null || prev <= 0) {
+                  clearInterval(countdownIntervalRef.current);
+                  return 0;
+                }
+                return prev - 1;
+              });
+            }, 1000);
+          } else {
+            setClientTimeUntilNextGame(null);
+            if (countdownIntervalRef.current) {
+              clearInterval(countdownIntervalRef.current);
+            }
+          }
+          
           // Update prize pool during setup phase with specific timing
           const now = Date.now();
           const timeSinceLastUpdate = now - lastPrizePoolUpdate;
@@ -950,12 +966,14 @@ function App(){
     }
     
     pullSchedulerStatus();
-    // Reduced scheduler polling frequency to improve performance
-    const interval = setInterval(pullSchedulerStatus, 3000); // 3s instead of 1s
+    const interval = setInterval(pullSchedulerStatus, 1000); // Back to 1s
     
     return () => {
       mounted = false;
       clearInterval(interval);
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+      }
     };
   }, []);
 
@@ -1089,17 +1107,7 @@ function App(){
       }catch{}
     }
 
-    // Request throttling to prevent too many simultaneous requests
-    let lastRequestTime = 0;
-    const MIN_REQUEST_INTERVAL = 200; // Minimum 200ms between requests
-    
     async function pull(){
-      const now = Date.now();
-      if (now - lastRequestTime < MIN_REQUEST_INTERVAL) {
-        return; // Skip this request if too soon
-      }
-      lastRequestTime = now;
-      
       let s = null;
       try{
         const r=await fetch('/api/round/state?ts='+Date.now(), {cache:'no-store', headers:{Accept:'application/json'}});
@@ -1295,14 +1303,7 @@ function App(){
     }
 
     pull();
-    // Adaptive polling: faster during live games, slower during setup
-    const getPollingInterval = () => {
-      if (phase === 'live') return 500; // 500ms during live games for responsiveness
-      if (phase === 'setup') return 2000; // 2s during setup to reduce load
-      return 1000; // 1s default
-    };
-    
-    const id = setInterval(pull, getPollingInterval());
+    const id = setInterval(pull, 1000); // Back to 1s polling
     return ()=>{ mounted=false; clearInterval(id); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player.cards, audio, volume, alias]);
@@ -1442,8 +1443,8 @@ function App(){
                     // Initial render
                     updateModal();
                     
-                    // Set up live updates - update every 1000ms (reduced frequency)
-                    const updateInterval = setInterval(updateModal, 1000);
+                    // Set up live updates - update every 500ms
+                    const updateInterval = setInterval(updateModal, 500);
                     
                     // Clean up interval when modal is closed
                     const cleanup = () => {
@@ -1468,36 +1469,36 @@ function App(){
               </>)
             : (<>
                 {/* Scheduler Countdown Timer in Purchase Panel - Circular Progress Style */}
-                {schedulerStatus?.enabled && timeUntilNextGame !== null && (
+                {schedulerStatus?.enabled && (clientTimeUntilNextGame !== null || timeUntilNextGame !== null) && (
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '12px',
                     padding: '8px 12px',
-                    background: timeUntilNextGame <= 5 
+                    background: (clientTimeUntilNextGame || timeUntilNextGame) <= 5 
                       ? 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)' 
                       : 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
-                    border: `2px solid ${timeUntilNextGame <= 5 ? '#ef4444' : '#3b82f6'}`,
+                    border: `2px solid ${(clientTimeUntilNextGame || timeUntilNextGame) <= 5 ? '#ef4444' : '#3b82f6'}`,
                     borderRadius: '8px',
                     marginBottom: '8px',
-                    boxShadow: timeUntilNextGame <= 5 
+                    boxShadow: (clientTimeUntilNextGame || timeUntilNextGame) <= 5 
                       ? '0 2px 8px rgba(239, 68, 68, 0.3)' 
                       : '0 2px 8px rgba(59, 130, 246, 0.3)',
                     position: 'relative',
                     overflow: 'hidden',
-                    animation: timeUntilNextGame <= 5 ? 'pulse-urgent 1s ease-in-out infinite' : 'none'
+                    animation: (clientTimeUntilNextGame || timeUntilNextGame) <= 5 ? 'pulse-urgent 1s ease-in-out infinite' : 'none'
                   }}>
                     {/* Text content - now on the left */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ 
                         fontSize: '14px', 
                         fontWeight: '600',
-                        color: timeUntilNextGame <= 5 ? '#991b1b' : '#1e40af',
+                        color: (clientTimeUntilNextGame || timeUntilNextGame) <= 5 ? '#991b1b' : '#1e40af',
                         textTransform: 'uppercase',
                         letterSpacing: '0.5px',
                         marginBottom: '2px'
                       }}>
-                        {timeUntilNextGame <= 5 ? '🔥 Starting Soon!' : '⏰ Next Game'}
+                        {(clientTimeUntilNextGame || timeUntilNextGame) <= 5 ? '🔥 Starting Soon!' : '⏰ Next Game'}
                       </div>
                     
                       {!canPurchaseCards && (
@@ -1525,7 +1526,7 @@ function App(){
                           cy="30"
                           r="24"
                           fill="none"
-                          stroke={timeUntilNextGame <= 5 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)'}
+                          stroke={(clientTimeUntilNextGame || timeUntilNextGame) <= 5 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)'}
                           strokeWidth="4"
                         />
                         {/* Progress circle */}
@@ -1534,14 +1535,14 @@ function App(){
                           cy="30"
                           r="24"
                           fill="none"
-                          stroke={timeUntilNextGame <= 5 ? '#ef4444' : '#3b82f6'}
+                          stroke={(clientTimeUntilNextGame || timeUntilNextGame) <= 5 ? '#ef4444' : '#3b82f6'}
                           strokeWidth="4"
                           strokeLinecap="round"
                           strokeDasharray={`${2 * Math.PI * 24}`}
-                          strokeDashoffset={`${2 * Math.PI * 24 * (1 - (timeUntilNextGame / ((schedulerStatus?.preBuyMinutes || 1) * 60)))}`}
+                          strokeDashoffset={`${2 * Math.PI * 24 * (1 - ((clientTimeUntilNextGame || timeUntilNextGame) / ((schedulerStatus?.preBuyMinutes || 1) * 60)))}`}
                           style={{
                             transition: 'stroke-dashoffset 1s linear',
-                            filter: timeUntilNextGame <= 5 ? 'drop-shadow(0 0 4px rgba(239, 68, 68, 0.6))' : 'drop-shadow(0 0 4px rgba(59, 130, 246, 0.4))'
+                            filter: (clientTimeUntilNextGame || timeUntilNextGame) <= 5 ? 'drop-shadow(0 0 4px rgba(239, 68, 68, 0.6))' : 'drop-shadow(0 0 4px rgba(59, 130, 246, 0.4))'
                           }}
                         />
                       </svg>
@@ -1557,11 +1558,11 @@ function App(){
                         <div style={{ 
                           fontSize: '14px', 
                           fontWeight: 'bold', 
-                          color: timeUntilNextGame <= 5 ? '#dc2626' : '#1e40af',
+                          color: (clientTimeUntilNextGame || timeUntilNextGame) <= 5 ? '#dc2626' : '#1e40af',
                           fontFamily: 'system-ui, -apple-system, sans-serif',
                           lineHeight: '1'
                         }}>
-                          {formatTimeUntilNextGame(timeUntilNextGame)}
+                          {formatTimeUntilNextGame(clientTimeUntilNextGame || timeUntilNextGame)}
                         </div>
                       </div>
                     </div>

@@ -176,20 +176,11 @@ function FXStyles(){
 .shieldCtl input{ vertical-align:middle; }
 .shieldIcon{ height:16px; width:auto; display:inline-block; vertical-align:middle; }
 
-/* Shield container with S icon */
+/* Shield container */
 .shieldContainer{
   position:relative; display:inline-block; vertical-align:middle;
 }
 
-.shieldSIcon{
-  position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
-  pointer-events:none; z-index:1;
-  display:flex; align-items:center; justify-content:center;
-}
-
-.shieldSIcon svg{
-  filter:drop-shadow(0 0 2px rgba(0,0,0,0.8));
-}
 
 
 /* Grid of 5 columns */
@@ -423,7 +414,6 @@ function FXStyles(){
   background:transparent; z-index:3;
 }
 .mobileLockIcon{
-  font-size:58px; color:#1e293b;
   transition:all 0.2s ease;
   animation: lockPulseFaded 2s ease-in-out infinite;
   opacity:0.05;
@@ -433,7 +423,6 @@ function FXStyles(){
   width:58px; height:58px;
 }
 .mobileLockOverlay.locked .mobileLockIcon{
-  color:#1e293b; font-size:58px;
   animation: lockShake 0.5s ease-in-out;
   opacity:0.8;
 }
@@ -549,12 +538,10 @@ function FXStyles(){
   .priceTag{ font-size:11px; padding:2px 6px; }
   .shieldCtl{ font-size:11px; }
   .shieldIcon{ height:21px; width:21px; }
-  .shieldSIcon svg{ width:10px; height:10px; }
   .daubsCounter{ font-size:11px; padding:3px 6px; height:26px; }
   .explodedText{ font-size:11px; padding:3px 6px; height:26px; }
   .lockButton{ display:none; }
   .mobileLockOverlay{ display:flex; }
-  .mobileLockIcon{ font-size:35px; }
   .mobileLockIcon img{ width:35px; height:35px; }
   .bingoBall{ width:32px; height:32px; font-size:14px; }
   .bingoBallMain{ width:60px; height:60px; font-size:24px; }
@@ -574,12 +561,10 @@ function FXStyles(){
   .phase-live .cell .num{ --cell-font: clamp(10px, 2.8vw, 13px); }
   .phase-live .bomb{ --bomb-font: clamp(8px, 2.1vw, 10.5px); }
   .shieldIcon{ height:23px; width:23px; }
-  .shieldSIcon svg{ width:11px; height:11px; }
   .daubsCounter{ font-size:12px; padding:4px 8px; height:29px; }
   .explodedText{ font-size:12px; padding:4px 8px; height:29px; }
   .lockButton{ display:none; }
   .mobileLockOverlay{ display:flex; }
-  .mobileLockIcon{ font-size:35px; }
   .mobileLockIcon img{ width:35px; height:35px; }
   .bingoBall{ width:32px; height:32px; font-size:14px; }
   .bingoBallMain{ width:60px; height:60px; font-size:24px; }
@@ -677,12 +662,6 @@ function CardView({
           {phase === 'setup' && !selectable && card.wantsShield && (
 		  <div className="shieldContainer">
 		    <img src={SHIELD_ICON} alt="Shield active" className="shieldIcon" />
-		    <div className="shieldSIcon">
-		      <svg width="8" height="8" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-		        <path d="M20 20 Q30 10 40 20 Q50 30 40 40 Q30 50 40 60 Q50 70 60 60 Q70 50 60 40 Q50 30 60 20 Q70 10 80 20" 
-		              fill="white" stroke="none" stroke-width="2"/>
-		      </svg>
-		    </div>
 		  </div>
 		)}
           {/* LOCKED text when card is locked */}
@@ -700,12 +679,6 @@ function CardView({
           {phase === 'live' && card.wantsShield && !card.shieldUsed && (
 			  <div className="shieldContainer">
 			    <img src={SHIELD_ICON} alt="Shield active" className="shieldIcon" />
-			    <div className="shieldSIcon">
-			      <svg width="8" height="8" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-			        <path d="M20 20 Q30 10 40 20 Q50 30 40 40 Q30 50 40 60 Q50 70 60 60 Q70 50 60 40 Q50 30 60 20 Q70 10 80 20" 
-			              fill="white" stroke="none" stroke-width="2"/>
-			      </svg>
-			    </div>
 			  </div>
 			)}
           {/* Shield breaking effect when just saved - VIDEO OVER FULL CARD */}
@@ -1684,7 +1657,7 @@ function App(){
                         owned={true}
                         showShield={false}
                         onShieldToggle={()=>{}}
-                        showLock={true}
+                        showLock={phase === 'live'}
                         cardPrice={cardPrice}
                         shieldPricePercent={shieldPricePercent}
                       />

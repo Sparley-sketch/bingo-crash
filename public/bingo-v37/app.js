@@ -108,7 +108,7 @@ function applyCallToCards(cards, n, audioOn, volume){
     vibrate([80,40,120]);
     if(audioOn) boom(volume);
   }
-  setTimeout(()=>{ next.forEach(c=>{ c.justExploded=false; c.justSaved=false; }); }, 900);
+  setTimeout(()=>{ next.forEach(c=>{ c.justExploded=false; c.justSaved=false; }); }, 2000); // Increased to 2s for video
   return next;
 }
 
@@ -366,7 +366,7 @@ function FXStyles(){
   z-index:15;
 }
 
-/* Breaking shield video - covers full card at 4x speed */
+/* Breaking shield video - covers full card at 8x speed */
 .shieldBreakingVideoContainer{
   position:absolute;
   top:0;
@@ -375,6 +375,7 @@ function FXStyles(){
   height:100%;
   z-index:20;
   pointer-events:none;
+  background:rgba(0,0,0,0.1); /* Fallback background */
 }
 
 .shieldBreakingVideo{
@@ -382,6 +383,7 @@ function FXStyles(){
   height:100%;
   object-fit:cover;
   animation:playbackSpeed 0.375s linear forwards; /* 8x speed = 0.375s duration */
+  background:transparent;
 }
 
 @keyframes playbackSpeed{
@@ -715,7 +717,15 @@ function CardView({
                 autoPlay 
                 muted 
                 playsInline
-                onLoadedMetadata={(e) => e.target.playbackRate = 8}
+                preload="auto"
+                onLoadedMetadata={(e) => {
+                  e.target.playbackRate = 8;
+                  e.target.play().catch(err => console.log('Video play failed:', err));
+                }}
+                onError={(e) => {
+                  console.error('Shield breaking video failed to load:', e);
+                  e.target.style.display = 'none';
+                }}
                 onEnded={(e) => e.target.style.display = 'none'}
               />
             </div>

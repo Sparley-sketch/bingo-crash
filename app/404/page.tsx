@@ -51,24 +51,6 @@ export default function GameDisabledPage() {
           flexWrap: 'wrap'
         }}>
           <button 
-            onClick={() => window.location.href = '/admin'}
-            style={{
-              background: '#2b6cff',
-              border: 'none',
-              color: '#fff',
-              padding: '12px 24px',
-              borderRadius: '10px',
-              fontSize: '14px',
-              cursor: 'pointer',
-              fontWeight: '600',
-              transition: 'background 0.2s'
-            }}
-            onMouseOver={(e) => (e.target as HTMLButtonElement).style.background = '#3b77ff'}
-            onMouseOut={(e) => (e.target as HTMLButtonElement).style.background = '#2b6cff'}
-          >
-            Admin Panel
-          </button>
-          <button 
             onClick={() => window.location.href = '/play'}
             style={{
               background: 'rgba(255,255,255,.06)',

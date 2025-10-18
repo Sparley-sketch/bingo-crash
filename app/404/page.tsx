@@ -65,10 +65,11 @@ export default function GameDisabledPage() {
             onMouseOver={(e) => (e.target as HTMLButtonElement).style.background = 'rgba(255,255,255,.12)'}
             onMouseOut={(e) => (e.target as HTMLButtonElement).style.background = 'rgba(255,255,255,.06)'}
           >
-            Back to Game
+            Refresh
           </button>
         </div>
       </div>
     </main>
   );
 }
+

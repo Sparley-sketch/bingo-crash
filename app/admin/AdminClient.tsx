@@ -502,27 +502,17 @@ export default function AdminClient() {
           </div>
           <div className="actions">
             <button className="btn" onClick={loadSchedulerConfig}>Reload</button>
-          </div>
-          </div>
-          
-        <div className="row between" style={{ marginTop: '16px' }}>
-          <div>
-            <label className="check">
-              <input 
-                type="checkbox" 
-                checked={schedulerConfig?.enabled || false} 
-                onChange={e => setSchedulerConfig((prev: any) => prev ? { ...prev, enabled: e.target.checked } : { enabled: e.target.checked, preBuyMinutes: 2, winnerDisplaySeconds: 10, nextGameStart: null, lastCycleAt: null })} 
-              />
-              Enable Scheduler
-            </label>
             {schedulerStatus?.enabled && (
               <div className="scheduler-status">
                 <div>Status: <b>{schedulerStatus.currentPhase}</b></div>
                 <div>Next game in: <b>{formatTimeUntilNextGame(schedulerStatus.timeUntilNextGame || 0)}</b></div>
                 <div>Pre-buy enabled: <b>{schedulerStatus.canPurchaseCards ? 'Yes' : 'No'}</b></div>
-            </div>
-          )}
-        </div>
+              </div>
+            )}
+          </div>
+          </div>
+          
+        <div className="row between" style={{ marginTop: '16px' }}>
           <div className="actions">
             <button className="btn success" onClick={startScheduler} disabled={!!busy || schedulerConfig?.enabled}>Start Scheduler</button>
             <button className="btn warn" onClick={stopScheduler} disabled={!!busy || !schedulerConfig?.enabled}>Stop Scheduler</button>
@@ -534,11 +524,6 @@ export default function AdminClient() {
       <section className="card" style={{ opacity: (schedulerConfig?.enabled) ? 0.6 : 1 }}>
         <div className="row between">
           <div className="title">Round Control · <span className="cap">{phase}</span> · {called}/25</div>
-          {schedulerConfig?.enabled && (
-            <div style={{ padding: 8, backgroundColor: '#fff3cd', border: '1px solid #ffeaa7', borderRadius: 4, marginBottom: 8, fontSize: 14 }}>
-              ⚠️ Scheduler is active - manual controls are disabled
-            </div>
-          )}
           <div className="row smgap">
             <label className="check"><input type="checkbox" checked={polling} onChange={e => setPolling(e.target.checked)} />Polling</label>
             <span>Poll: <b>{pollMs}</b> ms</span>

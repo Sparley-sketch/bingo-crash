@@ -1,61 +1,257 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import * as React from 'react';
 
-type ConfigItem = { key: string; value: any; updated_at?: string };
-
-type SchedulerConfig = {
-  enabled: boolean;
-  preBuyMinutes: number;
-  nextGameStart: string | null;
-  currentPhase: string;
-  winnerDisplaySeconds: number;
-  purchaseBlockSeconds: number;
+type RoundState = {
+  id: string | null;
+  phase: 'setup' | 'live' | 'ended' | string;
+  speed_ms: number;
+  called: number[];
+  created_at: string | null;
+  live_cards_count?: number;
+  player_count?: number;
 };
 
-export default function AdminClient({ canWrite }: { canWrite: boolean }) {
-  const [items, setItems] = useState<ConfigItem[]>([]);
-  const [keyName, setKeyName] = useState('round.duration_ms');
-  const [valText, setValText] = useState('800');
+export default function AdminClient() {
+  const CFG_KEY = 'round.duration_ms';
 
-  const [round, setRound] = useState<{ id?: string; phase: string; speed_ms: number; called: number[] } | null>(null);
-  const [autoOn, setAutoOn] = useState(false);
-  const [schedulerConfig, setSchedulerConfig] = useState<SchedulerConfig | null>(null);
-  const [schedulerStatus, setSchedulerStatus] = useState<any>(null);
-  const [preBuySeconds, setPreBuySeconds] = useState(30);
-  // Supabase client is imported
+  // Config UI
+  const [cfgValue, setCfgValue] = React.useState('1500');
+  const [saving, setSaving] = React.useState(false);
 
-  // Load config table
-  useEffect(() => {
-    (async () => {
-      const res = await fetch('/api/config');
-      if (res.ok) {
-        const data = await res.json();
-        setItems(data.items || []);
+  // Round state
+  const [state, setState] = React.useState<RoundState | null>(null);
+  const [busy, setBusy] = React.useState<string | null>(null);
+
+  // Polling + Auto-run
+  const [pollMs, setPollMs] = React.useState(800);
+  const [polling, setPolling] = React.useState(true);
+  const [autoRun, setAutoRun] = React.useState(false);
+
+  // Game Access Control
+  const [gameEnabled, setGameEnabled] = React.useState(true);
+
+  // Scheduler state
+  const [schedulerConfig, setSchedulerConfig] = React.useState<any>(null);
+  const [schedulerStatus, setSchedulerStatus] = React.useState<any>(null);
+  const [preBuySeconds, setPreBuySeconds] = React.useState(30);
+  const [isEditingPreBuy, setIsEditingPreBuy] = React.useState(false);
+  const isEditingRef = React.useRef(false); // For preventing polling while editing
+
+  // Pricing state
+  const [cardPrice, setCardPrice] = React.useState(10);
+  const [shieldPricePercent, setShieldPricePercent] = React.useState(50);
+  const [isEditingPrice, setIsEditingPrice] = React.useState(false);
+
+  // ---------------- helpers ----------------
+  async function fetchStateOnce() {
+    const r = await fetch(`/api/round/state?ts=${Date.now()}`, {
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+      next: { revalidate: 0 },
+    });
+    const json = (await r.json()) as RoundState;
+    console.log('📊 Fetched state:', json);
+    setState(json);
+    return json;
+  }
+
+  async function post(path: string) {
+    setBusy(path);
+    try {
+      const body = path.includes('/api/round/') && state?.id ? { roundId: state.id } : undefined;
+      console.log(`🚀 Calling ${path} with body:`, body);
+      
+      const r = await fetch(`${path}?ts=${Date.now()}`, {
+          method: 'POST',
+        cache: 'no-store',
+        headers: { 
+          Accept: 'application/json',
+          ...(body ? { 'Content-Type': 'application/json' } : {})
+        },
+        ...(body ? { body: JSON.stringify(body) } : {})
+      });
+      
+      const response = await r.json().catch(() => ({}));
+      console.log(`📡 Response from ${path}:`, response);
+      
+      // Re-pull twice to avoid race with DB write
+      console.log('🔄 Fetching state after API call...');
+      await fetchStateOnce();
+      await new Promise((res) => setTimeout(res, 120));
+      await fetchStateOnce();
+      console.log('✅ State fetch completed');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // Config endpoints
+  async function loadConfig() {
+      const r = await fetch(`/api/config/get?key=${encodeURIComponent(CFG_KEY)}&ts=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+        next: { revalidate: 0 },
+      });
+      const j = await r.json();
+      if (j?.value != null) setCfgValue(String(j.value));
+  }
+  
+  async function saveConfig() {
+    setSaving(true);
+    try {
+      await fetch(`/api/config/set?ts=${Date.now()}`, {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ key: CFG_KEY, value: cfgValue }),
+      });
+      await fetchStateOnce();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function loadSchedulerConfig() {
+    const r = await fetch(`/api/scheduler?ts=${Date.now()}`, { cache: 'no-store' });
+    const data = await r.json();
+    setSchedulerConfig(data);
+    if (data?.preBuyMinutes != null) {
+      setPreBuySeconds(data.preBuyMinutes * 60);
+    }
+  }
+
+  async function startScheduler() {
+    try {
+      // Convert seconds to minutes (divide by 60)
+      const preBuyMinutes = preBuySeconds / 60;
+      const res = await fetch('/api/scheduler/control', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start', preBuyMinutes, winnerDisplaySeconds: 1 })
+      });
+      const j = await res.json().catch(()=>({}));
+      if (!res.ok) {
+        alert(`Start scheduler failed: ${j.error || res.statusText}`);
+      } else {
+        // Reload scheduler config
+        await loadSchedulerConfig();
       }
-    })();
+    } catch (error) {
+      console.error('Error starting scheduler:', error);
+      alert('Error starting scheduler');
+    }
+  }
+
+  async function stopScheduler() {
+    try {
+      const res = await fetch('/api/scheduler/control', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'stop' })
+      });
+      const j = await res.json().catch(()=>({}));
+      if (!res.ok) {
+        alert(`Stop scheduler failed: ${j.error || res.statusText}`);
+      } else {
+        // Reload scheduler config
+        await loadSchedulerConfig();
+      }
+    } catch (error) {
+      console.error('Error stopping scheduler:', error);
+      alert('Error stopping scheduler');
+    }
+  }
+
+  async function toggleGameAccess() {
+    try {
+      const newState = !gameEnabled;
+      const res = await fetch('/api/game-access', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: newState })
+      });
+
+      if (res.ok) {
+        setGameEnabled(newState);
+        alert(`Game access ${newState ? 'ENABLED' : 'DISABLED'}. ${newState ? 'Players can now access the game.' : 'Game page will return 404 error.'}`);
+      } else {
+        alert('Failed to update game access');
+      }
+    } catch (error) {
+      console.error('Error toggling game access:', error);
+      alert('Error toggling game access');
+    }
+  }
+
+  async function loadPricingConfig() {
+    const r = await fetch(`/api/config/get?key=pricing&ts=${Date.now()}`, { cache: 'no-store' });
+    const j = await r.json();
+    if (j?.value) {
+      setCardPrice(j.value.card_cost || 10);
+      setShieldPricePercent(j.value.shield_cost_percent || 50);
+    }
+  }
+
+  async function savePricing() {
+    try {
+      const res = await fetch('/api/config/set', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          key: 'pricing', 
+          value: { 
+            card_cost: cardPrice, 
+            shield_cost_percent: shieldPricePercent 
+          } 
+        })
+      });
+      if (res.ok) {
+        alert('Pricing saved!');
+        setIsEditingPrice(false);
+      } else {
+        alert('Failed to save pricing');
+      }
+    } catch (error) {
+      console.error('Error saving pricing:', error);
+      alert('Error saving pricing');
+    }
+  }
+
+  // ---------------- effects ----------------
+  React.useEffect(() => {
+    fetchStateOnce();
+    loadConfig();
+    loadSchedulerConfig();
+    loadPricingConfig();
+    // Load game access status
+    fetch('/api/game-access?ts=' + Date.now(), { cache: 'no-store' })
+      .then(res => res.json())
+      .then(data => setGameEnabled(data.enabled !== false))
+      .catch(error => console.error('Error loading game access:', error));
   }, []);
 
-  // Load scheduler config
-  useEffect(() => {
-    (async () => {
-      const res = await fetch('/api/scheduler');
-      if (res.ok) {
-        const data = await res.json();
-        setSchedulerConfig(data);
-        // Convert from minutes to seconds (multiply by 60)
-        const minutes = data.preBuyMinutes || 2;
-        const seconds = minutes * 60;
-        // Ensure the value is within our valid range (10-60 seconds)
-        const validSeconds = Math.max(10, Math.min(60, seconds));
-        setPreBuySeconds(validSeconds);
-      }
-    })();
-  }, []);
+  React.useEffect(() => {
+    if (!polling) return;
+    const id = setInterval(fetchStateOnce, pollMs);
+    return () => clearInterval(id);
+  }, [pollMs, polling]);
 
-  // Poll scheduler status
-  useEffect(() => {
+  // Auto-run calls while LIVE
+  React.useEffect(() => {
+    if (!autoRun || state?.phase !== 'live') return;
+    const id = setInterval(() => {
+      fetch('/api/round/call?ts=' + Date.now(), {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+      }).then(() => fetchStateOnce());
+    }, state!.speed_ms || 800);
+    return () => clearInterval(id);
+  }, [autoRun, state?.phase, state?.speed_ms]);
+
+  // Scheduler status polling
+  React.useEffect(() => {
     let stop = false;
     async function loadSchedulerStatus() {
       try {
@@ -65,12 +261,12 @@ export default function AdminClient({ canWrite }: { canWrite: boolean }) {
       } catch {}
     }
     loadSchedulerStatus();
-    const t = setInterval(loadSchedulerStatus, 1000);
+    const t = setInterval(loadSchedulerStatus, 1500); // 1.5s for scheduler (less critical)
     return () => { stop = true; clearInterval(t); };
   }, []);
 
   // Handle complete scheduler cycle (auto-start, winner display, setup, next game)
-  useEffect(() => {
+  React.useEffect(() => {
     if (!schedulerConfig?.enabled) return;
     
     let stop = false;
@@ -86,7 +282,7 @@ export default function AdminClient({ canWrite }: { canWrite: boolean }) {
         if (!stop && autoStartData.started) {
           console.log('Game started automatically via scheduler - enabling auto-run');
           // Enable auto-run for scheduled games
-          setAutoOn(true);
+          setAutoRun(true);
           // Refresh scheduler config after auto-start
           const res = await fetch('/api/scheduler');
           if (res.ok) {
@@ -104,14 +300,24 @@ export default function AdminClient({ canWrite }: { canWrite: boolean }) {
         const cycleData = await cycleResponse.json();
         
         if (!stop && cycleData.action && cycleData.action !== 'none') {
-          console.log('Scheduler cycle action:', cycleData.action, 'New phase:', cycleData.newPhase);
+          console.log('Scheduler cycle action:', cycleData.action,
+            'New phase:', cycleData.newPhase);
           
           if (cycleData.action === 'setup') {
             console.log('Moved to setup phase - players can now purchase cards');
           } else if (cycleData.action === 'started') {
             console.log('Next game started automatically - enabling auto-run');
-            setAutoOn(true);
+            setAutoRun(true);
           }
+          
+          // Refresh scheduler config after cycle action
+          const res = await fetch('/api/scheduler');
+          if (res.ok) {
+            const config = await res.json();
+            setSchedulerConfig(config);
+          }
+          // Also refresh main state to reflect new round/phase
+          await fetchStateOnce();
         }
       } catch (error) {
         console.error('Scheduler cycle check failed:', error);
@@ -123,266 +329,292 @@ export default function AdminClient({ canWrite }: { canWrite: boolean }) {
     return () => { stop = true; clearInterval(t); };
   }, [schedulerConfig?.enabled]);
 
-  // Poll round state
-  useEffect(() => {
-    let stop = false;
-    async function loadRound() {
-      try {
-        const r = await fetch('/api/round/state', { cache: 'no-store' });
-        const data = await r.json();
-        if (!stop) setRound({ id: data.id, phase: data.phase, speed_ms: data.speed_ms, called: data.called || [] });
-      } catch {}
-    }
-    loadRound();
-    const t = setInterval(loadRound, 1000);
-    return () => { stop = true; clearInterval(t); };
-  }, []);
+  const phase = state?.phase ?? '—';
+  const called = Array.isArray(state?.called) ? state!.called.length : 0;
+  const speed = (state?.speed_ms ?? Number(cfgValue)) || 800;
+  const liveCards = state?.live_cards_count ?? 0;
+  const playerCount = state?.player_count ?? 0;
 
-  // Auto-run caller - automatically call balls when auto-run is enabled
-  useEffect(() => {
-    if (!autoOn || !canWrite || !round || round.phase !== 'live') return;
-    
-    const ms = round?.speed_ms || 800;
-    const id = setInterval(async () => {
-      try {
-        await fetch('/api/round/call', { method: 'POST' });
-      } catch (error) {
-        console.error('Auto-call failed:', error);
-      }
-    }, ms);
-    
-    return () => clearInterval(id);
-  }, [autoOn, round?.speed_ms, round?.phase, canWrite]);
-
-  function parseValue(txt: string) {
-    try { return JSON.parse(txt); } catch {}
-    if (/^\d+$/.test(txt)) return Number(txt);
-    if (txt === 'true') return true;
-    if (txt === 'false') return false;
-    return txt;
-  }
-
-  async function save() {
-    if (!canWrite) return;
-    const body = { key: keyName, value: parseValue(valText) };
-    const r = await fetch('/api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    if (!r.ok) {
-      const j = await r.json().catch(() => ({}));
-      alert(`Save failed: ${j.error || r.statusText}`);
-      return;
-    }
-    const data = await r.json();
-    setItems(data.items);
-  }
-
-  async function signOut() {
-    await supabase.auth.signOut();
-    window.location.href = '/admin/login';
-  }
-
-  async function startRound() {
-    const r = await fetch('/api/round/start', { method: 'POST' });
-    const j = await r.json().catch(()=>({}));
-    if (!r.ok) alert(`Start failed: ${j.error || r.statusText}`);
-  }
-  
-  async function callOnce() {
-    const r = await fetch('/api/round/call', { method: 'POST' });
-    const j = await r.json().catch(()=>({}));
-    if (!r.ok) alert(`Call failed: ${j.error || r.statusText}`);
-  }
-
-  async function endRound() {
-    const body = round?.id ? { roundId: round.id } : undefined;
-    const r = await fetch('/api/round/end', { 
-      method: 'POST',
-      headers: body ? { 'Content-Type': 'application/json' } : {},
-      body: body ? JSON.stringify(body) : undefined
-    });
-    const j = await r.json().catch(()=>({}));
-    if (!r.ok) alert(`End failed: ${j.error || r.statusText}`);
-  }
-  async function resetToSetup() {
-    const r = await fetch('/api/round/reset', { method: 'POST' });
-    const j = await r.json().catch(()=>({}));
-    if (!r.ok) alert((await r.json().catch(()=>({}))).error || r.statusText);
-    setAutoOn(false);
-  }
-
-  async function startScheduler() {
-    // Convert seconds to minutes (divide by 60)
-    const preBuyMinutes = preBuySeconds / 60;
-    const r = await fetch('/api/scheduler/control', { 
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'start', preBuyMinutes, winnerDisplaySeconds: 1 })
-    });
-    const j = await r.json().catch(()=>({}));
-    if (!r.ok) alert(`Start scheduler failed: ${j.error || r.statusText}`);
-    else {
-      // Reload scheduler config
-      const res = await fetch('/api/scheduler');
-      if (res.ok) {
-        const data = await res.json();
-        setSchedulerConfig(data);
-      }
-    }
-  }
-
-  async function stopScheduler() {
-    const r = await fetch('/api/scheduler/control', { 
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'stop' })
-    });
-    const j = await r.json().catch(()=>({}));
-    if (!r.ok) alert(`Stop scheduler failed: ${j.error || r.statusText}`);
-    else {
-      // Reload scheduler config
-      const res = await fetch('/api/scheduler');
-      if (res.ok) {
-        const data = await res.json();
-        setSchedulerConfig(data);
-      }
-    }
-  }
-
-  async function rescheduleNextGame() {
-    // Convert seconds to minutes (divide by 60)
-    const preBuyMinutes = preBuySeconds / 60;
-    const r = await fetch('/api/scheduler/control', { 
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'reschedule', preBuyMinutes })
-    });
-    const j = await r.json().catch(()=>({}));
-    if (!r.ok) alert(`Reschedule failed: ${j.error || r.statusText}`);
-    else {
-      // Reload scheduler config
-      const res = await fetch('/api/scheduler');
-      if (res.ok) {
-        const data = await res.json();
-        setSchedulerConfig(data);
-      }
-    }
-  }
-
-  function formatTimeUntilNextGame(seconds: number | null): string {
-    if (seconds === null) return '—';
+  function formatTimeUntilNextGame(seconds: number): string {
+    if (seconds === null || seconds <= 0) return '00:00';
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   }
 
-  console.log('AdminClient rendering, schedulerConfig:', schedulerConfig);
-  // Updated with Simple Admin logic - v2
-
   return (
     <main className="wrap">
-      <div className="card">
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-          <h2>Admin — Config {canWrite ? '' : '(read-only)'}</h2>
-          <button className="btn ghost" onClick={signOut}>Sign out</button>
+      <header className="header">
+        <h1>Admin — Config</h1>
+        <div className="status">
+          <span>Phase: <b className="cap">{phase}</b></span>
+          <span>· Called: <b>{called}</b>/25</span>
+          <span>· Speed: <b>{speed}</b> ms</span>
         </div>
+      </header>
 
-        <div className="row" style={{ marginTop: 8 }}>
-          <input placeholder="key (e.g., round.duration_ms)" value={keyName} onChange={e => setKeyName(e.target.value)} disabled={!canWrite} />
-          <input placeholder="value (JSON or raw)" value={valText} onChange={e => setValText(e.target.value)} disabled={!canWrite} />
-          <button className="btn" onClick={save} disabled={!canWrite}>Save</button>
+      {/* Game Status Notification */}
+      {phase === 'live' && (
+        <section className="notification">
+          <div className="notification-content">
+            <div className="notification-icon">🎮</div>
+            <div className="notification-text">
+              <div className="notification-title">Game in Progress</div>
+              <div className="notification-details">
+                <span><b>{playerCount}</b> players</span>
+                <span>·</span>
+                <span><b>{liveCards}</b> live cards</span>
         </div>
-
-        <div style={{ marginTop: 16 }}>
-          <table>
-            <thead><tr><th>Key</th><th>Value</th><th>Updated</th></tr></thead>
-            <tbody>
-              {items.map((it) => (
-                <tr key={it.key}>
-                  <td>{it.key}</td>
-                  <td><code style={{ fontSize: 12 }}>{JSON.stringify(it.value)}</code></td>
-                  <td style={{ color: '#9aa0a6' }}>{it.updated_at || ''}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </div>
+        </section>
+      )}
 
-      <div className="card" style={{ marginTop: 16, opacity: canWrite ? 1 : 0.6 }}>
-        <h3>Games Scheduler</h3>
-        {/* Scheduler controls */}
-        <div style={{ marginBottom: 16 }}>
-          <div className="row" style={{gap:8, marginBottom:8, alignItems: 'center'}}>
-            <label style={{display: 'flex', alignItems: 'center', gap: 8}}>
-              Pre-buy seconds: 
+      {/* Game Access Control */}
+      <section className="card" style={{ 
+        background: gameEnabled ? '#dcfce7' : '#fee2e2',
+        border: gameEnabled ? '2px solid #22c55e' : '2px solid #ef4444'
+      }}>
+        <div className="row between" style={{ alignItems: 'center' }}>
+          <div>
+            <h3 style={{ margin: '0 0 8px 0', color: gameEnabled ? '#166534' : '#991b1b' }}>
+              🔒 Game Access Control
+            </h3>
+            <p style={{ margin: 0, fontSize: '14px', color: gameEnabled ? '#15803d' : '#b91c1c' }}>
+              {gameEnabled 
+                ? '✅ Game is PUBLIC - Players can access /play' 
+                : '❌ Game is BLOCKED - /play returns 404 error'}
+            </p>
+          </div>
+          <button 
+            className={gameEnabled ? 'btn' : 'btn primary'}
+            onClick={toggleGameAccess}
+            style={{ 
+              minWidth: '120px',
+              background: gameEnabled ? '#ef4444' : '#22c55e',
+              color: '#fff',
+              border: 'none',
+              fontWeight: 'bold'
+            }}
+          >
+            {gameEnabled ? '🔒 Disable Game' : '✅ Enable Game'}
+          </button>
+        </div>
+      </section>
+
+          {/* Config card */}
+          <section className="card">
+            <div className="row between">
+              <div className="field">
+                <label>Round Duration</label>
               <input 
-                type="number" 
-                min="10"
-                max="60"
-                value={preBuySeconds} 
-                onChange={e => {
-                  const inputValue = e.target.value;
-                  if (inputValue === '') {
-                    setPreBuySeconds(10);
-                  } else {
-                    const value = parseInt(inputValue);
-                    if (!isNaN(value)) {
-                      setPreBuySeconds(value);
-                    }
-                  }
-                }}
-                disabled={!canWrite}
-                style={{width: 80, marginLeft: 10, padding: 5}}
-              />
-            </label>
-            <button 
-              className="btn" 
-              disabled={!canWrite || schedulerConfig?.enabled} 
-              onClick={startScheduler}
-            >
-              Start Scheduler
+                  className="input"
+                  value={cfgValue}
+                  onChange={(e) => setCfgValue(e.target.value)}
+                  inputMode="numeric"
+                  placeholder="ms"
+                />
+              </div>
+              <div className="actions">
+                <button className="btn primary" onClick={saveConfig} disabled={saving}>
+                  {saving ? 'Saving…' : 'Save'}
             </button>
-            <button 
-              className="btn" 
-              disabled={!canWrite || !schedulerConfig?.enabled} 
-              onClick={stopScheduler}
-            >
-              Stop Scheduler
+                <button className="btn" onClick={loadConfig}>Reload</button>
+          </div>
+            </div>
+          </section>
+
+      {/* Pricing Section */}
+      <section className="card">
+        <h3>Pricing</h3>
+        <div className="row between">
+          <div className="field grow">
+            <label>Card Price</label>
+            <input
+              className="input"
+              type="number"
+              value={cardPrice}
+              onChange={e => {
+                const value = parseInt(e.target.value);
+                if (!isNaN(value)) {
+                  setCardPrice(value);
+                }
+              }}
+              onFocus={() => isEditingRef.current = true}
+              onBlur={() => isEditingRef.current = false}
+              placeholder="coins"
+              min="1"
+              max="1000"
+            />
+          </div>
+          <div className="field grow">
+            <label>Shield Price (%)</label>
+            <input
+              className="input"
+              type="number"
+              value={shieldPricePercent}
+              onChange={e => {
+                const value = parseInt(e.target.value);
+                if (!isNaN(value)) {
+                  setShieldPricePercent(value);
+                }
+              }}
+              onFocus={() => isEditingRef.current = true}
+              onBlur={() => isEditingRef.current = false}
+              placeholder="%"
+              min="0"
+              max="100"
+            />
+          </div>
+          <div className="actions">
+            <button className="btn primary" onClick={savePricing}>
+              Save
             </button>
           </div>
+        </div>
+        <div className="hint">
+          Shield cost: {cardPrice * (shieldPricePercent / 100)} coins ({shieldPricePercent}% of card price)
+        </div>
+      </section>
+
+      {/* Games Scheduler Section */}
+      <section className="card">
+        <h3>Games Scheduler</h3>
+        <div className="row between">
+          <div className="field">
+            <label>Pre-buy seconds</label>
+              <input 
+              className="input"
+                type="number" 
+                value={preBuySeconds} 
+                onChange={e => {
+                const value = parseInt(e.target.value);
+                    if (!isNaN(value)) {
+                      setPreBuySeconds(value);
+                }
+              }}
+              onFocus={() => isEditingRef.current = true}
+              onBlur={() => isEditingRef.current = false}
+              placeholder="seconds"
+              min="10"
+              max="3600"
+            />
+          </div>
+          <div className="actions">
+            <button className="btn" onClick={loadSchedulerConfig}>Reload</button>
+          </div>
+          </div>
           
-          {schedulerConfig?.enabled && schedulerStatus && (
-            <div style={{ padding: 12, backgroundColor: '#f0f9ff', border: '1px solid #7dd3fc', borderRadius: 8, fontSize: 14, marginTop: 12 }}>
-              <div><strong>Scheduler Status:</strong> {schedulerStatus.enabled ? 'Active' : 'Inactive'}</div>
-              <div><strong>Current Phase:</strong> {schedulerStatus.currentPhase}</div>
-              <div><strong>Time Until Next Game:</strong> {formatTimeUntilNextGame(schedulerStatus.timeUntilNextGame)}</div>
-              <div><strong>Can Purchase Cards:</strong> {schedulerStatus.canPurchaseCards ? 'Yes' : 'No'}</div>
-              <div><strong>Pre-buy Period:</strong> {schedulerConfig.preBuyMinutes * 60} seconds</div>
-              <div><strong>Winner Display:</strong> {schedulerConfig.winnerDisplaySeconds} seconds</div>
+        <div className="row between" style={{ marginTop: '16px' }}>
+          <div>
+            <label className="check">
+              <input 
+                type="checkbox" 
+                checked={schedulerConfig?.enabled || false} 
+                onChange={e => setSchedulerConfig((prev: any) => prev ? { ...prev, enabled: e.target.checked } : { enabled: e.target.checked, preBuyMinutes: 2, winnerDisplaySeconds: 10, nextGameStart: null, lastCycleAt: null })} 
+              />
+              Enable Scheduler
+            </label>
+            {schedulerStatus?.enabled && (
+              <div className="scheduler-status">
+                <div>Status: <b>{schedulerStatus.currentPhase}</b></div>
+                <div>Next game in: <b>{formatTimeUntilNextGame(schedulerStatus.timeUntilNextGame || 0)}</b></div>
+                <div>Pre-buy enabled: <b>{schedulerStatus.canPurchaseCards ? 'Yes' : 'No'}</b></div>
             </div>
           )}
         </div>
-      </div>
-
-      <div className="card" style={{ marginTop: 16, opacity: (canWrite && !schedulerConfig?.enabled) ? 1 : 0.6 }}>
-        <h3>Manual Round Control · {round?.phase || '—'} · {round?.called?.length || 0}/25</h3>
-        {schedulerConfig?.enabled && (
-          <div style={{ padding: 8, backgroundColor: '#fff3cd', border: '1px solid #ffeaa7', borderRadius: 4, marginBottom: 8, fontSize: 14 }}>
-            ⚠️ Scheduler is active - manual controls are disabled
-          </div>
-        )}
-        <div className="row" style={{gap:8, marginTop:8}}>
-          <button className="btn" disabled={!canWrite || schedulerConfig?.enabled} onClick={startRound}>Start Round</button>
-          <button className="btn" disabled={!canWrite || schedulerConfig?.enabled} onClick={callOnce}>Call Next</button>
-          <button className="btn" disabled={!canWrite || schedulerConfig?.enabled} onClick={endRound}>End Round</button>
-          <button className="btn" disabled={!canWrite || schedulerConfig?.enabled} onClick={resetToSetup}>Reset to Setup</button>
-
-          <label className="inline-row" style={{display:'inline-flex',alignItems:'center',gap:6}}>
-            <input type="checkbox" checked={autoOn} onChange={e=>setAutoOn(e.target.checked)} disabled={!canWrite || schedulerConfig?.enabled} />
-            Auto-run (uses speed_ms)
-          </label>
-          <span className="muted small">Speed: {round?.speed_ms ?? '—'} ms</span>
+          <div className="actions">
+            <button className="btn success" onClick={startScheduler} disabled={!!busy || schedulerConfig?.enabled}>Start Scheduler</button>
+            <button className="btn warn" onClick={stopScheduler} disabled={!!busy || !schedulerConfig?.enabled}>Stop Scheduler</button>
         </div>
       </div>
+      </section>
+
+      {/* Control card */}
+      <section className="card" style={{ opacity: (schedulerConfig?.enabled) ? 0.6 : 1 }}>
+        <div className="row between">
+          <div className="title">Round Control · <span className="cap">{phase}</span> · {called}/25</div>
+          {schedulerConfig?.enabled && (
+            <div style={{ padding: 8, backgroundColor: '#fff3cd', border: '1px solid #ffeaa7', borderRadius: 4, marginBottom: 8, fontSize: 14 }}>
+              ⚠️ Scheduler is active - manual controls are disabled
+            </div>
+          )}
+          <div className="row smgap">
+            <label className="check"><input type="checkbox" checked={polling} onChange={e => setPolling(e.target.checked)} />Polling</label>
+            <span>Poll: <b>{pollMs}</b> ms</span>
+            <button className="btn" onClick={() => setPollMs(m => Math.max(250, m - 250))}>Faster</button>
+            <button className="btn" onClick={() => setPollMs(m => Math.min(5000, m + 500))}>Slower</button>
+            <button className="btn" onClick={fetchStateOnce}>Fetch Once</button>
+          </div>
+        </div>
+
+        <div className="row smgap wrap">
+          <button className="btn success" onClick={() => post('/api/round/start')} disabled={!!busy || schedulerConfig?.enabled}>Start Round</button>
+          <button className="btn info"    onClick={() => post('/api/round/call')}  disabled={!!busy || schedulerConfig?.enabled}>Call Next</button>
+          <button className="btn warn"    onClick={() => post('/api/round/end')}   disabled={!!busy || schedulerConfig?.enabled}>End Round</button>
+          <button className="btn purple"  onClick={() => post('/api/round/reset')} disabled={!!busy || schedulerConfig?.enabled}>Reset to Setup</button>
+
+          <label className="check ml">
+            <input type="checkbox" checked={autoRun} onChange={e => setAutoRun(e.target.checked)} disabled={schedulerConfig?.enabled} />
+            Auto-run (uses speed_ms)
+          </label>
+        </div>
+      </section>
+
+      {/* Scoped styles (no Tailwind required) */}
+      <style jsx>{`
+        :global(html, body) { background:#0f1220; color:#fff; }
+        .wrap { max-width: 1000px; margin: 0 auto; padding: 20px; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+        .header h1 { margin: 0 0 6px; font-size: 28px; font-weight: 800; }
+        .status { color:#b9c0d3; display:flex; gap:10px; flex-wrap:wrap; }
+        .cap { text-transform: capitalize; }
+
+        .card { background:#12162a; border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:16px; margin-top:16px; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+        .title { font-weight:600; color:#dfe6ff; }
+        .row { display:flex; gap:12px; align-items:center; }
+        .row.wrap { flex-wrap:wrap; }
+        .row.between { justify-content:space-between; align-items:center; }
+        .smgap { gap:8px; }
+        .ml { margin-left:auto; }
+
+        .field { margin-bottom:10px; }
+        .field.grow { flex:1; }
+        .field label { display:block; font-size:12px; color:#aab3cc; margin-bottom:6px; }
+        .hint { margin:4px 0 0; font-size:12px; color:#9aa3bd; }
+
+        .input { width:100%; background:#0c1020; color:#fff; border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:10px 12px; font-size:14px; outline:none; }
+        .input:focus { border-color:#5b8cff; box-shadow:0 0 0 3px rgba(91,140,255,.25); }
+
+        .actions { display:flex; gap:8px; align-items:center; }
+
+        .btn { border:1px solid/: rgba(255,255,255,.12); background:rgba(255,255,255,.06); color:#e8eeff; padding:8px 12px; border-radius:10px; font-size:14px; cursor:pointer; transition:.15s; }
+        .btn:hover { background:rgba(255,255,255,.12); }
+        .btn:disabled { opacity:.5; cursor:not-allowed; }
+
+        .primary { background:#2b6cff; border-color:#2b6cff; }
+        .primary:hover { background:#3b77ff; }
+        .success { background:#16a34a; border-color:#16a34a; }
+        .success:hover { background:#22b357; }
+        .info { background:#2081e2; border-color:#2081e2; }
+        .info:hover { background:#2a8ff0; }
+        .warn { background:#f59e0b; border-color:#f59e0b; color:#171923; }
+        .warn:hover { background:#ffb31a; }
+        .purple { background:#7c3aed; border-color:#7c3aed; }
+        .purple:hover { background:#8b5cf6; }
+
+        .check { display:inline-flex; align-items:center; gap:8px; font-size:14px; color:#c5cbe0; }
+
+        .notification { background: linear-gradient(135deg, #1e3a8a, #1e40af); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; padding: 16px; margin-top: 16px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2); }
+        .notification-content { display: flex; align-items: center; gap: 12px; }
+        .notification-icon { font-size: 24px; }
+        .notification-text { flex: 1; }
+        .notification-title { font-weight: 600; color: #dbeafe; margin-bottom: 4px; }
+        .notification-details { display: flex; align-items: center; gap: 8px; color: #bfdbfe; font-size: 14px; }
+
+        .scheduler-status { padding: 12px; background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 8px; margin-top: 12px; font-size: 14px; color: #000000; }
+        .scheduler-status div { margin-bottom: 4px; color: #000000; }
+        .scheduler-status div:last-child { margin-bottom: 0; }
+      `}</style>
     </main>
   );
 }

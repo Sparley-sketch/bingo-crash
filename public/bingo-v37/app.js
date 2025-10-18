@@ -108,7 +108,7 @@ function applyCallToCards(cards, n, audioOn, volume){
     vibrate([80,40,120]);
     if(audioOn) boom(volume);
   }
-  setTimeout(()=>{ next.forEach(c=>{ c.justExploded=false; c.justSaved=false; }); }, 2000); // Increased to 2s for video
+  setTimeout(()=>{ next.forEach(c=>{ c.justExploded=false; c.justSaved=false; }); }, 500); // Back to 500ms for responsiveness
   return next;
 }
 
@@ -120,6 +120,36 @@ const ICON_LOCK_CLOSED= 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2
 const EXPLOSION_SRC = '/bingo-v37/explosion.gif';
 const SHIELD_ICON = '/bingo-v37/shield.png';
 const SHIELD_BREAKING_SRC = '/bingo-v37/shield_break.mp4'; // Your custom breaking shield MP4
+
+// Simple preload function for shield breaking video
+const preloadShieldVideo = () => {
+  // Create a hidden video element to preload the video
+  const video = document.createElement('video');
+  video.src = SHIELD_BREAKING_SRC;
+  video.preload = 'auto';
+  video.muted = true;
+  video.playsInline = true;
+  video.style.display = 'none';
+  
+  video.addEventListener('canplaythrough', () => {
+    console.log('🛡️ Shield breaking video preloaded');
+    // Remove the preload element after it's loaded
+    if (video.parentNode) {
+      video.parentNode.removeChild(video);
+    }
+  });
+  
+  video.addEventListener('error', (e) => {
+    console.warn('Failed to preload shield breaking video:', e);
+    if (video.parentNode) {
+      video.parentNode.removeChild(video);
+    }
+  });
+  
+  // Add to DOM and start loading
+  document.body.appendChild(video);
+  video.load();
+};
 
 function Cell({cell, highlight, bombWriggling}){
   const cls=['cell']; 
@@ -685,15 +715,19 @@ function CardView({
           {phase === 'live' && card.justSaved && (
             <div className="shieldBreakingVideoContainer">
               <video 
-                src={SHIELD_BREAKING_SRC} 
+                src={SHIELD_BREAKING_SRC}
                 className="shieldBreakingVideo"
                 autoPlay 
                 muted 
                 playsInline
                 preload="auto"
                 onLoadedMetadata={(e) => {
-                  e.target.playbackRate = 8;
-                  e.target.play().catch(err => console.log('Video play failed:', err));
+                  try {
+                    e.target.playbackRate = 8;
+                    e.target.play().catch(err => console.log('Video play failed:', err));
+                  } catch (error) {
+                    console.error('Error setting up video playback:', error);
+                  }
                 }}
                 onError={(e) => {
                   console.error('Shield breaking video failed to load:', e);
@@ -939,7 +973,7 @@ function App(){
     }
     
     pullSchedulerStatus();
-    const interval = setInterval(pullSchedulerStatus, 1000); // Back to 1s
+    const interval = setInterval(pullSchedulerStatus, 1500); // 1.5s for scheduler (less critical)
     
     return () => {
       mounted = false;
@@ -989,6 +1023,8 @@ function App(){
     if (alias) {
       // Create each purchased card in the database SEQUENTIALLY to avoid race conditions
       async function createCardsSequentially() {
+        // UI is already updated above, just sync with database
+        
         for (let i = 0; i < ownedAdd.length; i++) {
           const card = ownedAdd[i];
           
@@ -1276,12 +1312,17 @@ function App(){
     }
 
     pull();
-    const id = setInterval(pull, 1000); // Back to 1s polling
+    const id = setInterval(pull, 800); // Slightly faster polling for better responsiveness
     return ()=>{ mounted=false; clearInterval(id); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player.cards, audio, volume, alias]);
 
-
+  // Preload shield video when game starts
+  React.useEffect(() => {
+    if (phase === 'live') {
+      preloadShieldVideo();
+    }
+  }, [phase]);
 
   const lastCalled = called[called.length-1];
   
@@ -1416,8 +1457,8 @@ function App(){
                     // Initial render
                     updateModal();
                     
-                    // Set up live updates - update every 500ms
-                    const updateInterval = setInterval(updateModal, 500);
+                    // Set up live updates - update every 300ms for better responsiveness
+                    const updateInterval = setInterval(updateModal, 300);
                     
                     // Clean up interval when modal is closed
                     const cleanup = () => {
@@ -1763,5 +1804,14 @@ function App(){
   );
 }
 
+
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(React.createElement(App));
+
+// Preload shield breaking video when page loads
+document.addEventListener('DOMContentLoaded', () => {
+  // Only preload if we're on the game page
+  if (window.location.pathname.includes('/play') || window.location.pathname.includes('/bingo-v37')) {
+    preloadShieldVideo();
+  }
+});

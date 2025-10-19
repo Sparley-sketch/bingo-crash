@@ -55,7 +55,7 @@ export default function GameDisabledPage() {
             style={{
               background: 'rgba(255,255,255,.06)',
               border: '1px solid rgba(255,255,255,.12)',
-              color: '#e8eeff',
+              color: '#e8eeff'
               padding: '12px 24px',
               borderRadius: '10px',
               fontSize: '14px',
@@ -72,4 +72,5 @@ export default function GameDisabledPage() {
     </main>
   );
 }
+
 

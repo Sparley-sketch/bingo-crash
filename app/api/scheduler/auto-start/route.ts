@@ -6,6 +6,9 @@ import { verifyAdminAuth } from '@/lib/adminAuth';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
+  const schedulerStartTime = Date.now();
+  const schedulerTimestamp = new Date().toISOString();
+  
   try {
     // Verify admin authentication
     const authError = await verifyAdminAuth(req);
@@ -13,7 +16,9 @@ export async function POST(req: NextRequest) {
       return authError;
     }
     
-    console.log('Auto-start endpoint called');
+    console.log(`🔄 SCHEDULER AUTO-START CALLED:`);
+    console.log(`  📅 Timestamp: ${schedulerTimestamp}`);
+    console.log(`  ⏰ Start Time: ${schedulerStartTime}ms`);
     
     // Check if it's time to start a game
     const { data: schedulerData, error: schedulerError } = await supabaseAdmin

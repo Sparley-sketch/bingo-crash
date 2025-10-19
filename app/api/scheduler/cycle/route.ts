@@ -5,6 +5,9 @@ import { verifyAdminAuth } from '@/lib/adminAuth';
 
 export const dynamic = 'force-dynamic';
 
+// Simple mutex to prevent duplicate round creation
+let isCreatingRound = false;
+
 export async function POST(req: NextRequest) {
   try {
     // Verify admin authentication
@@ -115,6 +118,16 @@ export async function POST(req: NextRequest) {
             }, { onConflict: 'key' });
 
           // Create a NEW round instead of updating the existing one
+          // Check mutex to prevent duplicate round creation
+          if (isCreatingRound) {
+            console.log('Round creation already in progress, skipping...');
+            return NextResponse.json({ 
+              message: 'Round creation already in progress',
+              action: 'setup'
+            }, { headers: { 'Cache-Control': 'no-store' } });
+          }
+          
+          isCreatingRound = true;
           console.log('Creating NEW round for next game cycle');
           
           // Get speed_ms from config
@@ -150,8 +163,10 @@ export async function POST(req: NextRequest) {
 
           if (createError) {
             console.error('Error creating new round:', createError);
+            isCreatingRound = false; // Release mutex on error
           } else {
             console.log(`Created NEW round ${newRound.id} with fresh prize pool`);
+            isCreatingRound = false; // Release mutex on success
           }
 
           return NextResponse.json({ 

@@ -4,7 +4,24 @@ import { tableNames } from '@/lib/config';
 
 export const dynamic = 'force-dynamic';
 
+// Simple in-memory cache for round state (short-lived)
+let lastRoundState: any = null;
+let lastCacheTime = 0;
+const CACHE_DURATION = 50; // Back to 50ms for more responsive updates
+
 export async function GET() {
+  const startTime = Date.now();
+  const now = Date.now();
+  
+  // Return cached response if available and recent
+  if (lastRoundState && (now - lastCacheTime) < CACHE_DURATION) {
+    const responseTime = Date.now() - startTime;
+    if (responseTime > 50) {
+      console.warn(`⚠️  SLOW CACHED RESPONSE: ${responseTime}ms`);
+    }
+    return NextResponse.json(lastRoundState, { headers: { 'Cache-Control': 'no-store' }});
+  }
+  
   try {
     // Get current round
     const { data: round, error: roundError } = await supabaseAdmin
@@ -30,30 +47,28 @@ export async function GET() {
       }, { headers: { 'Cache-Control': 'no-store' }});
     }
 
-    // Get live cards count
-    const { data: liveCardsData, error: liveCardsError } = await supabaseAdmin
-      .from(tableNames.cards)
-      .select('id')
-      .eq('round_id', round.id)
-      .eq('exploded', false)
-      .eq('paused', false);
+    // Optimize: Use count queries instead of fetching all data
+    // Only fetch counts if we need them (during live phase or when checking for game end)
+    let liveCardsCount = 0;
+    let playerCount = 0;
+    
+    if (round.phase === 'live' || round.phase === 'ended') {
+      const [liveCardsResult, playersResult] = await Promise.all([
+        supabaseAdmin
+          .from(tableNames.cards)
+          .select('id', { count: 'exact', head: true })
+          .eq('round_id', round.id)
+          .eq('exploded', false)
+          .eq('paused', false),
+        supabaseAdmin
+          .from(tableNames.players)
+          .select('id', { count: 'exact', head: true })
+          .eq('round_id', round.id)
+      ]);
 
-    if (liveCardsError) {
-      console.error('Error fetching live cards:', liveCardsError);
+      liveCardsCount = liveCardsResult.count || 0;
+      playerCount = playersResult.count || 0;
     }
-
-    // Get player count
-    const { data: playersData, error: playersError } = await supabaseAdmin
-      .from(tableNames.players)
-      .select('id')
-      .eq('round_id', round.id);
-
-    if (playersError) {
-      console.error('Error fetching players:', playersError);
-    }
-
-    const liveCardsCount = liveCardsData?.length || 0;
-    const playerCount = playersData?.length || 0;
 
     // Auto-end game when all cards are exploded or locked (live_cards_count = 0)
     if (round.phase === 'live' && liveCardsCount === 0) {
@@ -153,7 +168,14 @@ export async function GET() {
       daubs: round.winner_daubs || 0
     } : null;
 
-    return NextResponse.json({
+    const responseTime = Date.now() - startTime;
+    
+    // Log slow responses
+    if (responseTime > 200) {
+      console.warn(`⚠️  SLOW ROUND STATE API: ${responseTime}ms (Round: ${round.id})`);
+    }
+    
+    const responseData = {
       id: round.id,
       phase: round.phase,
       called: round.called || [],
@@ -163,7 +185,13 @@ export async function GET() {
       winner: winner,
       prize_pool: round.prize_pool || 0,
       total_collected: round.total_collected || 0
-    }, { headers: { 'Cache-Control': 'no-store' }});
+    };
+    
+    // Update cache
+    lastRoundState = responseData;
+    lastCacheTime = Date.now();
+    
+    return NextResponse.json(responseData, { headers: { 'Cache-Control': 'no-store' }});
   } catch (error) {
     console.error('Unexpected error in state endpoint:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

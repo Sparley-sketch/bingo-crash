@@ -122,15 +122,22 @@ const SHIELD_ICON = '/bingo-v37/shield.png';
 // Video format sources - WebM now default for all devices (lightest)
 const SHIELD_BREAKING_SOURCES = {
   webm: '/bingo-v37/shield_break.webm', // Default format (lightest, 6x speed)
+  webmMobile: '/bingo-v37/shield_break_mobile.webm', // Mobile-optimized version
   mp4: '/bingo-v37/shield_break.mp4',   // Fallback for unsupported browsers
   gif: '/bingo-v37/shield_break.gif'    // Ultimate fallback (1x speed only)
 };
 
 // Get the best video source for the current device
 const getBestVideoSource = () => {
-  // WebM is now the default for both PC and mobile (much lighter)
+  // For low-performance devices, always use GIF
+  if (isLowPerformanceDevice()) {
+    console.log('🛡️ Low-performance device detected, using GIF fallback');
+    return SHIELD_BREAKING_SOURCES.gif;
+  }
+  
+  // Use mobile-optimized WebM for mobile devices
   if (supportsWebM()) {
-    return SHIELD_BREAKING_SOURCES.webm;
+    return isMobile() ? SHIELD_BREAKING_SOURCES.webmMobile : SHIELD_BREAKING_SOURCES.webm;
   } else if (supportsMP4()) {
     return SHIELD_BREAKING_SOURCES.mp4;
   } else {
@@ -156,14 +163,30 @@ const isMobile = () => {
          window.innerWidth <= 768;
 };
 
+// Detect low-performance devices
+const isLowPerformanceDevice = () => {
+  // Check for low-end device indicators
+  const userAgent = navigator.userAgent.toLowerCase();
+  const isOldAndroid = /android [1-4]\./i.test(userAgent);
+  const isLowEndAndroid = /android.*(go|lite|low)/i.test(userAgent);
+  const isOldIOS = /iphone os [1-9]_/i.test(userAgent);
+  const hasLowMemory = navigator.deviceMemory && navigator.deviceMemory <= 2;
+  const hasSlowConnection = navigator.connection && (
+    navigator.connection.effectiveType === 'slow-2g' || 
+    navigator.connection.effectiveType === '2g'
+  );
+  
+  return isOldAndroid || isLowEndAndroid || isOldIOS || hasLowMemory || hasSlowConnection;
+};
+
 // Smart preload function with format detection and mobile optimization
 const preloadShieldVideo = () => {
   const videoSource = getBestVideoSource();
   
-  // Skip preloading on mobile to save bandwidth and memory
-  if (isMobile()) {
-    console.log('🛡️ Skipping video preload on mobile for better performance');
-    console.log('🛡️ Will use WebM format:', videoSource);
+  // Skip preloading on mobile and low-performance devices to save bandwidth and memory
+  if (isMobile() || isLowPerformanceDevice()) {
+    console.log('🛡️ Skipping video preload for better performance');
+    console.log('🛡️ Will use format:', videoSource);
     return;
   }
   
@@ -827,20 +850,26 @@ function CardView({
                     const videoSource = getBestVideoSource();
                     console.log('🛡️ Loading shield break video:', videoSource);
                     
-                    // Adjust playback rate based on format (WebM now default with 6x speed)
+                    // Adjust playback rate based on format and device performance
                     let playbackRate;
                     if (videoSource.includes('.gif')) {
                       playbackRate = 1; // GIFs can't be sped up
+                    } else if (isLowPerformanceDevice()) {
+                      playbackRate = 3; // Slower playback for low-performance devices
+                    } else if (isMobile()) {
+                      playbackRate = 6; // 6x speed for mobile devices
                     } else {
-                      playbackRate = 8; // 8x speed for both WebM and MP4 on all devices
+                      playbackRate = 8; // 8x speed for desktop
                     }
                     
                     e.target.playbackRate = playbackRate;
                     
-                    // Mobile-specific optimizations
+                    // Enhanced mobile-specific optimizations
                     if (isMobile()) {
                       e.target.style.willChange = 'transform';
                       e.target.style.transform = 'translateZ(0)'; // Force hardware acceleration
+                      e.target.style.backfaceVisibility = 'hidden'; // Additional optimization
+                      e.target.style.perspective = '1000px'; // 3D acceleration hint
                     }
                     
                     e.target.play().catch(err => {

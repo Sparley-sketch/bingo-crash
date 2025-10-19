@@ -44,10 +44,9 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    // Temporarily disabled all middleware matching to test login
-    // '/admin',
-    // '/admin/((?!login|forbidden).*)',
-    // '/api/config/:path*', 
-    // '/api/admin/:path*'
+     '/admin',
+     '/admin/((?!login|forbidden).*)',
+     '/api/config/:path*', 
+     '/api/admin/:path*'
   ],
 };

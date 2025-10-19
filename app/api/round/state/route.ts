@@ -71,7 +71,8 @@ export async function GET() {
     }
 
     // Auto-end game when all cards are exploded or locked (live_cards_count = 0)
-    if (round.phase === 'live' && liveCardsCount === 0) {
+    // BUT only if there were cards initially (to allow manually started rounds with no cards)
+    if (round.phase === 'live' && liveCardsCount === 0 && playerCount > 0) {
       // Compute winner before ending the round
       let winner = null;
       if (playerCount > 0) {

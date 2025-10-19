@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 type RoundState = {
   id: string | null;
@@ -42,6 +43,47 @@ export default function AdminClient() {
   const [cardPrice, setCardPrice] = React.useState(10);
   const [shieldPricePercent, setShieldPricePercent] = React.useState(50);
   const [isEditingPrice, setIsEditingPrice] = React.useState(false);
+
+  // Session management state
+  const [sessionTimeout, setSessionTimeout] = React.useState(30 * 60 * 1000); // 30 minutes in milliseconds
+  const [lastActivity, setLastActivity] = React.useState(Date.now());
+  const [sessionWarning, setSessionWarning] = React.useState(false);
+  const [sessionExpired, setSessionExpired] = React.useState(false);
+  const [timeUntilExpiry, setTimeUntilExpiry] = React.useState(30 * 60); // seconds
+
+  // ---------------- session management ----------------
+  const supabase = createClientComponentClient();
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      // Clear any local storage or session data
+      localStorage.clear();
+      sessionStorage.clear();
+      // Redirect to login
+      window.location.href = '/admin/login';
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force redirect even if logout fails
+      window.location.href = '/admin/login';
+    }
+  };
+
+  const resetSessionTimeout = () => {
+    setLastActivity(Date.now());
+    setSessionWarning(false);
+    setSessionExpired(false);
+  };
+
+  const extendSession = () => {
+    resetSessionTimeout();
+    setTimeUntilExpiry(30 * 60); // Reset to 30 minutes
+  };
+
+  // Activity tracking
+  const trackActivity = () => {
+    resetSessionTimeout();
+  };
 
   // ---------------- helpers ----------------
   async function fetchStateOnce() {
@@ -237,6 +279,56 @@ export default function AdminClient() {
     return () => clearInterval(id);
   }, [pollMs, polling]);
 
+  // Session timeout monitoring
+  React.useEffect(() => {
+    const sessionTimer = setInterval(() => {
+      const now = Date.now();
+      const timeSinceLastActivity = now - lastActivity;
+      const remainingTime = Math.max(0, sessionTimeout - timeSinceLastActivity);
+      
+      setTimeUntilExpiry(Math.floor(remainingTime / 1000));
+      
+      if (remainingTime <= 0) {
+        setSessionExpired(true);
+        clearInterval(sessionTimer);
+        return;
+      }
+      
+      // Show warning 5 minutes before expiry
+      if (remainingTime <= 5 * 60 * 1000 && !sessionWarning) {
+        setSessionWarning(true);
+      }
+    }, 1000); // Check every second
+
+    return () => clearInterval(sessionTimer);
+  }, [lastActivity, sessionTimeout, sessionWarning]);
+
+  // Auto-logout when session expires
+  React.useEffect(() => {
+    if (sessionExpired) {
+      handleLogout();
+    }
+  }, [sessionExpired]);
+
+  // Activity tracking - reset timeout on user interaction
+  React.useEffect(() => {
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    const handleActivity = () => {
+      trackActivity();
+    };
+
+    events.forEach(event => {
+      document.addEventListener(event, handleActivity, true);
+    });
+
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, handleActivity, true);
+      });
+    };
+  }, []);
+
   // Auto-run calls while LIVE
   React.useEffect(() => {
     if (!autoRun || state?.phase !== 'live') return;
@@ -345,11 +437,21 @@ export default function AdminClient() {
   return (
     <main className="wrap">
       <header className="header">
-        <h1>Admin — Config</h1>
-        <div className="status">
-          <span>Phase: <b className="cap">{phase}</b></span>
-          <span>· Called: <b>{called}</b>/25</span>
-          <span>· Speed: <b>{speed}</b> ms</span>
+        <div className="row between">
+          <div>
+            <h1>Admin — Config</h1>
+            <div className="status">
+              <span>Phase: <b className="cap">{phase}</b></span>
+              <span>· Called: <b>{called}</b>/25</span>
+              <span>· Speed: <b>{speed}</b> ms</span>
+              <span>· Session: <b>{Math.floor(timeUntilExpiry / 60)}:{(timeUntilExpiry % 60).toString().padStart(2, '0')}</b></span>
+            </div>
+          </div>
+          <div className="actions">
+            <button className="btn warn" onClick={handleLogout}>
+              Logout
+            </button>
+          </div>
         </div>
       </header>
 
@@ -367,6 +469,27 @@ export default function AdminClient() {
         </div>
         </div>
       </div>
+        </section>
+      )}
+
+      {/* Session Warning Modal */}
+      {sessionWarning && (
+        <section className="session-warning-overlay">
+          <div className="session-warning-modal">
+            <div className="session-warning-icon">⚠️</div>
+            <div className="session-warning-content">
+              <h3>Session Expiring Soon</h3>
+              <p>Your session will expire in {Math.floor(timeUntilExpiry / 60)}:{(timeUntilExpiry % 60).toString().padStart(2, '0')} due to inactivity.</p>
+              <div className="session-warning-actions">
+                <button className="btn primary" onClick={extendSession}>
+                  Extend Session
+                </button>
+                <button className="btn" onClick={handleLogout}>
+                  Logout Now
+                </button>
+              </div>
+            </div>
+          </div>
         </section>
       )}
 
@@ -507,11 +630,11 @@ export default function AdminClient() {
                 <div>Status: <b>{schedulerStatus.currentPhase}</b></div>
                 <div>Next game in: <b>{formatTimeUntilNextGame(schedulerStatus.timeUntilNextGame || 0)}</b></div>
                 <div>Pre-buy enabled: <b>{schedulerStatus.canPurchaseCards ? 'Yes' : 'No'}</b></div>
-              </div>
-            )}
-          </div>
-          </div>
-          
+            </div>
+          )}
+        </div>
+      </div>
+
         <div className="row between" style={{ marginTop: '16px' }}>
           <div className="actions">
             <button className="btn success" onClick={startScheduler} disabled={!!busy || schedulerConfig?.enabled}>Start Scheduler</button>
@@ -599,6 +722,13 @@ export default function AdminClient() {
         .scheduler-status { padding: 12px; background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 8px; margin-top: 12px; font-size: 14px; color: #000000; }
         .scheduler-status div { margin-bottom: 4px; color: #000000; }
         .scheduler-status div:last-child { margin-bottom: 0; }
+
+        .session-warning-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+        .session-warning-modal { background: #1e293b; border: 2px solid #f59e0b; border-radius: 16px; padding: 24px; max-width: 400px; text-align: center; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5); }
+        .session-warning-icon { font-size: 48px; margin-bottom: 16px; }
+        .session-warning-content h3 { color: #fbbf24; margin: 0 0 12px; font-size: 20px; font-weight: 600; }
+        .session-warning-content p { color: #e2e8f0; margin: 0 0 20px; font-size: 16px; }
+        .session-warning-actions { display: flex; gap: 12px; justify-content: center; }
       `}</style>
     </main>
   );

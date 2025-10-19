@@ -5,16 +5,16 @@ export const isDev = isDevelopment; // Alias for compatibility
 // Supabase configuration based on environment
 export const supabaseConfig = {
   url: isDevelopment 
-    ? (process.env.NEXT_PUBLIC_SUPABASE_URL_DEV || process.env.NEXT_PUBLIC_SUPABASE_URL || '')
-    : (process.env.NEXT_PUBLIC_SUPABASE_URL || ''),
+    ? (process.env.NEXT_PUBLIC_SUPABASE_URL_DEV || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co')
+    : (process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'),
   
   anonKey: isDevelopment 
-    ? (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY_DEV || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '')
-    : (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''),
+    ? (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY_DEV || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_anon_key')
+    : (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_anon_key'),
   
   serviceKey: isDevelopment 
-    ? (process.env.SUPABASE_SERVICE_ROLE_KEY_DEV || process.env.SUPABASE_SERVICE_ROLE_KEY || '')
-    : (process.env.SUPABASE_SERVICE_ROLE_KEY || '')
+    ? (process.env.SUPABASE_SERVICE_ROLE_KEY_DEV || process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder_service_key')
+    : (process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder_service_key')
 };
 
 // Table names based on environment

@@ -119,20 +119,64 @@ const ICON_LOCK_CLOSED= 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2
 // Explosion image (animated GIF)
 const EXPLOSION_SRC = '/bingo-v37/explosion.gif';
 const SHIELD_ICON = '/bingo-v37/shield.png';
-const SHIELD_BREAKING_SRC = '/bingo-v37/shield_break.mp4'; // Your custom breaking shield MP4
+// Video format sources - WebM now default for all devices (lightest)
+const SHIELD_BREAKING_SOURCES = {
+  webm: '/bingo-v37/shield_break.webm', // Default format (lightest, 6x speed)
+  mp4: '/bingo-v37/shield_break.mp4',   // Fallback for unsupported browsers
+  gif: '/bingo-v37/shield_break.gif'    // Ultimate fallback (1x speed only)
+};
 
-// Simple preload function for shield breaking video
+// Get the best video source for the current device
+const getBestVideoSource = () => {
+  // WebM is now the default for both PC and mobile (much lighter)
+  if (supportsWebM()) {
+    return SHIELD_BREAKING_SOURCES.webm;
+  } else if (supportsMP4()) {
+    return SHIELD_BREAKING_SOURCES.mp4;
+  } else {
+    return SHIELD_BREAKING_SOURCES.gif;
+  }
+};
+
+// Check WebM support
+const supportsWebM = () => {
+  const video = document.createElement('video');
+  return video.canPlayType('video/webm; codecs="vp8, vorbis"') !== '';
+};
+
+// Check MP4 support  
+const supportsMP4 = () => {
+  const video = document.createElement('video');
+  return video.canPlayType('video/mp4; codecs="avc1.42E01E"') !== '';
+};
+
+// Detect mobile device for performance optimization
+const isMobile = () => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+         window.innerWidth <= 768;
+};
+
+// Smart preload function with format detection and mobile optimization
 const preloadShieldVideo = () => {
+  const videoSource = getBestVideoSource();
+  
+  // Skip preloading on mobile to save bandwidth and memory
+  if (isMobile()) {
+    console.log('🛡️ Skipping video preload on mobile for better performance');
+    console.log('🛡️ Will use WebM format:', videoSource);
+    return;
+  }
+  
   // Create a hidden video element to preload the video
   const video = document.createElement('video');
-  video.src = SHIELD_BREAKING_SRC;
-  video.preload = 'auto';
+  video.src = videoSource;
+  video.preload = 'metadata'; // Use metadata instead of auto for better performance
   video.muted = true;
   video.playsInline = true;
   video.style.display = 'none';
   
   video.addEventListener('canplaythrough', () => {
-    console.log('🛡️ Shield breaking video preloaded');
+    console.log('🛡️ Shield breaking video preloaded:', videoSource);
     // Remove the preload element after it's loaded
     if (video.parentNode) {
       video.parentNode.removeChild(video);
@@ -140,9 +184,16 @@ const preloadShieldVideo = () => {
   });
   
   video.addEventListener('error', (e) => {
-    console.warn('Failed to preload shield breaking video:', e);
-    if (video.parentNode) {
-      video.parentNode.removeChild(video);
+    console.warn('Failed to preload shield breaking video:', videoSource, e);
+    // Try fallback format if WebM fails
+    if (videoSource.includes('.webm')) {
+      console.log('🛡️ Trying MP4 fallback...');
+      video.src = SHIELD_BREAKING_SOURCES.mp4;
+      video.load();
+    } else {
+      if (video.parentNode) {
+        video.parentNode.removeChild(video);
+      }
     }
   });
   
@@ -176,10 +227,52 @@ function FXStyles(){
 .row{ display:flex; align-items:center; gap:12px; flex-wrap:nowrap; }
 .list .chip{ margin:2px 4px 0 0; }
 
-.btn{ border:1px solid #e2e8f0; background:#f8fafc; color:#0f172a; padding:6px 10px; border-radius:8px; cursor:pointer; }
+.btn{ border:1px solid #e2e8f0; background:#f8fafc; color:#0f172a; padding:6px 10px; border-radius:8px; cursor:pointer; transition: all 0.2s ease; }
 .btn.primary{ background:#3b82f6; border-color:#3b82f6; color:#fff; }
 .btn.gray{ background:#eef2f7; }
 .btn:disabled{ opacity:.5; cursor:not-allowed; }
+.btn:hover:not(:disabled){ transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+/* Custom slider styles */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+input[type="range"]::-webkit-slider-track {
+  background: #e2e8f0;
+  height: 6px;
+  border-radius: 3px;
+}
+
+input[type="range"]::-moz-range-track {
+  background: #e2e8f0;
+  height: 6px;
+  border-radius: 3px;
+  border: none;
+}
 .chip{ background:#f1f5f9; border:1px solid #e2e8f0; padding:6px 10px; border-radius:999px; }
 .title{ font-size:22px; font-weight:800; margin:0 0 4px; }
 .muted{ color:#64748b; font-size:14px; }
@@ -403,8 +496,15 @@ function FXStyles(){
   width:100%;
   height:100%;
   object-fit:cover;
-  animation:playbackSpeed 0.375s linear forwards; /* 8x speed = 0.375s duration */
+  animation:playbackSpeed 0.375s linear forwards; /* 10x speed = 0.375s duration */
   background:transparent;
+  /* Mobile optimizations */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  -webkit-perspective: 1000;
+  perspective: 1000;
 }
 
 @keyframes playbackSpeed{
@@ -715,25 +815,68 @@ function CardView({
           {phase === 'live' && card.justSaved && (
             <div className="shieldBreakingVideoContainer">
               <video 
-                src={SHIELD_BREAKING_SRC}
+                src={getBestVideoSource()}
                 className="shieldBreakingVideo"
                 autoPlay 
                 muted 
                 playsInline
-                preload="auto"
+                webkit-playsinline="true"
+                preload={isMobile() ? "none" : "metadata"}
                 onLoadedMetadata={(e) => {
                   try {
-                    e.target.playbackRate = 8;
-                    e.target.play().catch(err => console.log('Video play failed:', err));
+                    const videoSource = getBestVideoSource();
+                    console.log('🛡️ Loading shield break video:', videoSource);
+                    
+                    // Adjust playback rate based on format (WebM now default with 6x speed)
+                    let playbackRate;
+                    if (videoSource.includes('.gif')) {
+                      playbackRate = 1; // GIFs can't be sped up
+                    } else {
+                      playbackRate = 12; // 6x speed for both WebM and MP4 on all devices
+                    }
+                    
+                    e.target.playbackRate = playbackRate;
+                    
+                    // Mobile-specific optimizations
+                    if (isMobile()) {
+                      e.target.style.willChange = 'transform';
+                      e.target.style.transform = 'translateZ(0)'; // Force hardware acceleration
+                    }
+                    
+                    e.target.play().catch(err => {
+                      console.log('Video play failed:', err);
+                      // Fallback: try with reduced playback rate
+                      e.target.playbackRate = 1; // Fallback to normal speed if 6x fails
+                      e.target.play().catch(fallbackErr => console.log('Fallback video play failed:', fallbackErr));
+                    });
                   } catch (error) {
                     console.error('Error setting up video playback:', error);
                   }
                 }}
                 onError={(e) => {
-                  console.error('Shield breaking video failed to load:', e);
-                  e.target.style.display = 'none';
+                  console.error('Shield breaking video failed to load:', e.target.src);
+                  
+                  // Try fallback formats
+                  const currentSrc = e.target.src;
+                  if (currentSrc.includes('.webm')) {
+                    console.log('🛡️ WebM failed, trying MP4...');
+                    e.target.src = SHIELD_BREAKING_SOURCES.mp4;
+                  } else if (currentSrc.includes('.mp4')) {
+                    console.log('🛡️ MP4 failed, trying GIF...');
+                    e.target.src = SHIELD_BREAKING_SOURCES.gif;
+                  } else {
+                    console.log('🛡️ All formats failed, hiding video');
+                    e.target.style.display = 'none';
+                  }
                 }}
-                onEnded={(e) => e.target.style.display = 'none'}
+                onEnded={(e) => {
+                  e.target.style.display = 'none';
+                  // Clean up mobile-specific styles
+                  if (isMobile()) {
+                    e.target.style.willChange = 'auto';
+                    e.target.style.transform = '';
+                  }
+                }}
               />
             </div>
           )}
@@ -857,9 +1000,12 @@ function App(){
   const [prizePool, setPrizePool] = useState(0);
   const [cardPrice, setCardPrice] = useState(10);
   const [shieldPricePercent, setShieldPricePercent] = useState(50);
+  const [quickPurchaseCount, setQuickPurchaseCount] = useState(2);
 
   // ensure we only end once
   const endPostedRef = useRef(false);
+  
+  // Track first load state to prevent redundant ball processing (removed - simplified logic)
 
   // Load pricing configuration on mount
   useEffect(() => {
@@ -973,7 +1119,7 @@ function App(){
     }
     
     pullSchedulerStatus();
-    const interval = setInterval(pullSchedulerStatus, 1500); // 1.5s for scheduler (less critical)
+    const interval = setInterval(pullSchedulerStatus, 1500); // Back to 1.5s for scheduler
     
     return () => {
       mounted = false;
@@ -1082,6 +1228,98 @@ function App(){
     setAvailable(a=>a.map(c=> selectedPool.has(c.id) ? ({...c, wantsShield:on}) : c ));
   }
 
+  // Quick purchase function - instantly purchase cards and shields
+  function quickPurchase(cardCount, shieldCount) {
+    // Check if purchases are blocked by scheduler
+    if (!canPurchaseCards) {
+      alert('Card purchases are blocked. Next game starting soon!');
+      return;
+    }
+    
+    if (!alias) {
+      alert('Please set your alias first.');
+      return;
+    }
+    
+    if (cardCount === 0 && shieldCount === 0) {
+      alert('Please select at least 1 card or shield.');
+      return;
+    }
+    
+    // Calculate total cost
+    const shieldCost = Math.round(cardPrice * (shieldPricePercent / 100) * 100) / 100;
+    const totalCost = Math.round((cardCount * cardPrice + shieldCount * shieldCost) * 100) / 100;
+    
+    if (wallet === null || wallet < totalCost) { 
+      alert(`Not enough coins. Need ${totalCost.toFixed(2)}, have ${wallet !== null ? wallet.toFixed(2) : 'unknown'}.`); 
+      return; 
+    }
+
+    // Create cards with shields
+    const newCards = [];
+    for (let i = 0; i < cardCount; i++) {
+      const card = makeCard(uid('c'), 'Quick Card', 3);
+      card.wantsShield = shieldCount > i; // First few cards get shields
+      newCards.push(card);
+    }
+
+    // Add to owned cards immediately (optimistic update)
+    setPlayer(p => ({...p, cards: [...p.cards, ...newCards]}));
+    
+    // Create cards in database
+    async function createQuickPurchaseCards() {
+      for (let i = 0; i < newCards.length; i++) {
+        const card = newCards[i];
+        
+        try {
+          const response = await fetch('/api/round/buy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              alias: alias,
+              cardName: card.name || 'Quick Card',
+              wantsShield: card.wantsShield || false
+            })
+          });
+          
+          const result = await response.json();
+          
+          if (response.ok && result.ok && result.cardId) {
+            // Update wallet with actual balance from server
+            if (result.newBalance !== undefined) {
+              setWallet(result.newBalance);
+            }
+            
+            // Update the local card with the database UUID
+            setPlayer(p => ({
+              ...p, 
+              cards: p.cards.map(c => 
+                c.id === card.id ? { ...c, id: result.cardId } : c
+              )
+            }));
+          } else if (!response.ok) {
+            // Handle error (e.g., insufficient balance)
+            alert(result.error || 'Failed to purchase card');
+            // Revert the optimistic update for this card
+            setPlayer(p => ({
+              ...p,
+              cards: p.cards.filter(c => c.id !== card.id)
+            }));
+          }
+        } catch (error) {
+          console.error('Quick purchase card creation failed:', error);
+          // Revert the optimistic update for this card
+          setPlayer(p => ({
+            ...p,
+            cards: p.cards.filter(c => c.id !== card.id)
+          }));
+        }
+      }
+    }
+    
+    createQuickPurchaseCards();
+  }
+
   // Owned management
   function pauseOwned(cardId){ 
     setPlayer(p=>({...p, cards:p.cards.map(c=>{
@@ -1116,12 +1354,37 @@ function App(){
       }catch{}
     }
 
+    // Request throttling to prevent too many simultaneous calls
+    let lastRequestTime = 0;
+    const minRequestInterval = 200; // Back to 200ms minimum between requests
+    
     async function pull(){
+      const now = Date.now();
+      const timeSinceLastRequest = now - lastRequestTime;
+      
+      // Throttle requests to prevent overwhelming the server
+      if (timeSinceLastRequest < minRequestInterval) {
+        return; // Skip this request if it's too soon
+      }
+      
+      lastRequestTime = now;
+      const pullStartTime = Date.now();
+      const pullTimestamp = new Date().toISOString();
+      
       let s = null;
       try{
+        const fetchStartTime = Date.now();
         const r=await fetch('/api/round/state?ts='+Date.now(), {cache:'no-store', headers:{Accept:'application/json'}});
+        const fetchEndTime = Date.now();
+        const fetchTime = fetchEndTime - fetchStartTime;
+        
         s=await r.json();
         if(!mounted) return;
+        
+        // Log fetch timing
+        if (fetchTime > 200) {
+          console.warn(`⚠️  SLOW API FETCH: ${fetchTime}ms at ${pullTimestamp}`);
+        }
 
 
         const newPhase = s.phase || 'setup';
@@ -1136,10 +1399,14 @@ function App(){
         }
 
         // RESET TO SETUP: clear purchases & selections, regenerate Available and force paint
-        if ((lastPhase !== 'setup' && newPhase === 'setup') || (newCalls.length < lastCount)) {
+        if (lastPhase !== 'setup' && newPhase === 'setup') {
           setPlayer({ id: uid('p'), cards: [] });
           setAvailable(freshAvail());
           setSelectedPool(new Set());
+          
+          // Reset lastCount when transitioning to setup phase
+          lastCount = 0;
+          console.log(`🔄 RESET TO SETUP: Reset lastCount to 0, called balls: ${newCalls.length}`);
           setShowHowTo(true);
           setSyncedWinner(null);
           setAsk(true);
@@ -1170,12 +1437,43 @@ function App(){
             .catch(err => console.error('Failed to fetch pricing:', err));
         }
 
-        // Apply new calls to owned cards
+        // Process new balls if we have more than before
         if (newCalls.length > lastCount) {
+          // Apply new calls to owned cards (only after first load)
           const news = newCalls.slice(lastCount);
+          const newBallTime = Date.now();
+          const newBallTimestamp = new Date().toISOString();
+          
+          console.log(`🎲 NEW BALL(S) DETECTED:`);
+          console.log(`  📅 Timestamp: ${newBallTimestamp}`);
+          console.log(`  ⏰ Detection Time: ${newBallTime}ms`);
+          console.log(`  🔢 New Balls: [${news.join(', ')}]`);
+          console.log(`  📊 Total Called: ${newCalls.length}/25`);
+          console.log(`  🎯 All Called Numbers: [${newCalls.join(', ')}]`);
+          console.log(`  🔍 LastCount: ${lastCount} -> ${newCalls.length}`);
+          
+          // Log timing since last detection
+          if (window.lastBallDetectionTime) {
+            const timeSinceLastBall = newBallTime - window.lastBallDetectionTime;
+            console.log(`  ⏱️  Time Since Last Ball: ${timeSinceLastBall}ms`);
+            
+            // Check if timing is consistent with expected speed
+            const expectedTime = speedMs || 800;
+            const timingVariance = Math.abs(timeSinceLastBall - expectedTime);
+            if (timingVariance > 100) {
+              console.warn(`⚠️  TIMING VARIANCE: Expected ~${expectedTime}ms, got ${timeSinceLastBall}ms (variance: ${timingVariance}ms)`);
+            } else {
+              console.log(`✅ TIMING OK: ${timeSinceLastBall}ms (expected ~${expectedTime}ms)`);
+            }
+          }
+          window.lastBallDetectionTime = newBallTime;
+          
           let next = player.cards;
           news.forEach(n => { next = applyCallToCards(next, n, audio, volume); });
           setPlayer(p=>({...p, cards: next}));
+          
+          // CRITICAL: Update lastCount immediately after processing new balls
+          lastCount = newCalls.length;
 
           // Trigger rolling ball animation for the latest called number
           if (news.length > 0) {
@@ -1203,6 +1501,9 @@ function App(){
               }).catch(()=>{});
             }
           }
+        } else {
+          // No new balls detected - log for debugging
+          console.log(`🔍 NO NEW BALLS: lastCount=${lastCount}, newCalls.length=${newCalls.length}`);
         }
 
         // End-game detection is handled entirely by the server
@@ -1224,9 +1525,9 @@ function App(){
         //     .catch(()=>{});
         // }
 
-        lastPhase = newPhase; lastCount = newCalls.length;
-        setPhase(newPhase);
-        setSpeedMs(Number(s.speed_ms)||800);
+          lastPhase = newPhase;
+          setPhase(newPhase);
+          setSpeedMs(Number(s.speed_ms)||800);
         
         // Update called numbers, but preserve history during setup phase
         // Only clear history when we detect a completely new round (different round ID)
@@ -1312,8 +1613,29 @@ function App(){
     }
 
     pull();
-    const id = setInterval(pull, 800); // Slightly faster polling for better responsiveness
-    return ()=>{ mounted=false; clearInterval(id); };
+    
+    // Smart polling: faster when game is live, slower when idle
+    const getPollingInterval = () => {
+      if (phase === 'live') return 800; // Back to 800ms during live games for smooth gameplay
+      return 1500; // Back to 1500ms during setup/ended phases
+    };
+    
+    let id = setInterval(pull, getPollingInterval());
+    
+    // Dynamic polling adjustment
+    const adjustPolling = () => {
+      clearInterval(id);
+      id = setInterval(pull, getPollingInterval());
+    };
+    
+    // Adjust polling when phase changes
+    const phaseCheckInterval = setInterval(adjustPolling, 2000);
+    
+    return ()=>{ 
+      mounted=false; 
+      clearInterval(id); 
+      clearInterval(phaseCheckInterval);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player.cards, audio, volume, alias]);
 
@@ -1583,13 +1905,88 @@ function App(){
                   </div>
                 )}
                 
-                <div className="row" style={{flexWrap:'wrap', gap:8}}>
-                  <div className="muted" style={{marginRight:'auto'}}>Purchase Panel</div>
-                  <input id="genN" className="chip" style={{padding:'8px 10px'}} type="number" min="1" max="12" defaultValue="2"/>
-                  <button className="btn" onClick={()=>{ const el=document.getElementById('genN'); generateCards(Number(el?.value)||2); }}>Generate n</button>
-                  {/* bulk shields for SELECTED AVAILABLE */}
-                  <button className="btn" onClick={()=>shieldSelectedAvailable(true)} disabled={selectedPool.size===0}>Shield selected</button>
-                  <button className="btn" onClick={()=>shieldSelectedAvailable(false)} disabled={selectedPool.size===0}>Unshield selected</button>
+                {/* 1-Click/Tap Purchase Buttons */}
+                <div style={{marginTop: '12px', marginBottom: '8px'}}>
+                  <div className="muted" style={{marginBottom: '8px', fontSize: '13px'}}>
+                    {/Mobi|Android/i.test(navigator.userAgent) ? '1-tap purchase' : '1-click purchase'}
+                  </div>
+                  <div className="row" style={{flexWrap:'wrap', gap:6}}>
+                    <button 
+                      className="btn" 
+                      style={{background: '#f0f9ff', borderColor: '#0ea5e9', color: '#0c4a6e', fontSize: '12px', padding: '6px 10px'}}
+                      onClick={() => quickPurchase(4, 0)}
+                      disabled={!canPurchaseCards || wallet === null}
+                    >
+                      4 Cards - {(cardPrice * 4).toFixed(1)} coins
+                    </button>
+                    <button 
+                      className="btn primary" 
+                      style={{background: '#fef3c7', borderColor: '#f59e0b', color: '#92400e', fontSize: '12px', padding: '6px 10px', fontWeight: 'bold'}}
+                      onClick={() => quickPurchase(4, 4)}
+                      disabled={!canPurchaseCards || wallet === null}
+                    >
+                      4 Cards & shields Pack - {(cardPrice * 4 + (cardPrice * 4) * (shieldPricePercent / 100)).toFixed(1)} coins
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Quick Purchase Slider */}
+                <div style={{marginTop: '25px', marginBottom: '8px'}}>
+                  <div className="muted" style={{marginBottom: '8px', fontSize: '13px'}}>Quick Purchase</div>
+                  <div style={{background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px', marginBottom: '8px'}}>
+                    <div className="row" style={{justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
+                      <span style={{fontSize: '14px', fontWeight: '600', color: '#1e293b'}}>Cards & Shields</span>
+                      <span style={{fontSize: '12px', color: '#64748b'}}>
+                        {(() => {
+                          const cardCost = cardPrice * quickPurchaseCount;
+                          const shieldCost = (cardPrice * quickPurchaseCount) * (shieldPricePercent / 100);
+                          return `${(cardCost + shieldCost).toFixed(1)} coins`;
+                        })()}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="4"
+                      value={quickPurchaseCount}
+                      onChange={(e) => setQuickPurchaseCount(Number(e.target.value))}
+                      style={{
+                        width: '100%',
+                        height: '6px',
+                        borderRadius: '3px',
+                        background: '#e2e8f0',
+                        outline: 'none',
+                        appearance: 'none',
+                        cursor: 'pointer'
+                      }}
+                    />
+                    <div className="row" style={{justifyContent: 'space-between', marginTop: '4px'}}>
+                      <span style={{fontSize: '11px', color: '#64748b'}}>1</span>
+                      <span style={{fontSize: '12px', fontWeight: '600', color: '#1e293b'}}>
+                        {quickPurchaseCount} Cards + {quickPurchaseCount} Shields
+                      </span>
+                      <span style={{fontSize: '11px', color: '#64748b'}}>4</span>
+                    </div>
+                    <button 
+                      className="btn primary" 
+                      style={{
+                        width: '100%',
+                        marginTop: '8px',
+                        padding: '8px 12px',
+                        fontSize: '13px',
+                        fontWeight: '600'
+                      }}
+                      onClick={() => quickPurchase(quickPurchaseCount, quickPurchaseCount)}
+                      disabled={!canPurchaseCards || wallet === null || quickPurchaseCount === 0}
+                    >
+                      Buy {quickPurchaseCount} Cards + {quickPurchaseCount} Shields
+                    </button>
+                  </div>
+                </div>
+
+                {/* Custom Purchase */}
+                <div style={{marginTop: '25px', marginBottom: '8px'}}>
+                  <div className="muted" style={{marginBottom: '8px', fontSize: '13px'}}>Custom Purchase</div>
                   <button className="btn primary" onClick={buySelected} disabled={selectedPool.size===0 || wallet === null}>Buy selected</button>
                 </div>
                 

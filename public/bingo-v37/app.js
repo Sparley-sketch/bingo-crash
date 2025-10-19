@@ -1087,7 +1087,14 @@ function App(){
           
           // Start client-side countdown for smooth updates
           if (status.timeUntilNextGame !== null && status.timeUntilNextGame > 0) {
-            setClientTimeUntilNextGame(status.timeUntilNextGame);
+            // Only update client countdown if server countdown is higher than current client countdown
+            // This prevents the "jump back" issue when countdown reaches 0
+            setClientTimeUntilNextGame(prev => {
+              if (prev === null || prev > status.timeUntilNextGame || prev <= 0) {
+                return status.timeUntilNextGame;
+              }
+              return prev; // Keep current client countdown if it's still valid
+            });
             
             // Clear existing interval
             if (countdownIntervalRef.current) {

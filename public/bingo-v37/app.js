@@ -832,7 +832,7 @@ function CardView({
                     if (videoSource.includes('.gif')) {
                       playbackRate = 1; // GIFs can't be sped up
                     } else {
-                      playbackRate = 12; // 6x speed for both WebM and MP4 on all devices
+                      playbackRate = 8; // 8x speed for both WebM and MP4 on all devices
                     }
                     
                     e.target.playbackRate = playbackRate;

@@ -1,11 +1,17 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { tableNames } from '@/lib/config';
+import { verifyAdminAuth } from '@/lib/adminAuth';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
+    // Verify admin authentication
+    const authError = await verifyAdminAuth(req);
+    if (authError) {
+      return authError;
+    }
     // Get speed_ms from config
     let speedMs = 800; // default
     try {

@@ -1,12 +1,19 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { tableNames } from '@/lib/config';
+import { verifyAdminAuth } from '@/lib/adminAuth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    // Verify admin authentication
+    const authError = await verifyAdminAuth(req);
+    if (authError) {
+      return authError;
+    }
+    
     const body = await req.json().catch(() => ({}));
     const key = String(body?.key ?? 'round.duration_ms');
     const valRaw = String(body?.value ?? '1500');

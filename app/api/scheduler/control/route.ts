@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { tableNames } from '@/lib/config';
+import { verifyAdminAuth } from '@/lib/adminAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
+    // Verify admin authentication
+    const authError = await verifyAdminAuth(req);
+    if (authError) {
+      return authError;
+    }
+    
     const body = await req.json().catch(() => ({}));
     const { action, preBuyMinutes, winnerDisplaySeconds } = body;
 

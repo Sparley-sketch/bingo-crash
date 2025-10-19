@@ -1148,7 +1148,7 @@ function App(){
     }
     
     pullSchedulerStatus();
-    const interval = setInterval(pullSchedulerStatus, 1500); // Back to 1.5s for scheduler
+    const interval = setInterval(pullSchedulerStatus, 5000); // Reduced to 5s for scheduler
     
     return () => {
       mounted = false;
@@ -1385,7 +1385,7 @@ function App(){
 
     // Request throttling to prevent too many simultaneous calls
     let lastRequestTime = 0;
-    const minRequestInterval = 200; // Back to 200ms minimum between requests
+    const minRequestInterval = 1000; // Increased to 1s minimum between requests
     
     async function pull(){
       const now = Date.now();
@@ -1645,8 +1645,8 @@ function App(){
     
     // Smart polling: faster when game is live, slower when idle
     const getPollingInterval = () => {
-      if (phase === 'live') return 800; // Back to 800ms during live games for smooth gameplay
-      return 1500; // Back to 1500ms during setup/ended phases
+      if (phase === 'live') return 2000; // Increased to 2s during live games
+      return 3000; // Increased to 3s during setup/ended phases
     };
     
     let id = setInterval(pull, getPollingInterval());
@@ -1658,7 +1658,7 @@ function App(){
     };
     
     // Adjust polling when phase changes
-    const phaseCheckInterval = setInterval(adjustPolling, 2000);
+    const phaseCheckInterval = setInterval(adjustPolling, 5000);
     
     return ()=>{ 
       mounted=false; 
@@ -1808,8 +1808,8 @@ function App(){
                     // Initial render
                     updateModal();
                     
-                    // Set up live updates - update every 300ms for better responsiveness
-                    const updateInterval = setInterval(updateModal, 300);
+                    // Set up live updates - update every 2s for better performance
+                    const updateInterval = setInterval(updateModal, 2000);
                     
                     // Clean up interval when modal is closed
                     const cleanup = () => {

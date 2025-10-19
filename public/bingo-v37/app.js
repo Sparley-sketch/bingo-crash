@@ -1643,10 +1643,16 @@ function App(){
 
     pull();
     
-    // Smart polling: faster when game is live, slower when idle
+    // Smart polling: faster when game is live or countdown is near zero
     const getPollingInterval = () => {
-      if (phase === 'live') return 2000; // Increased to 2s during live games
-      return 3000; // Increased to 3s during setup/ended phases
+      if (phase === 'live') return 1000; // 1s during live games for smooth gameplay
+      
+      // During setup phase, poll more frequently when countdown is near zero
+      if (phase === 'setup' && (clientTimeUntilNextGame || timeUntilNextGame) <= 10) {
+        return 500; // 500ms when countdown is 10 seconds or less
+      }
+      
+      return 2000; // 2s during normal setup/ended phases
     };
     
     let id = setInterval(pull, getPollingInterval());
@@ -1657,8 +1663,8 @@ function App(){
       id = setInterval(pull, getPollingInterval());
     };
     
-    // Adjust polling when phase changes
-    const phaseCheckInterval = setInterval(adjustPolling, 5000);
+    // Adjust polling when phase changes or countdown is near zero
+    const phaseCheckInterval = setInterval(adjustPolling, 1000);
     
     return ()=>{ 
       mounted=false; 
@@ -1666,7 +1672,7 @@ function App(){
       clearInterval(phaseCheckInterval);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [player.cards, audio, volume, alias]);
+  }, [player.cards, audio, volume, alias, phase, clientTimeUntilNextGame, timeUntilNextGame]);
 
   // Preload shield video when game starts
   React.useEffect(() => {
@@ -1937,78 +1943,25 @@ function App(){
                 {/* 1-Click/Tap Purchase Buttons */}
                 <div style={{marginTop: '12px', marginBottom: '8px'}}>
                   <div className="muted" style={{marginBottom: '8px', fontSize: '13px'}}>
-                    {/Mobi|Android/i.test(navigator.userAgent) ? '1-tap purchase' : '1-click purchase'}
+                    {/Mobi|Android/i.test(navigator.userAgent) ? '1-tap purchase: 4 cards' : '1-click purchase: 4 cards'}
                   </div>
                   <div className="row" style={{flexWrap:'wrap', gap:6}}>
-                    <button 
-                      className="btn" 
-                      style={{background: '#f0f9ff', borderColor: '#0ea5e9', color: '#0c4a6e', fontSize: '12px', padding: '6px 10px'}}
-                      onClick={() => quickPurchase(4, 0)}
-                      disabled={!canPurchaseCards || wallet === null}
-                    >
-                      4 Cards - {(cardPrice * 4).toFixed(1)} coins
-                    </button>
                     <button 
                       className="btn primary" 
                       style={{background: '#fef3c7', borderColor: '#f59e0b', color: '#92400e', fontSize: '12px', padding: '6px 10px', fontWeight: 'bold'}}
                       onClick={() => quickPurchase(4, 4)}
                       disabled={!canPurchaseCards || wallet === null}
                     >
-                      4 Cards & shields Pack - {(cardPrice * 4 + (cardPrice * 4) * (shieldPricePercent / 100)).toFixed(1)} coins
+                      Inc. shields - {(cardPrice * 4 + (cardPrice * 4) * (shieldPricePercent / 100)).toFixed(1)} coins
                     </button>
-                  </div>
-                </div>
-                
-                {/* Quick Purchase Slider */}
-                <div style={{marginTop: '25px', marginBottom: '8px'}}>
-                  <div className="muted" style={{marginBottom: '8px', fontSize: '13px'}}>Quick Purchase</div>
-                  <div style={{background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px', marginBottom: '8px'}}>
-                    <div className="row" style={{justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
-                      <span style={{fontSize: '14px', fontWeight: '600', color: '#1e293b'}}>Cards & Shields</span>
-                      <span style={{fontSize: '12px', color: '#64748b'}}>
-                        {(() => {
-                          const cardCost = cardPrice * quickPurchaseCount;
-                          const shieldCost = (cardPrice * quickPurchaseCount) * (shieldPricePercent / 100);
-                          return `${(cardCost + shieldCost).toFixed(1)} coins`;
-                        })()}
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="1"
-                      max="4"
-                      value={quickPurchaseCount}
-                      onChange={(e) => setQuickPurchaseCount(Number(e.target.value))}
-                      style={{
-                        width: '100%',
-                        height: '6px',
-                        borderRadius: '3px',
-                        background: '#e2e8f0',
-                        outline: 'none',
-                        appearance: 'none',
-                        cursor: 'pointer'
-                      }}
-                    />
-                    <div className="row" style={{justifyContent: 'space-between', marginTop: '4px'}}>
-                      <span style={{fontSize: '11px', color: '#64748b'}}>1</span>
-                      <span style={{fontSize: '12px', fontWeight: '600', color: '#1e293b'}}>
-                        {quickPurchaseCount} Cards + {quickPurchaseCount} Shields
-                      </span>
-                      <span style={{fontSize: '11px', color: '#64748b'}}>4</span>
-                    </div>
-                    <button 
-                      className="btn primary" 
-                      style={{
-                        width: '100%',
-                        marginTop: '8px',
-                        padding: '8px 12px',
-                        fontSize: '13px',
-                        fontWeight: '600'
-                      }}
-                      onClick={() => quickPurchase(quickPurchaseCount, quickPurchaseCount)}
-                      disabled={!canPurchaseCards || wallet === null || quickPurchaseCount === 0}
+                    
+					<button 
+                      className="btn" 
+                      style={{background: '#f0f9ff', borderColor: '#0ea5e9', color: '#0c4a6e', fontSize: '12px', padding: '6px 10px'}}
+                      onClick={() => quickPurchase(4, 0)}
+                      disabled={!canPurchaseCards || wallet === null}
                     >
-                      Buy {quickPurchaseCount} Cards + {quickPurchaseCount} Shields
+                      No Shields - {(cardPrice * 4).toFixed(1)} coins
                     </button>
                   </div>
                 </div>

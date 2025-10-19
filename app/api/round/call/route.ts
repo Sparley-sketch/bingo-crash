@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { tableNames } from '@/lib/config';
 import { getCertifiedRandom } from '@/lib/certifiedRNG';
-import { verifyAdminAuth } from '@/lib/adminAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,11 +10,7 @@ export async function POST(req: NextRequest) {
   const callTimestamp = new Date().toISOString();
   
   try {
-    // Verify admin authentication
-    const authError = await verifyAdminAuth(req);
-    if (authError) {
-      return authError;
-    }
+    // Note: This endpoint is called by the game client during gameplay, not admin users
     // Get current round - optimized query
     const { data: round, error: roundError } = await supabaseAdmin
       .from(tableNames.rounds)

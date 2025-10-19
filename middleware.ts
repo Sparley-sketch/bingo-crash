@@ -29,8 +29,10 @@ export async function middleware(req: NextRequest) {
   
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
   
-  // Temporarily disabled session validation to allow login to work
-  // The AdminWrapper.tsx will handle authentication on the server side
+  // Temporarily disabled middleware session validation for admin routes
+  // The AdminWrapper.tsx handles authentication on the server side
+  // The backend API endpoints are protected with verifyAdminAuth()
+  // This prevents middleware conflicts with the login flow
   // if (req.nextUrl.pathname.startsWith('/admin') && 
   //     !req.nextUrl.pathname.includes('/admin/login') && 
   //     !req.nextUrl.pathname.includes('/admin/forbidden')) {
@@ -46,7 +48,7 @@ export const config = {
   matcher: [
      '/admin',
      '/admin/((?!login|forbidden).*)',
-     '/api/config/:path*', 
-     '/api/admin/:path*'
+     // Admin API endpoints are now protected by backend authentication
+     // No need to include them in middleware matcher
   ],
 };

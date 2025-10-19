@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
             // Update the round with the new called number - optimized update
             const { error: updateError } = await supabaseAdmin
               .from(tableNames.rounds)
-              .update({ called: newCalledNumbers, updated_at: new Date().toISOString() })
+              .update({ called: newCalledNumbers })
               .eq('id', round.id)
               .select('id')
               .single();

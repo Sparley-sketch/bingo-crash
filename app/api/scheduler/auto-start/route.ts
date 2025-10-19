@@ -121,13 +121,18 @@ export async function POST(req: NextRequest) {
             // If current round is live, end it first before creating new round
             if (currentRound && currentRound.phase === 'live') {
               console.log('Ending current live round before creating new round');
-              await supabaseAdmin
+              const { error: endError } = await supabaseAdmin
                 .from(tableNames.rounds)
                 .update({ 
                   phase: 'ended',
                   ended_at: new Date().toISOString()
                 })
                 .eq('id', currentRound.id);
+              
+              if (endError) {
+                console.error('Error ending current round:', endError);
+                return NextResponse.json({ error: 'Failed to end current round' }, { status: 500 });
+              }
             }
 
             // Always create a new round if the current round has ended
@@ -154,6 +159,14 @@ export async function POST(req: NextRequest) {
 
               if (insertError) {
                 console.error('Error creating new round:', insertError);
+                // Handle unique constraint violation (multiple schedulers trying to create rounds)
+                if (insertError.code === '23505') {
+                  console.log('Unique constraint violation - another scheduler already created a live round');
+                  return NextResponse.json({ 
+                    message: 'Game already started by another scheduler',
+                    started: true 
+                  }, { status: 200 });
+                }
                 return NextResponse.json({ error: `Failed to create new round: ${insertError.message}` }, { status: 500 });
               }
               console.log('New round created:', newRound.id);
@@ -178,6 +191,14 @@ export async function POST(req: NextRequest) {
 
               if (updateError) {
                 console.error('Error updating round:', updateError);
+                // Handle unique constraint violation (multiple schedulers trying to update rounds)
+                if (updateError.code === '23505') {
+                  console.log('Unique constraint violation - another scheduler already updated this round');
+                  return NextResponse.json({ 
+                    message: 'Game already started by another scheduler',
+                    started: true 
+                  }, { status: 200 });
+                }
                 return NextResponse.json({ error: `Failed to update round: ${updateError.message}` }, { status: 500 });
               }
               console.log('Round updated to live:', currentRound.id);

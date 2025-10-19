@@ -332,14 +332,37 @@ export default function AdminClient() {
   // Auto-run calls while LIVE
   React.useEffect(() => {
     if (!autoRun || state?.phase !== 'live') return;
+    
+    const speedMs = state!.speed_ms || 800;
+    console.log(`🚀 ADMIN AUTO-RUN STARTED: Speed ${speedMs}ms`);
+    
     const id = setInterval(() => {
+      const callStartTime = Date.now();
+      const callTimestamp = new Date().toISOString();
+      
+      console.log(`🎯 ADMIN TRIGGERING BALL CALL:`);
+      console.log(`  📅 Timestamp: ${callTimestamp}`);
+      console.log(`  ⏰ Scheduled Time: ${callStartTime}ms`);
+      console.log(`  ⏱️  Expected Speed: ${speedMs}ms`);
+      
       fetch('/api/round/call?ts=' + Date.now(), {
         method: 'POST',
         cache: 'no-store',
         headers: { Accept: 'application/json' },
-      }).then(() => fetchStateOnce());
-    }, state!.speed_ms || 800);
-    return () => clearInterval(id);
+      }).then(() => {
+        const callEndTime = Date.now();
+        const actualCallTime = callEndTime - callStartTime;
+        console.log(`🏁 ADMIN BALL CALL COMPLETED: ${actualCallTime}ms`);
+        fetchStateOnce();
+      }).catch(error => {
+        console.error('❌ ADMIN BALL CALL FAILED:', error);
+      });
+    }, speedMs);
+    
+    return () => {
+      console.log(`🛑 ADMIN AUTO-RUN STOPPED`);
+      clearInterval(id);
+    };
   }, [autoRun, state?.phase, state?.speed_ms]);
 
   // Scheduler status polling
@@ -417,7 +440,7 @@ export default function AdminClient() {
     }
     
     handleSchedulerCycle();
-    const t = setInterval(handleSchedulerCycle, 1000); // Check every second
+    const t = setInterval(handleSchedulerCycle, 1000); // Back to every second
     return () => { stop = true; clearInterval(t); };
   }, [schedulerConfig?.enabled]);
 

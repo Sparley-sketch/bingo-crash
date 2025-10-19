@@ -1155,7 +1155,7 @@ function App(){
     }
     
     pullSchedulerStatus();
-    const interval = setInterval(pullSchedulerStatus, 5000); // Reduced to 5s for scheduler
+    const interval = setInterval(pullSchedulerStatus, 5000); // 5s for scheduler
     
     return () => {
       mounted = false;
@@ -1650,28 +1650,45 @@ function App(){
 
     pull();
     
-    // Smart polling: faster when game is live or countdown is near zero
+    // Smart polling: balance performance with functionality
     const getPollingInterval = () => {
-      if (phase === 'live') return 1000; // 1s during live games for smooth gameplay
+      if (phase === 'live') return 800; // 800ms during live games for smooth gameplay
       
       // During setup phase, poll more frequently when countdown is near zero
-      if (phase === 'setup' && (clientTimeUntilNextGame || timeUntilNextGame) <= 10) {
-        return 500; // 500ms when countdown is 10 seconds or less
+      if (phase === 'setup' && (clientTimeUntilNextGame || timeUntilNextGame) <= 15) {
+        return 500; // 500ms when countdown is 15 seconds or less
       }
       
-      return 2000; // 2s during normal setup/ended phases
+      // During setup phase, moderate polling for countdown updates
+      if (phase === 'setup') {
+        return 2000; // 2s during normal setup phase
+      }
+      
+      return 3000; // 3s during ended phases
     };
     
-    let id = setInterval(pull, getPollingInterval());
+    let id = null;
+    const startPolling = () => {
+      const interval = getPollingInterval();
+      if (interval > 0) {
+        id = setInterval(pull, interval);
+      } else {
+        id = null;
+      }
+    };
+    
+    startPolling();
     
     // Dynamic polling adjustment
     const adjustPolling = () => {
-      clearInterval(id);
-      id = setInterval(pull, getPollingInterval());
+      if (id) {
+        clearInterval(id);
+      }
+      startPolling();
     };
     
     // Adjust polling when phase changes or countdown is near zero
-    const phaseCheckInterval = setInterval(adjustPolling, 1000);
+    const phaseCheckInterval = setInterval(adjustPolling, 2000);
     
     return ()=>{ 
       mounted=false; 

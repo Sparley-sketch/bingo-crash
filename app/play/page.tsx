@@ -48,7 +48,7 @@ export default function PlayPage() {
     // Initial check
     checkGameAccess();
 
-    // Poll for game access changes every 2 seconds
+    // Poll for game access changes every 20 seconds (security requirement)
     const interval = setInterval(async () => {
       try {
         const accessRes = await fetch('/api/game-access', { cache: 'no-store' });
@@ -65,7 +65,7 @@ export default function PlayPage() {
       } catch (error) {
         console.error('Error polling game access:', error);
       }
-    }, 2000);
+    }, 20000); // 20 seconds instead of 2 seconds
 
     return () => clearInterval(interval);
   }, [router]);

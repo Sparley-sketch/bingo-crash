@@ -17,6 +17,7 @@ type SchedulerStatus = {
   winnerDisplaySeconds: number;
   purchaseBlockSeconds: number;
 };
+type WalletInfo = { balance: number | null; hasPlayer: boolean };
 
 // Simple in-memory cache for game status (short-lived)
 let lastGameStatus: any = null;
@@ -216,7 +217,7 @@ export async function GET(req: Request) {
     }
 
     // Process wallet balance
-    let wallet = {
+    let wallet: WalletInfo = {
       balance: null,
       hasPlayer: false
     };

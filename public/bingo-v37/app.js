@@ -1336,7 +1336,8 @@ function App(){
         const s = gameStatus.roundState;
         const schedulerStatus = gameStatus.schedulerStatus;
         const pricing = gameStatus.pricing;
-        const wallet = gameStatus.wallet;
+        const walletInfo = gameStatus.wallet;
+
 
         const newPhase = s.phase || 'setup';
         const newCalls = Array.isArray(s.called) ? s.called : [];
@@ -1354,9 +1355,9 @@ function App(){
         }
         
         // Update wallet (only if alias provided and balance changed)
-        if (alias && wallet.balance !== null && wallet.balance !== wallet) {
-          setWallet(wallet.balance);
-        }
+		if (alias && walletInfo && walletInfo.balance !== null && walletInfo.balance !== wallet) {
+		setWallet(walletInfo.balance);
+		}
         
         // Update prize pool
         if (s.prize_pool !== undefined) {

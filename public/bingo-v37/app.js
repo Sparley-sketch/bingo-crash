@@ -971,24 +971,21 @@ function App(){
   const ownedAtStartRef = useRef(0);
   const postedOutRef    = useRef(false);
 
-  // Fetch wallet balance when component mounts or alias changes
-  useEffect(() => {
-    if (alias) {
-      console.log('Fetching wallet balance for alias:', alias);
-      fetch(`/api/player/wallet?alias=${encodeURIComponent(alias)}&ts=${Date.now()}`, { cache: 'no-store' })
-        .then(r => r.json())
-        .then(data => {
-          console.log('Wallet API response:', data);
-          if (data.balance !== undefined) {
-            setWallet(data.balance);
-            console.log('Wallet balance loaded on mount/alias change:', data.balance);
-          }
-        })
-        .catch(err => console.error('Failed to fetch wallet balance:', err));
-    } else {
-      console.log('No alias set, wallet will remain null');
+  // Wallet balance will be fetched via merged API endpoint
+  // Only fetch separately when needed (purchases, wins)
+  const fetchWalletBalance = async () => {
+    if (!alias) return;
+    
+    try {
+      const response = await fetch(`/api/player/wallet?alias=${encodeURIComponent(alias)}&ts=${Date.now()}`, { cache: 'no-store' });
+      const data = await response.json();
+      if (data.balance !== undefined) {
+        setWallet(data.balance);
+      }
+    } catch (err) {
+      console.error('Failed to fetch wallet balance:', err);
     }
-  }, [alias]);
+  };
 
   // Available (pre-buy) vs Owned (purchased)
   const freshAvail = () => Array.from({length:4},()=>makeCard(uid('pool'),'', 3)); // start with 4 visible
@@ -1036,22 +1033,20 @@ function App(){
   
   // Track first load state to prevent redundant ball processing (removed - simplified logic)
 
-  // Load pricing configuration on mount
-  useEffect(() => {
-    async function loadPricing() {
-      try {
-        const r = await fetch('/api/pricing', { cache: 'no-store' });
-        if (r.ok) {
-          const data = await r.json();
-          setCardPrice(data.cardPrice || 10);
-          setShieldPricePercent(data.shieldPricePercent || 50);
-        }
-      } catch (error) {
-        console.error('Failed to load pricing:', error);
+  // Pricing configuration will be loaded via merged API endpoint
+  // Only load separately if needed (admin changes between games)
+  const loadPricingConfig = async () => {
+    try {
+      const r = await fetch('/api/pricing', { cache: 'no-store' });
+      if (r.ok) {
+        const data = await r.json();
+        setCardPrice(data.cardPrice || 10);
+        setShieldPricePercent(data.shieldPricePercent || 50);
       }
+    } catch (error) {
+      console.error('Failed to load pricing:', error);
     }
-    loadPricing();
-  }, []);
+  };
 
   // Handle "don't show again" checkbox
   function handleDontShowAgain(event) {
@@ -1068,103 +1063,8 @@ function App(){
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   }
 
-  // Poll scheduler status with prize pool updates
-  useEffect(() => {
-    let mounted = true;
-    let lastPrizePoolUpdate = 0;
-    
-    async function pullSchedulerStatus() {
-      try {
-        const r = await fetch('/api/scheduler/status?ts=' + Date.now(), { 
-          cache: 'no-store', 
-          headers: { Accept: 'application/json' } 
-        });
-        const status = await r.json();
-        if (mounted) {
-          setSchedulerStatus(status);
-          setTimeUntilNextGame(status.timeUntilNextGame);
-          setCanPurchaseCards(status.canPurchaseCards);
-          
-          // Start client-side countdown for smooth updates
-          if (status.timeUntilNextGame !== null && status.timeUntilNextGame > 0) {
-            // Only update client countdown if server countdown is higher than current client countdown
-            // This prevents the "jump back" issue when countdown reaches 0
-            setClientTimeUntilNextGame(prev => {
-              if (prev === null || prev > status.timeUntilNextGame || prev <= 0) {
-                return status.timeUntilNextGame;
-              }
-              return prev; // Keep current client countdown if it's still valid
-            });
-            
-            // Clear existing interval
-            if (countdownIntervalRef.current) {
-              clearInterval(countdownIntervalRef.current);
-            }
-            
-            // Start new countdown
-            countdownIntervalRef.current = setInterval(() => {
-              setClientTimeUntilNextGame(prev => {
-                if (prev === null || prev <= 0) {
-                  clearInterval(countdownIntervalRef.current);
-                  return 0;
-                }
-                return prev - 1;
-              });
-            }, 1000);
-          } else {
-            setClientTimeUntilNextGame(null);
-            if (countdownIntervalRef.current) {
-              clearInterval(countdownIntervalRef.current);
-            }
-          }
-          
-          // Update prize pool during setup phase with specific timing
-          const now = Date.now();
-          const timeSinceLastUpdate = now - lastPrizePoolUpdate;
-          
-          // Update prize pool every 5 seconds during pre-buy, or 2 seconds before game starts
-          if (status.enabled && status.currentPhase === 'setup' && status.timeUntilNextGame !== null) {
-            const shouldUpdate = 
-              timeSinceLastUpdate >= 5000 || // Every 5 seconds
-              status.timeUntilNextGame <= 2; // 2 seconds before game starts
-              
-            if (shouldUpdate) {
-              try {
-                const prizeResponse = await fetch('/api/round/state?ts=' + now, { 
-                  cache: 'no-store',
-                  headers: { Accept: 'application/json' }
-                });
-                if (prizeResponse.ok) {
-                  const roundData = await prizeResponse.json();
-                  if (roundData.prize_pool !== undefined) {
-                    const pool = Number(roundData.prize_pool) || 0;
-                    setPrizePool(pool);
-                    lastPrizePoolUpdate = now;
-                    console.log(`Prize pool updated during setup: ${pool} (timeUntilNext: ${status.timeUntilNextGame}s)`);
-                  }
-                }
-              } catch (error) {
-                console.error('Failed to fetch prize pool during setup:', error);
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch scheduler status:', error);
-      }
-    }
-    
-    pullSchedulerStatus();
-    const interval = setInterval(pullSchedulerStatus, 5000); // 5s for scheduler
-    
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-      if (countdownIntervalRef.current) {
-        clearInterval(countdownIntervalRef.current);
-      }
-    };
-  }, []);
+  // This will be replaced by the main merged API polling
+  // Keep this as fallback for now, but it will be removed
 
 
   // ---------- Pre-buy actions (include shields) ----------
@@ -1227,6 +1127,9 @@ function App(){
               // Update wallet with actual balance from server
               if (result.newBalance !== undefined) {
                 setWallet(result.newBalance);
+              } else {
+                // Fallback: fetch wallet balance if not provided in response
+                fetchWalletBalance();
               }
               
               // Update the local card with the database UUID
@@ -1324,6 +1227,9 @@ function App(){
             // Update wallet with actual balance from server
             if (result.newBalance !== undefined) {
               setWallet(result.newBalance);
+            } else {
+              // Fallback: fetch wallet balance if not provided in response
+              fetchWalletBalance();
             }
             
             // Update the local card with the database UUID
@@ -1378,7 +1284,7 @@ function App(){
   }
 
 
-  // Poll state + transitions + global winner sync + stop caller on game over
+  // Main polling using merged API endpoint
   useEffect(()=>{
     let mounted=true, lastPhase='setup', lastCount=0;
 
@@ -1392,7 +1298,7 @@ function App(){
 
     // Request throttling to prevent too many simultaneous calls
     let lastRequestTime = 0;
-    const minRequestInterval = 1000; // Increased to 1s minimum between requests
+    const minRequestInterval = 1000; // 1s minimum between requests
     
     async function pull(){
       const now = Date.now();
@@ -1407,31 +1313,55 @@ function App(){
       const pullStartTime = Date.now();
       const pullTimestamp = new Date().toISOString();
       
-      let s = null;
+      let gameStatus = null;
       try{
         const fetchStartTime = Date.now();
-        const r=await fetch('/api/round/state?ts='+Date.now(), {cache:'no-store', headers:{Accept:'application/json'}});
+        // Use merged API endpoint with alias parameter
+        const url = alias 
+          ? `/api/game/status?alias=${encodeURIComponent(alias)}&ts=${Date.now()}`
+          : `/api/game/status?ts=${Date.now()}`;
+        const r=await fetch(url, {cache:'no-store', headers:{Accept:'application/json'}});
         const fetchEndTime = Date.now();
         const fetchTime = fetchEndTime - fetchStartTime;
         
-        s=await r.json();
+        gameStatus=await r.json();
         if(!mounted) return;
         
         // Log fetch timing
         if (fetchTime > 200) {
-          console.warn(`⚠️  SLOW API FETCH: ${fetchTime}ms at ${pullTimestamp}`);
+          console.warn(`⚠️  SLOW MERGED API FETCH: ${fetchTime}ms at ${pullTimestamp}`);
         }
 
+        // Extract data from merged response
+        const s = gameStatus.roundState;
+        const schedulerStatus = gameStatus.schedulerStatus;
+        const pricing = gameStatus.pricing;
+        const wallet = gameStatus.wallet;
 
         const newPhase = s.phase || 'setup';
         const newCalls = Array.isArray(s.called) ? s.called : [];
         setRoundId(s.id || null);
         
+        // Update all state from merged response
+        setSchedulerStatus(schedulerStatus);
+        setTimeUntilNextGame(schedulerStatus.timeUntilNextGame);
+        setCanPurchaseCards(schedulerStatus.canPurchaseCards);
+        
+        // Update pricing (only if changed)
+        if (pricing.cardPrice !== cardPrice || pricing.shieldPricePercent !== shieldPricePercent) {
+          setCardPrice(pricing.cardPrice);
+          setShieldPricePercent(pricing.shieldPricePercent);
+        }
+        
+        // Update wallet (only if alias provided and balance changed)
+        if (alias && wallet.balance !== null && wallet.balance !== wallet) {
+          setWallet(wallet.balance);
+        }
+        
         // Update prize pool
         if (s.prize_pool !== undefined) {
           const pool = Number(s.prize_pool) || 0;
           setPrizePool(pool);
-          console.log('Prize pool updated from server:', pool);
         }
 
         // RESET TO SETUP: clear purchases & selections, regenerate Available and force paint
@@ -1442,35 +1372,14 @@ function App(){
           
           // Reset lastCount when transitioning to setup phase
           lastCount = 0;
-          console.log(`🔄 RESET TO SETUP: Reset lastCount to 0, called balls: ${newCalls.length}`);
           setShowHowTo(true);
           setSyncedWinner(null);
           setAsk(true);
           endPostedRef.current = false;
           setResetKey(k => k + 1);     // <- forces a repaint
           
-          // Fetch wallet balance from server when entering setup phase
-          if (alias) {
-            fetch(`/api/player/wallet?alias=${encodeURIComponent(alias)}&ts=${Date.now()}`, { cache: 'no-store' })
-              .then(r => r.json())
-              .then(data => {
-                if (data.balance !== undefined) {
-                  setWallet(data.balance);
-                  console.log('Wallet balance loaded from server:', data.balance);
-                }
-              })
-              .catch(err => console.error('Failed to fetch wallet balance:', err));
-          }
-          
-          // Refresh pricing configuration when entering setup phase
-          fetch('/api/pricing', { cache: 'no-store' })
-            .then(r => r.json())
-            .then(data => {
-              setCardPrice(data.cardPrice || 10);
-              setShieldPricePercent(data.shieldPricePercent || 50);
-              console.log('Pricing loaded from server:', data);
-            })
-            .catch(err => console.error('Failed to fetch pricing:', err));
+          // Wallet and pricing are already updated from merged API response above
+          // No need for separate API calls
         }
 
         // Process new balls if we have more than before
@@ -1480,29 +1389,8 @@ function App(){
           const newBallTime = Date.now();
           const newBallTimestamp = new Date().toISOString();
           
-          console.log(`🎲 NEW BALL(S) DETECTED:`);
-          console.log(`  📅 Timestamp: ${newBallTimestamp}`);
-          console.log(`  ⏰ Detection Time: ${newBallTime}ms`);
-          console.log(`  🔢 New Balls: [${news.join(', ')}]`);
-          console.log(`  📊 Total Called: ${newCalls.length}/25`);
-          console.log(`  🎯 All Called Numbers: [${newCalls.join(', ')}]`);
-          console.log(`  🔍 LastCount: ${lastCount} -> ${newCalls.length}`);
-          
-          // Log timing since last detection
-          if (window.lastBallDetectionTime) {
-            const timeSinceLastBall = newBallTime - window.lastBallDetectionTime;
-            console.log(`  ⏱️  Time Since Last Ball: ${timeSinceLastBall}ms`);
-            
-            // Check if timing is consistent with expected speed
-            const expectedTime = speedMs || 800;
-            const timingVariance = Math.abs(timeSinceLastBall - expectedTime);
-            if (timingVariance > 100) {
-              console.warn(`⚠️  TIMING VARIANCE: Expected ~${expectedTime}ms, got ${timeSinceLastBall}ms (variance: ${timingVariance}ms)`);
-            } else {
-              console.log(`✅ TIMING OK: ${timeSinceLastBall}ms (expected ~${expectedTime}ms)`);
-            }
-          }
-          window.lastBallDetectionTime = newBallTime;
+          // Minimal logging for new balls - only essential info
+          console.log(`🎲 New balls: [${news.join(', ')}] (${newCalls.length}/25)`);
           
           let next = player.cards;
           news.forEach(n => { next = applyCallToCards(next, n, audio, volume); });
@@ -1537,9 +1425,6 @@ function App(){
               }).catch(()=>{});
             }
           }
-        } else {
-          // No new balls detected - log for debugging
-          console.log(`🔍 NO NEW BALLS: lastCount=${lastCount}, newCalls.length=${newCalls.length}`);
         }
 
         // End-game detection is handled entirely by the server
@@ -1574,10 +1459,6 @@ function App(){
         } else if (isNewRound) {
           // New round - clear history
           setCalled(newCalls);
-          console.log('New round detected - clearing history');
-        } else {
-          // Same round, setup phase - preserve history
-          console.log('Preserving called numbers history during setup phase');
         }
         setLiveCardsCount(Number(s.live_cards_count) || 0);
 
@@ -1591,13 +1472,11 @@ function App(){
             
             // Check if we've already awarded this round (prevent duplicate calls from polling)
             if (awardedRoundsRef.current.has(s.id)) {
-              console.log('Prize already awarded for round', s.id, '- skipping duplicate call');
               return;
             }
             
             // Mark this round as awarded immediately (before the API call)
             awardedRoundsRef.current.add(s.id);
-            console.log('Awarding prize - Round ID:', s.id, 'Prize Pool:', s.prize_pool, 'Winner:', winner);
             
             fetch(`/api/round/winner`, {
               method: 'POST',
@@ -1610,9 +1489,9 @@ function App(){
             })
             .then(r => r.json())
             .then(result => {
-              console.log('Prize awarded to winner:', result);
-              if (result.alreadyAwarded) {
-                console.log('Prize was already awarded for this round (server-side check)');
+              // Update wallet after prize award
+              if (alias && winner.alias === alias) {
+                fetchWalletBalance();
               }
             })
             .catch(err => {
@@ -1622,22 +1501,10 @@ function App(){
             });
           };
           
-          // Use winner from state response if available, otherwise fetch separately
+          // Use winner from merged response if available
           if (s.winner && s.winner.alias) {
             setSyncedWinner({ alias: s.winner.alias, daubs: s.winner.daubs });
             awardPrize(s.winner);
-          } else if (s.id) {
-            fetch(`/api/round/winner?round_id=${encodeURIComponent(s.id)}&ts=${Date.now()}`, { cache:'no-store' })
-              .then(r => r.json())
-              .then(w => {
-                if (w?.alias) {
-                  setSyncedWinner({ alias: w.alias, daubs: w.daubs });
-                  awardPrize(w);
-                } else {
-                  setSyncedWinner({ alias: '—', daubs: 0 });
-                }
-              })
-              .catch(() => setSyncedWinner({ alias: '—', daubs: 0 }));
           } else {
             setSyncedWinner({ alias: '—', daubs: 0 });
           }
@@ -1650,21 +1517,21 @@ function App(){
 
     pull();
     
-    // Smart polling: balance performance with functionality
+    // Optimized polling with merged API endpoint
     const getPollingInterval = () => {
-      if (phase === 'live') return 800; // 800ms during live games for smooth gameplay
+      if (phase === 'live') return 1000; // 1s during live games (merged API is more efficient)
       
       // During setup phase, poll more frequently when countdown is near zero
       if (phase === 'setup' && (clientTimeUntilNextGame || timeUntilNextGame) <= 15) {
-        return 500; // 500ms when countdown is 15 seconds or less
+        return 1000; // 1s when countdown is 15 seconds or less
       }
       
       // During setup phase, moderate polling for countdown updates
       if (phase === 'setup') {
-        return 2000; // 2s during normal setup phase
+        return 3000; // 3s during normal setup phase (merged API reduces need for frequent polling)
       }
       
-      return 3000; // 3s during ended phases
+      return 5000; // 5s during ended phases
     };
     
     let id = null;
@@ -2134,16 +2001,7 @@ function App(){
         onClose={()=>{
           // Refresh wallet before reloading page
           if (alias) {
-            fetch(`/api/player/wallet?alias=${encodeURIComponent(alias)}&ts=${Date.now()}`, { cache: 'no-store' })
-              .then(r => r.json())
-              .then(data => {
-                if (data.balance !== undefined) {
-                  setWallet(data.balance);
-                  console.log('Wallet refreshed before reload:', data.balance);
-                }
-              })
-              .catch(err => console.error('Failed to refresh wallet:', err))
-              .finally(() => location.reload());
+            fetchWalletBalance().finally(() => location.reload());
           } else {
             location.reload();
           }
@@ -2153,16 +2011,7 @@ function App(){
         onPrimary={()=>{
           // Refresh wallet before reloading page
           if (alias) {
-            fetch(`/api/player/wallet?alias=${encodeURIComponent(alias)}&ts=${Date.now()}`, { cache: 'no-store' })
-              .then(r => r.json())
-              .then(data => {
-                if (data.balance !== undefined) {
-                  setWallet(data.balance);
-                  console.log('Wallet refreshed before reload:', data.balance);
-                }
-              })
-              .catch(err => console.error('Failed to refresh wallet:', err))
-              .finally(() => location.reload());
+            fetchWalletBalance().finally(() => location.reload());
           } else {
             location.reload();
           }

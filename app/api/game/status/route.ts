@@ -22,7 +22,7 @@ type WalletInfo = { balance: number | null; hasPlayer: boolean };
 // Simple in-memory cache for game status (short-lived)
 let lastGameStatus: any = null;
 let lastCacheTime = 0;
-const CACHE_DURATION = 100; // 100ms cache for merged endpoint
+const CACHE_DURATION = 25 // 100ms cache for merged endpoint
 
 export async function GET(req: Request) {
   const startTime = Date.now();

@@ -7,6 +7,16 @@ export const dynamic = 'force-dynamic';
 
 // Explicit type for winner object to avoid null-only inference
 type Winner = { alias: string; daubs: number } | null;
+type SchedulerStatus = {
+  enabled: boolean;
+  timeUntilNextGame: number | null;
+  canPurchaseCards: boolean;
+  currentPhase: string;
+  nextGameStart: string | null;
+  preBuyMinutes: number;
+  winnerDisplaySeconds: number;
+  purchaseBlockSeconds: number;
+};
 
 // Simple in-memory cache for game status (short-lived)
 let lastGameStatus: any = null;
@@ -129,7 +139,7 @@ export async function GET(req: Request) {
     }
 
     // Process scheduler status
-    let schedulerStatus = {
+    let schedulerStatus: SchedulerStatus = {
       enabled: false,
       timeUntilNextGame: null,
       canPurchaseCards: true,

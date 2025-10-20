@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { tableNames, isDev } from '@/lib/config';
 
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 // Explicit type for winner object to avoid null-only inference
@@ -39,7 +40,7 @@ export async function GET(req: Request) {
       // 1. Get current round state
       supabaseAdmin
         .from(tableNames.rounds)
-        .select('*')
+        .select('id, phase, called, speed_ms, prize_pool, winner_alias, winner_daubs')
         .order('created_at', { ascending: false })
         .limit(1)
         .single(),

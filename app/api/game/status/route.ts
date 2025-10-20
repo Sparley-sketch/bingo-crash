@@ -4,6 +4,9 @@ import { tableNames, isDev } from '@/lib/config';
 
 export const dynamic = 'force-dynamic';
 
+// Explicit type for winner object to avoid null-only inference
+type Winner = { alias: string; daubs: number } | null;
+
 // Simple in-memory cache for game status (short-lived)
 let lastGameStatus: any = null;
 let lastCacheTime = 0;
@@ -63,7 +66,16 @@ export async function GET(req: Request) {
     ]);
 
     // Process round state
-    let roundState = {
+    let roundState: {
+      id: string | null;
+      phase: 'setup' | 'live' | 'ended' | string;
+      called: number[];
+      speed_ms: number;
+      live_cards_count: number;
+      player_count: number;
+      prize_pool: number;
+      winner: Winner;
+    } = {
       id: null,
       phase: 'setup',
       called: [],

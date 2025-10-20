@@ -4,6 +4,8 @@
 
 const { useEffect, useState, useRef } = React;
 
+// DEBUG flag for production logging control
+const DEBUG = false; // Set to false in production
 
 function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a; }
 function uid(p='id'){ return p+Math.random().toString(36).slice(2,8); }
@@ -121,10 +123,10 @@ const EXPLOSION_SRC = '/bingo-v37/explosion.gif';
 const SHIELD_ICON = '/bingo-v37/shield.png';
 // Video format sources - WebM now default for all devices (lightest)
 const SHIELD_BREAKING_SOURCES = {
-  webm: '/bingo-v37/shield_break.webm', // Default format (lightest, 6x speed)
-  webmMobile: '/bingo-v37/shield_break_mobile.webm', // Mobile-optimized version
+  webm: '/bingo-v37/shield_break.webm', //Default format (lightest, 6x speed)
+  webmMobile: '/bingo-v37/shield_break.webm',//Mobile-optimized version
   mp4: '/bingo-v37/shield_break.mp4',   // Fallback for unsupported browsers
-  gif: '/bingo-v37/shield_break.gif'    // Ultimate fallback (1x speed only)
+  gif: '/bingo-v37/shield_break.gif',    // Ultimate fallback (1x speed only)
 };
 
 // Get the best video source for the current device
@@ -519,7 +521,7 @@ input[type="range"]::-moz-range-track {
   width:100%;
   height:100%;
   object-fit:cover;
-  animation:playbackSpeed 0.375s linear forwards; /* 10x speed = 0.375s duration */
+  /* Play at natural speed; no accelerated animation */
   background:transparent;
   /* Mobile optimizations */
   -webkit-transform: translateZ(0);
@@ -530,14 +532,7 @@ input[type="range"]::-moz-range-track {
   perspective: 1000;
 }
 
-@keyframes playbackSpeed{
-  0%{ 
-    opacity:1;
-  }
-  100%{ 
-    opacity:1;
-  }
-}
+/* removed playbackSpeed keyframes (no speed-up) */
 
 /* Flash effect removed - using breaking image only */
 
@@ -850,19 +845,8 @@ function CardView({
                     const videoSource = getBestVideoSource();
                     console.log('🛡️ Loading shield break video:', videoSource);
                     
-                    // Adjust playback rate based on format and device performance
-                    let playbackRate;
-                    if (videoSource.includes('.gif')) {
-                      playbackRate = 1; // GIFs can't be sped up
-                    } else if (isLowPerformanceDevice()) {
-                      playbackRate = 3; // Slower playback for low-performance devices
-                    } else if (isMobile()) {
-                      playbackRate = 6; // 6x speed for mobile devices
-                    } else {
-                      playbackRate = 8; // 8x speed for desktop
-                    }
-                    
-                    e.target.playbackRate = playbackRate;
+                    // Play at 2x speed for faster shield breaking effect
+                    e.target.playbackRate = 2;
                     
                     // Enhanced mobile-specific optimizations
                     if (isMobile()) {
@@ -874,8 +858,8 @@ function CardView({
                     
                     e.target.play().catch(err => {
                       console.log('Video play failed:', err);
-                      // Fallback: try with reduced playback rate
-                      e.target.playbackRate = 1; // Fallback to normal speed if 6x fails
+                      // Ensure 2x speed on retry
+                      e.target.playbackRate = 2;
                       e.target.play().catch(fallbackErr => console.log('Fallback video play failed:', fallbackErr));
                     });
                   } catch (error) {
@@ -1327,8 +1311,8 @@ function App(){
         gameStatus=await r.json();
         if(!mounted) return;
         
-        // Log fetch timing
-        if (fetchTime > 200) {
+        // Log fetch timing (only in debug mode)
+        if (DEBUG && fetchTime > 200) {
           console.warn(`⚠️  SLOW MERGED API FETCH: ${fetchTime}ms at ${pullTimestamp}`);
         }
 
@@ -1390,8 +1374,10 @@ function App(){
           const newBallTime = Date.now();
           const newBallTimestamp = new Date().toISOString();
           
-          // Minimal logging for new balls - only essential info
-          console.log(`🎲 New balls: [${news.join(', ')}] (${newCalls.length}/25)`);
+          // Minimal logging for new balls - only essential info (debug mode only)
+          if (DEBUG) {
+            console.log(`🎲 New balls: [${news.join(', ')}] (${newCalls.length}/25)`);
+          }
           
           let next = player.cards;
           news.forEach(n => { next = applyCallToCards(next, n, audio, volume); });
@@ -1520,7 +1506,7 @@ function App(){
     
     // Optimized polling with merged API endpoint
     const getPollingInterval = () => {
-      if (phase === 'live') return 1000; // 1s during live games (merged API is more efficient)
+      if (phase === 'live') return 2000; // 1s during live games (merged API is more efficient)
       
       // During setup phase, poll more frequently when countdown is near zero
       if (phase === 'setup' && (clientTimeUntilNextGame || timeUntilNextGame) <= 15) {
@@ -1529,10 +1515,10 @@ function App(){
       
       // During setup phase, moderate polling for countdown updates
       if (phase === 'setup') {
-        return 3000; // 3s during normal setup phase (merged API reduces need for frequent polling)
+        return 5000; // 3s during normal setup phase (merged API reduces need for frequent polling)
       }
       
-      return 5000; // 5s during ended phases
+      return 10000; // 5s during ended phases
     };
     
     let id = null;
@@ -1558,10 +1544,27 @@ function App(){
     // Adjust polling when phase changes or countdown is near zero
     const phaseCheckInterval = setInterval(adjustPolling, 2000);
     
+    // Visibility-based polling optimization
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Pause polling when tab is hidden
+        if (id) {
+          clearInterval(id);
+          id = null;
+        }
+      } else {
+        // Resume polling when tab becomes visible
+        startPolling();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
     return ()=>{ 
       mounted=false; 
       clearInterval(id); 
       clearInterval(phaseCheckInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player.cards, audio, volume, alias, phase, clientTimeUntilNextGame, timeUntilNextGame]);

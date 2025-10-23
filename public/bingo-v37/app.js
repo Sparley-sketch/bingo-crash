@@ -1993,10 +1993,15 @@ function App(){
         showDontShowAgain={true}
         onDontShowAgain={handleDontShowAgain}
       >
-        • Tap the <b>Lock</b> button to lockin your card.
-        {'\n'}• If a called number has a <b>bomb</b>, your card explodes <i>(unless shielded)</i>.
-        {'\n'}• <b>Shield</b>: choose on available cards <i>before buying</i>. Absorbs the first bomb on that card.
-        {'\n'}• <b>Winner(s)</b>: non-exploded card(s) with the most daubs. Ties split the prize equally.
+        • Use the <b>1-click purchase</b> button or manually <b>select and buy</b> up to 4 cards.
+		{'\n'}{'\n'}• A <b>shield</b> is available to purchase per card and will protect you from the <b>first</b> "Bomb".
+		{'\n'}{'\n'}• Called numbers are daubed automatically, unless...
+		{'\n'}{'\n'}• ...where a called number has a <b>bomb</b>, your card explodes <i>(if not shielded)</i>.
+		{'\n'}{'\n'}• At any time, tap the <b>Lock</b> icon to lock in your card and daub score.
+		{'\n'}{'\n'}• Locked cards will not get new daubs and cannot explode.		
+		{'\n'}{'\n'}• The game ends when all players' cards have either been locked or have exploded.	
+        {'\n'}{'\n'}• <b>Winner(s)</b>: Locked-in card(s) with the most daubs. 
+		{'\n'}{'\n'}• Ties split the prize equally between winning cards.
       </Modal>
 
       {/* Winner modal (synced across players) */}

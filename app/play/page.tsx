@@ -7,9 +7,34 @@ export default function PlayPage() {
   const [durationMs, setDurationMs] = useState(800);
   const [loading, setLoading] = useState(true);
   const [gameEnabled, setGameEnabled] = useState(true);
+  const [showPreloadVideo, setShowPreloadVideo] = useState(false);
+  const [videoEnded, setVideoEnded] = useState(false);
+  const [backgroundLoading, setBackgroundLoading] = useState(false);
+  const [videoMuted, setVideoMuted] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
+    // Check if this is the first visit (no localStorage flag)
+    const hasSeenPreload = localStorage.getItem('bingo-crash-preload-seen');
+    if (!hasSeenPreload) {
+      setShowPreloadVideo(true);
+      // Mark as seen for future visits
+      localStorage.setItem('bingo-crash-preload-seen', 'true');
+    }
+
+    // Try to enable audio on user interaction
+    const enableAudioOnInteraction = () => {
+      setVideoMuted(false);
+      document.removeEventListener('click', enableAudioOnInteraction);
+      document.removeEventListener('touchstart', enableAudioOnInteraction);
+      document.removeEventListener('keydown', enableAudioOnInteraction);
+    };
+
+    // Listen for any user interaction to enable audio
+    document.addEventListener('click', enableAudioOnInteraction);
+    document.addEventListener('touchstart', enableAudioOnInteraction);
+    document.addEventListener('keydown', enableAudioOnInteraction);
+
     // Check game access and duration settings
     const checkGameAccess = async () => {
       try {
@@ -37,6 +62,46 @@ export default function PlayPage() {
             setDurationMs(raw);
           }
         }
+
+        // Start background loading of game elements
+        setBackgroundLoading(true);
+        
+        // Preload game assets in the background
+        const preloadGameAssets = async () => {
+          try {
+            console.log('🔄 Starting background loading of game assets...');
+            
+            // Preload only static assets (no JS/CSS that might conflict)
+            const assetsToPreload = [
+              '/bingo-v37/explosion.gif',
+              '/bingo-v37/Shield_break.mp4',
+              '/bingo-v37/explosion3.gif',
+              '/bingo-v37/explosion4.gif'
+            ];
+
+            // Preload assets in parallel (only images and videos)
+            const preloadPromises = assetsToPreload.map(asset => {
+              return new Promise((resolve, reject) => {
+                const element = document.createElement(asset.endsWith('.mp4') ? 'video' : 'img');
+                element.src = asset;
+                element.onload = resolve;
+                element.onerror = reject;
+                // Don't add to DOM, just preload
+              });
+            });
+
+            // Wait for all assets to preload
+            await Promise.allSettled(preloadPromises);
+            
+            console.log('🎮 Game assets preloaded successfully');
+            setBackgroundLoading(false);
+          } catch (error) {
+            console.error('Error preloading game assets:', error);
+            setBackgroundLoading(false);
+          }
+        };
+
+        preloadGameAssets();
       } catch (error) {
         console.error('Error checking game settings:', error);
         // On error, allow access (fail open)
@@ -69,6 +134,189 @@ export default function PlayPage() {
 
     return () => clearInterval(interval);
   }, [router]);
+
+  // Handle video events
+  const handleVideoEnded = () => {
+    console.log('🎬 Preload video ended');
+    setVideoEnded(true);
+    setShowPreloadVideo(false);
+  };
+
+  const handleVideoError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+    console.error('❌ Preload video error:', e);
+    setShowPreloadVideo(false);
+    setVideoEnded(true);
+  };
+
+  // Function to reset preload video (for testing)
+  const resetPreloadVideo = () => {
+    localStorage.removeItem('bingo-crash-preload-seen');
+    setShowPreloadVideo(true);
+    setVideoEnded(false);
+  };
+
+  // Add keyboard shortcut for testing (Ctrl+Shift+R)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'R') {
+        console.log('🔄 Resetting preload video');
+        resetPreloadVideo();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Show preload video on first visit
+  if (showPreloadVideo) {
+    return (
+      <main style={{ 
+        maxWidth: 'unset', 
+        padding: 0, 
+        margin: 0,
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        height: '100vh',
+        background: '#0f1220',
+        position: 'relative'
+      }}>
+        <style dangerouslySetInnerHTML={{
+          __html: `
+            @keyframes pulse {
+              0%, 100% { opacity: 1; transform: translateX(-50%) scale(1); }
+              50% { opacity: 0.7; transform: translateX(-50%) scale(1.05); }
+            }
+          `
+        }} />
+        <video
+          src="/bingo-v37/PreLoad_shield_break.mp4"
+          autoPlay
+          muted={videoMuted}
+          playsInline
+          onEnded={handleVideoEnded}
+          onError={handleVideoError}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            zIndex: 1
+          }}
+        />
+        {backgroundLoading && (
+          <div style={{
+            position: 'absolute',
+            bottom: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            color: '#fff',
+            fontSize: '14px',
+            zIndex: 2,
+            background: 'rgba(0,0,0,0.7)',
+            padding: '8px 16px',
+            borderRadius: '8px'
+          }}>
+            Loading game assets...
+          </div>
+        )}
+        
+        {/* Audio prompt */}
+        {videoMuted && (
+          <div style={{
+            position: 'absolute',
+            bottom: '60px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            color: '#fff',
+            fontSize: '16px',
+            zIndex: 2,
+            background: 'rgba(0,0,0,0.8)',
+            padding: '12px 20px',
+            borderRadius: '12px',
+            border: '2px solid #4ade80',
+            textAlign: 'center',
+            animation: 'pulse 2s infinite',
+            boxShadow: '0 0 20px rgba(74, 222, 128, 0.5)'
+          }}>
+            🔊 Click anywhere to enable sound
+          </div>
+        )}
+        
+        {/* Control buttons */}
+        <div style={{
+          position: 'absolute',
+          top: '20px',
+          right: '20px',
+          zIndex: 3,
+          display: 'flex',
+          gap: '8px'
+        }}>
+          {/* Mute/Unmute button */}
+          <button
+            onClick={() => {
+              setVideoMuted(!videoMuted);
+              console.log(`🔊 Video ${!videoMuted ? 'muted' : 'unmuted'}`);
+            }}
+            style={{
+              background: 'rgba(0,0,0,0.7)',
+              color: '#fff',
+              border: '1px solid rgba(255,255,255,0.3)',
+              borderRadius: '8px',
+              padding: '8px 12px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0,0,0,0.9)';
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.6)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(0,0,0,0.7)';
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
+            }}
+          >
+            {videoMuted ? '🔇' : '🔊'} {videoMuted ? 'Unmute' : 'Mute'}
+          </button>
+          
+          {/* Skip button */}
+          <button
+            onClick={() => {
+              console.log('⏭️ Video skipped by user');
+              handleVideoEnded();
+            }}
+            style={{
+              background: 'rgba(0,0,0,0.7)',
+              color: '#fff',
+              border: '1px solid rgba(255,255,255,0.3)',
+              borderRadius: '8px',
+              padding: '8px 16px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0,0,0,0.9)';
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.6)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(0,0,0,0.7)';
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
+            }}
+          >
+            Skip Intro
+          </button>
+        </div>
+      </main>
+    );
+  }
 
   if (loading) {
     return (

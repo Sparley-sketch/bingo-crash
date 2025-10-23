@@ -164,19 +164,19 @@ export async function POST(req: NextRequest) {
     console.log(`🔍 Checking for live cards in round: ${result.id}`);
     console.log(`🔍 Using cards table: ${tableNames.cards}`);
     
-    const { data: liveCardsData, error: liveCardsError } = await supabaseAdmin
+    const { count: liveCardsCount, error: liveCardsError } = await supabaseAdmin
       .from(tableNames.cards)
-      .select('id', { count: 'exact', head: true })
+      .select('*', { count: 'exact', head: true })
       .eq('round_id', result.id)
       .eq('exploded', false)
       .eq('paused', false);
 
-    console.log(`🔍 Live cards query result:`, { liveCardsData, liveCardsError });
-    const liveCardsCount = liveCardsData?.count || 0;
-    console.log(`🔍 Live cards check after game start: ${liveCardsCount} cards found`);
+    console.log(`🔍 Live cards query result:`, { liveCardsCount, liveCardsError });
+    const finalLiveCardsCount = liveCardsCount || 0;
+    console.log(`🔍 Live cards check after game start: ${finalLiveCardsCount} cards found`);
 
     // If no live cards exist when game starts, reset to setup mode
-    if (liveCardsCount === 0) {
+    if (finalLiveCardsCount === 0) {
       console.log('⚠️  No live cards found when game started - resetting to setup mode');
       
       const { error: resetError } = await supabaseAdmin

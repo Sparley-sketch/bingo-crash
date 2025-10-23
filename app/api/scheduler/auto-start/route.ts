@@ -202,6 +202,75 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json({ error: `Failed to update round: ${updateError.message}` }, { status: 500 });
               }
               console.log('Round updated to live:', currentRound.id);
+              
+              // Check if there are any live cards after starting the game
+              // If no live cards exist, immediately reset to setup mode
+              console.log(`🔍 Checking for live cards in round: ${currentRound.id}`);
+              console.log(`🔍 Using cards table: ${tableNames.cards}`);
+              
+              const { count: liveCardsCount, error: liveCardsError } = await supabaseAdmin
+                .from(tableNames.cards)
+                .select('*', { count: 'exact', head: true })
+                .eq('round_id', currentRound.id)
+                .eq('exploded', false)
+                .eq('paused', false);
+
+              console.log(`🔍 Live cards query result:`, { liveCardsCount, liveCardsError });
+              const finalLiveCardsCount = liveCardsCount || 0;
+              console.log(`🔍 Live cards check after scheduler auto-start: ${finalLiveCardsCount} cards found`);
+
+              // If no live cards exist when game starts, reset to setup mode
+              if (finalLiveCardsCount === 0) {
+                console.log('⚠️  No live cards found when scheduler started game - resetting to setup mode');
+                
+                const { error: resetError } = await supabaseAdmin
+                  .from(tableNames.rounds)
+                  .update({ 
+                    phase: 'setup',
+                    called: [],
+                    ended_at: null,
+                    winner_alias: null,
+                    winner_daubs: null
+                  })
+                  .eq('id', currentRound.id);
+
+                if (resetError) {
+                  console.error('Error resetting round to setup:', resetError);
+                  return NextResponse.json({ error: `Failed to reset round: ${resetError.message}` }, { status: 500 });
+                }
+
+                console.log('✅ Round reset to setup mode due to no live cards');
+                
+                // Calculate new game start time based on pre-buy period
+                const preBuyMinutes = schedulerConfig.preBuyMinutes || 2;
+                const newGameStartTime = new Date();
+                newGameStartTime.setMinutes(newGameStartTime.getMinutes() + preBuyMinutes);
+                
+                console.log(`🔄 Scheduler reset - new game will start in ${preBuyMinutes} minutes at ${newGameStartTime.toISOString()}`);
+                
+                // Update scheduler config back to setup phase with new start time
+                const resetSchedulerConfig = {
+                  ...schedulerConfig,
+                  currentPhase: 'setup',
+                  nextGameStart: newGameStartTime.toISOString()
+                };
+
+                await supabaseAdmin
+                  .from(tableNames.config)
+                  .upsert({ 
+                    key: 'scheduler', 
+                    value: resetSchedulerConfig, 
+                    updated_at: new Date().toISOString() 
+                  }, { onConflict: 'key' });
+
+                return NextResponse.json({ 
+                  message: 'Game reset to setup mode - no live cards found. New game scheduled.',
+                  started: false,
+                  reset: true,
+                  nextGameStart: newGameStartTime.toISOString(),
+                  preBuyMinutes: preBuyMinutes
+                }, { headers: { 'Cache-Control': 'no-store' } });
+              }
             } else {
               console.log('Current round is in phase:', currentRound.phase, '- no action needed');
             }

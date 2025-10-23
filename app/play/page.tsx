@@ -71,18 +71,16 @@ export default function PlayPage() {
           try {
             console.log('🔄 Starting background loading of game assets...');
             
-            // Preload only static assets (no JS/CSS that might conflict)
+            // Preload only essential static assets (no JS/CSS that might conflict)
             const assetsToPreload = [
               '/bingo-v37/explosion.gif',
-              '/bingo-v37/Shield_break.mp4',
-              '/bingo-v37/explosion3.gif',
-              '/bingo-v37/explosion4.gif'
+              '/bingo-v37/shield_break.webm'
             ];
 
             // Preload assets in parallel (only images and videos)
             const preloadPromises = assetsToPreload.map(asset => {
               return new Promise((resolve, reject) => {
-                const element = document.createElement(asset.endsWith('.mp4') ? 'video' : 'img');
+                const element = document.createElement(asset.endsWith('.mp4') || asset.endsWith('.webm') ? 'video' : 'img');
                 element.src = asset;
                 element.onload = resolve;
                 element.onerror = reject;

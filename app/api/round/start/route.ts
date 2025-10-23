@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
       return authError;
     }
     
-    console.log('Start round endpoint called');
+    console.log('🚀 Start round endpoint called - Manual start from admin');
 
     // Try to get roundId from request body if provided
     let roundId = null;
@@ -157,6 +157,98 @@ export async function POST(req: NextRequest) {
       }
       result = data;
       console.log('Round updated successfully:', result);
+    }
+
+    // Check if there are any live cards after starting the game
+    // If no live cards exist, immediately reset to setup mode
+    console.log(`🔍 Checking for live cards in round: ${result.id}`);
+    console.log(`🔍 Using cards table: ${tableNames.cards}`);
+    
+    const { data: liveCardsData, error: liveCardsError } = await supabaseAdmin
+      .from(tableNames.cards)
+      .select('id', { count: 'exact', head: true })
+      .eq('round_id', result.id)
+      .eq('exploded', false)
+      .eq('paused', false);
+
+    console.log(`🔍 Live cards query result:`, { liveCardsData, liveCardsError });
+    const liveCardsCount = liveCardsData?.count || 0;
+    console.log(`🔍 Live cards check after game start: ${liveCardsCount} cards found`);
+
+    // If no live cards exist when game starts, reset to setup mode
+    if (liveCardsCount === 0) {
+      console.log('⚠️  No live cards found when game started - resetting to setup mode');
+      
+      const { error: resetError } = await supabaseAdmin
+        .from(tableNames.rounds)
+        .update({ 
+          phase: 'setup',
+          called: [],
+          ended_at: null,
+          winner_alias: null,
+          winner_daubs: null
+        })
+        .eq('id', result.id);
+
+      if (resetError) {
+        console.error('Error resetting round to setup:', resetError);
+        return NextResponse.json({ error: `Failed to reset round: ${resetError.message}` }, { status: 500 });
+      }
+
+      console.log('✅ Round reset to setup mode due to no live cards');
+      
+      // If scheduler is enabled, also reset the scheduler with new countdown
+      if (isScheduledStart) {
+        try {
+          const { data: schedulerData, error: schedulerError } = await supabaseAdmin
+            .from(tableNames.config)
+            .select('value')
+            .eq('key', 'scheduler')
+            .maybeSingle();
+
+          if (!schedulerError && schedulerData?.value) {
+            const schedulerConfig = schedulerData.value;
+            if (schedulerConfig.enabled) {
+              // Calculate new game start time based on pre-buy period
+              const preBuyMinutes = schedulerConfig.preBuyMinutes || 2;
+              const newGameStartTime = new Date();
+              newGameStartTime.setMinutes(newGameStartTime.getMinutes() + preBuyMinutes);
+              
+              console.log(`🔄 Scheduler reset - new game will start in ${preBuyMinutes} minutes at ${newGameStartTime.toISOString()}`);
+              
+              // Update scheduler config back to setup phase with new start time
+              const resetSchedulerConfig = {
+                ...schedulerConfig,
+                currentPhase: 'setup',
+                nextGameStart: newGameStartTime.toISOString()
+              };
+
+              await supabaseAdmin
+                .from(tableNames.config)
+                .upsert({ 
+                  key: 'scheduler', 
+                  value: resetSchedulerConfig, 
+                  updated_at: new Date().toISOString() 
+                }, { onConflict: 'key' });
+            }
+          }
+        } catch (error) {
+          console.error('Error updating scheduler after reset:', error);
+          // Don't fail the request, just log the error
+        }
+      }
+      
+      return NextResponse.json(
+        { 
+          id: result.id, 
+          phase: 'setup', 
+          speed_ms: result.speed_ms, 
+          called: [],
+          message: 'Game reset to setup mode - no live cards found',
+          schedulerReset: isScheduledStart
+        },
+        { headers: { 'Cache-Control': 'no-store' } }
+      );
     }
 
     return NextResponse.json(

@@ -86,14 +86,23 @@ export async function GET(req: Request) {
       );
       
       if (shouldLoadWallet) {
-        const walletPromise = supabaseAdmin
-          .from(isDev ? 'global_players_dev' : 'global_players')
-          .select('wallet_balance')
-          .eq('alias', alias)
-          .maybeSingle();
-          
-        const [result] = await Promise.allSettled([walletPromise]);
-        walletResult = result;
+        try {
+          const { data, error } = await supabaseAdmin
+            .from(isDev ? 'global_players_dev' : 'global_players')
+            .select('wallet_balance')
+            .eq('alias', alias)
+            .maybeSingle();
+            
+          walletResult = {
+            status: 'fulfilled' as const,
+            value: { data, error }
+          };
+        } catch (error) {
+          walletResult = {
+            status: 'rejected' as const,
+            reason: error
+          };
+        }
       }
     }
 

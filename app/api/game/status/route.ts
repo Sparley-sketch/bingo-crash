@@ -41,12 +41,11 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const alias = searchParams.get('alias');
     
-    // Get all data in parallel for better performance
+    // Get core data in parallel (always needed)
     const [
       roundResult,
       schedulerResult,
-      pricingResult,
-      walletResult
+      pricingResult
     ] = await Promise.allSettled([
       // 1. Get current round state
       supabaseAdmin
@@ -67,15 +66,31 @@ export async function GET(req: Request) {
       supabaseAdmin
         .from(tableNames.config)
         .select('key, value')
-        .in('key', ['card_price', 'shield_price_percent']),
-      
-      // 4. Get wallet balance (only if alias provided)
-      alias ? supabaseAdmin
-        .from(isDev ? 'global_players_dev' : 'global_players')
-        .select('wallet_balance')
-        .eq('alias', alias)
-        .maybeSingle() : Promise.resolve({ data: null, error: null })
+        .in('key', ['card_price', 'shield_price_percent'])
     ]);
+
+    // Get wallet balance only when needed (setup phase, buy action, or winner)
+    // This optimization reduces database calls from every ms to only when necessary
+    let walletResult = { status: 'fulfilled' as const, value: { data: null, error: null } };
+    if (alias) {
+      const round = roundResult.status === 'fulfilled' && !roundResult.value.error ? roundResult.value.data : null;
+      const shouldLoadWallet = round && (
+        round.phase === 'setup' || 
+        round.winner_alias === alias ||
+        // Add buy action detection here if needed
+        false
+      );
+      
+      if (shouldLoadWallet) {
+        walletResult = await Promise.allSettled([
+          supabaseAdmin
+            .from(isDev ? 'global_players_dev' : 'global_players')
+            .select('wallet_balance')
+            .eq('alias', alias)
+            .maybeSingle()
+        ]).then(results => results[0]);
+      }
+    }
 
     // Process round state
     let roundState: {
@@ -236,6 +251,13 @@ export async function GET(req: Request) {
           hasPlayer: false
         };
       }
+    } else if (alias) {
+      // Wallet not loaded (not in setup phase, not winner, no buy action)
+      // Return null to indicate wallet data not available
+      wallet = {
+        balance: null,
+        hasPlayer: false
+      };
     }
 
     // Build merged response

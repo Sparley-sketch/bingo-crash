@@ -71,7 +71,11 @@ export async function GET(req: Request) {
 
     // Get wallet balance only when needed (setup phase, buy action, or winner)
     // This optimization reduces database calls from every ms to only when necessary
-    let walletResult = { status: 'fulfilled' as const, value: { data: null, error: null } };
+    let walletResult: { status: 'fulfilled' | 'rejected'; value?: any; reason?: any } = { 
+      status: 'fulfilled', 
+      value: { data: null, error: null } 
+    };
+    
     if (alias) {
       const round = roundResult.status === 'fulfilled' && !roundResult.value.error ? roundResult.value.data : null;
       const shouldLoadWallet = round && (
@@ -82,13 +86,14 @@ export async function GET(req: Request) {
       );
       
       if (shouldLoadWallet) {
-        walletResult = await Promise.allSettled([
-          supabaseAdmin
-            .from(isDev ? 'global_players_dev' : 'global_players')
-            .select('wallet_balance')
-            .eq('alias', alias)
-            .maybeSingle()
-        ]).then(results => results[0]);
+        const walletPromise = supabaseAdmin
+          .from(isDev ? 'global_players_dev' : 'global_players')
+          .select('wallet_balance')
+          .eq('alias', alias)
+          .maybeSingle();
+          
+        const [result] = await Promise.allSettled([walletPromise]);
+        walletResult = result;
       }
     }
 

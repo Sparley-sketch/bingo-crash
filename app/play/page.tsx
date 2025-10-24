@@ -63,43 +63,14 @@ export default function PlayPage() {
           }
         }
 
-        // Start background loading of game elements
+        // Simple background loading indicator (no actual preloading to avoid conflicts)
         setBackgroundLoading(true);
         
-        // Preload game assets in the background
-        const preloadGameAssets = async () => {
-          try {
-            console.log('🔄 Starting background loading of game assets...');
-            
-            // Preload only essential static assets (no JS/CSS that might conflict)
-            const assetsToPreload = [
-              '/bingo-v37/explosion.gif',
-              '/bingo-v37/shield_break.webm'
-            ];
-
-            // Preload assets in parallel (only images and videos)
-            const preloadPromises = assetsToPreload.map(asset => {
-              return new Promise((resolve, reject) => {
-                const element = document.createElement(asset.endsWith('.mp4') || asset.endsWith('.webm') ? 'video' : 'img');
-                element.src = asset;
-                element.onload = resolve;
-                element.onerror = reject;
-                // Don't add to DOM, just preload
-              });
-            });
-
-            // Wait for all assets to preload
-            await Promise.allSettled(preloadPromises);
-            
-            console.log('🎮 Game assets preloaded successfully');
-            setBackgroundLoading(false);
-          } catch (error) {
-            console.error('Error preloading game assets:', error);
-            setBackgroundLoading(false);
-          }
-        };
-
-        preloadGameAssets();
+        // Simulate background loading without interfering with game assets
+        setTimeout(() => {
+          console.log('🎮 Background loading completed');
+          setBackgroundLoading(false);
+        }, 2000); // 2 second delay to show loading indicator
       } catch (error) {
         console.error('Error checking game settings:', error);
         // On error, allow access (fail open)
@@ -193,6 +164,7 @@ export default function PlayPage() {
           autoPlay
           muted={videoMuted}
           playsInline
+          preload="metadata"
           onEnded={handleVideoEnded}
           onError={handleVideoError}
           style={{
@@ -202,7 +174,8 @@ export default function PlayPage() {
             position: 'absolute',
             top: 0,
             left: 0,
-            zIndex: 1
+            zIndex: 1,
+            backgroundColor: '#0f1220'
           }}
         />
         {backgroundLoading && (
@@ -344,8 +317,16 @@ export default function PlayPage() {
     <main className="wrap" style={{ maxWidth: 'unset', padding: 0 }}>
       <iframe
         src={src}
-        style={{ border: 'none', width: '100%', height: '100vh' }}
+        style={{ 
+          border: 'none', 
+          width: '100%', 
+          height: '100vh',
+          background: '#0f1220' // Match video background
+        }}
         title="Bingo + Crash"
+        loading="eager"
+        allow="autoplay; fullscreen"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
       />
     </main>
   );

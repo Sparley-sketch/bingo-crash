@@ -148,14 +148,46 @@ export default function PlayPage() {
         alignItems: 'center', 
         justifyContent: 'center', 
         height: '100vh',
+        width: '100vw',
         background: '#0f1220',
-        position: 'relative'
+        position: 'relative',
+        overflow: 'hidden',
+        // Mobile-specific fixes
+        minHeight: '100vh',
+        minWidth: '100vw'
       }}>
         <style dangerouslySetInnerHTML={{
           __html: `
             @keyframes pulse {
               0%, 100% { opacity: 1; transform: translateX(-50%) scale(1); }
               50% { opacity: 0.7; transform: translateX(-50%) scale(1.05); }
+            }
+            
+            /* Mobile-specific video scaling */
+            @media screen and (max-width: 768px) {
+              video {
+                object-fit: contain !important;
+                max-width: 100vw !important;
+                max-height: 100vh !important;
+              }
+            }
+            
+            /* Landscape mobile */
+            @media screen and (max-width: 768px) and (orientation: landscape) {
+              video {
+                object-fit: contain !important;
+                width: 100vw !important;
+                height: 100vh !important;
+              }
+            }
+            
+            /* Portrait mobile */
+            @media screen and (max-width: 768px) and (orientation: portrait) {
+              video {
+                object-fit: contain !important;
+                width: 100vw !important;
+                height: 100vh !important;
+              }
             }
           `
         }} />
@@ -170,12 +202,17 @@ export default function PlayPage() {
           style={{
             width: '100%',
             height: '100%',
-            objectFit: 'cover',
+            objectFit: 'contain',
             position: 'absolute',
             top: 0,
             left: 0,
             zIndex: 1,
-            backgroundColor: '#0f1220'
+            backgroundColor: '#0f1220',
+            // Mobile-specific fixes
+            maxWidth: '100vw',
+            maxHeight: '100vh',
+            // Ensure video doesn't get cropped on mobile
+            objectPosition: 'center'
           }}
         />
         {backgroundLoading && (

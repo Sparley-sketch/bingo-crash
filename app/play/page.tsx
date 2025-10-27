@@ -163,30 +163,70 @@ export default function PlayPage() {
               50% { opacity: 0.7; transform: translateX(-50%) scale(1.05); }
             }
             
-            /* Mobile-specific video scaling */
+            /* Mobile-specific video scaling - prevent zoom-in while filling screen */
             @media screen and (max-width: 768px) {
               video {
-                object-fit: contain !important;
+                object-fit: cover !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                object-position: center !important;
+                /* Prevent excessive zoom on very wide screens */
                 max-width: 100vw !important;
                 max-height: 100vh !important;
               }
             }
             
-            /* Landscape mobile */
+            /* Landscape mobile - ensure proper aspect ratio */
             @media screen and (max-width: 768px) and (orientation: landscape) {
               video {
-                object-fit: contain !important;
+                object-fit: cover !important;
                 width: 100vw !important;
                 height: 100vh !important;
+                object-position: center center !important;
               }
             }
             
-            /* Portrait mobile */
+            /* Portrait mobile - prevent vertical zoom */
             @media screen and (max-width: 768px) and (orientation: portrait) {
               video {
-                object-fit: contain !important;
+                object-fit: cover !important;
                 width: 100vw !important;
                 height: 100vh !important;
+                object-position: center center !important;
+              }
+            }
+            
+            /* Very small screens - prevent extreme zoom */
+            @media screen and (max-width: 480px) {
+              video {
+                object-fit: cover !important;
+                object-position: center center !important;
+                /* Ensure video doesn't exceed screen bounds */
+                max-width: 100vw !important;
+                max-height: 100vh !important;
+              }
+            }
+            
+            /* Prevent zoom-in by using transform scale */
+            @media screen and (max-width: 768px) {
+              video {
+                transform: scale(1) !important;
+                transform-origin: center center !important;
+              }
+            }
+            
+            /* Handle different aspect ratios to prevent zoom */
+            @media screen and (max-aspect-ratio: 16/9) {
+              video {
+                object-fit: cover !important;
+                object-position: center center !important;
+              }
+            }
+            
+            @media screen and (max-aspect-ratio: 4/3) {
+              video {
+                object-fit: cover !important;
+                object-position: center center !important;
               }
             }
           `
@@ -202,16 +242,16 @@ export default function PlayPage() {
           style={{
             width: '100%',
             height: '100%',
-            objectFit: 'contain',
+            objectFit: 'cover',
             position: 'absolute',
             top: 0,
             left: 0,
             zIndex: 1,
             backgroundColor: '#0f1220',
-            // Mobile-specific fixes
-            maxWidth: '100vw',
-            maxHeight: '100vh',
-            // Ensure video doesn't get cropped on mobile
+            // Prevent zoom-in on mobile by ensuring proper scaling
+            minWidth: '100%',
+            minHeight: '100%',
+            // Center the video content
             objectPosition: 'center'
           }}
         />

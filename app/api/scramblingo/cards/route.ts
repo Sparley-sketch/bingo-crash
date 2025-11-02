@@ -84,11 +84,14 @@ async function createCard(body: any) {
     const card = scramblingoGame.createCard(playerId, targetRoundId, cardLetters);
 
     // Save to database
+    // Generate UUID for player_id (production requires it, but Scramblingo uses player_alias)
+    const playerIdUUID = crypto.randomUUID();
     const { data, error } = await supabaseAdmin
       .from(tableNames.cards)
       .insert({
         id: card.id,
         round_id: targetRoundId,
+        player_id: playerIdUUID, // Required by schema, but Scramblingo uses player_alias
         player_alias: playerId,
         game_type: GAME_TYPES.SCRAMBLINGO,
         letters: card.letters,
@@ -155,11 +158,14 @@ async function createRandomCard(body: any) {
     const card = scramblingoGame.createCard(playerId, roundId, randomLetters);
 
     // Save to database
+    // Generate UUID for player_id (production requires it, but Scramblingo uses player_alias)
+    const playerIdUUID = crypto.randomUUID();
     const { data, error } = await supabaseAdmin
       .from(tableNames.cards)
       .insert({
         id: card.id,
         round_id: roundId,
+        player_id: playerIdUUID, // Required by schema, but Scramblingo uses player_alias
         player_alias: playerId,
         game_type: GAME_TYPES.SCRAMBLINGO,
         letters: card.letters,
@@ -221,9 +227,12 @@ async function createRandomBulk(body: any) {
     for (let i = 0; i < toCreate; i++) {
       const randomLetters = scramblingoGame.generateRandomCard();
       const card = scramblingoGame.createCard(playerId, roundId, randomLetters);
+      // Generate UUID for player_id (production requires it, but Scramblingo uses player_alias)
+      const playerIdUUID = crypto.randomUUID();
       rows.push({
         id: card.id,
         round_id: roundId,
+        player_id: playerIdUUID, // Required by schema, but Scramblingo uses player_alias
         player_alias: playerId,
         game_type: GAME_TYPES.SCRAMBLINGO,
         letters: card.letters,

@@ -5,3 +5,9 @@ export const tableNames = {
   config: 'config',
   profiles: 'profiles'
 } as const;
+
+
+
+
+
+

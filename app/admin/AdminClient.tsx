@@ -11,6 +11,9 @@ type RoundState = {
   created_at: string | null;
   live_cards_count?: number;
   player_count?: number;
+  draw_order?: number[];
+  winner_call_index?: number | null;
+  game_type?: string;
 };
 
 export default function AdminClient() {
@@ -33,8 +36,16 @@ export default function AdminClient() {
   const [gameEnabled, setGameEnabled] = React.useState(true);
 
   // Scheduler state
-  const [schedulerConfig, setSchedulerConfig] = React.useState<any>(null);
-  const [schedulerStatus, setSchedulerStatus] = React.useState<any>(null);
+  type SchedulerConfig = {
+    enabled?: boolean;
+    currentPhase?: string;
+    nextGameStart?: string | null;
+    preBuyMinutes?: number;
+    currentGame?: string;
+    [key: string]: any; // Allow additional properties
+  };
+  const [schedulerConfig, setSchedulerConfig] = React.useState<SchedulerConfig | null>(null);
+  const [schedulerStatus, setSchedulerStatus] = React.useState<SchedulerConfig | null>(null);
   const [preBuySeconds, setPreBuySeconds] = React.useState(30);
   const [isEditingPreBuy, setIsEditingPreBuy] = React.useState(false);
   const isEditingRef = React.useRef(false); // For preventing polling while editing
@@ -232,14 +243,14 @@ export default function AdminClient() {
         alert(`Stop scheduler failed: ${j.error || res.statusText}`);
       } else {
         // Optimistically reflect stopped state immediately
-        setSchedulerConfig(prev => ({
-          ...(prev || {} as any),
+        setSchedulerConfig((prev: SchedulerConfig | null) => ({
+          ...(prev || {}),
           enabled: false,
           nextGameStart: null,
           currentPhase: 'manual'
         }));
-        setSchedulerStatus(prev => ({
-          ...(prev || {} as any),
+        setSchedulerStatus((prev: SchedulerConfig | null) => ({
+          ...(prev || {}),
           enabled: false,
           timeUntilNextGame: null,
           currentPhase: 'manual',

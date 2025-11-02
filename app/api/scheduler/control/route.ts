@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       preBuyMinutes: 2,
       nextGameStart: null,
       currentPhase: 'setup',
-      winnerDisplaySeconds: 1,
+      winnerDisplaySeconds: 10,
       purchaseBlockSeconds: 5,
       currentGame: GAME_TYPES.BINGO_CRASH,
       gameRotation: false,

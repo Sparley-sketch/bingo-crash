@@ -23,7 +23,7 @@ export async function GET() {
       preBuyMinutes: 2,
       nextGameStart: null,
       currentPhase: 'setup',
-      winnerDisplaySeconds: 1,
+      winnerDisplaySeconds: 10,
       purchaseBlockSeconds: 5
     };
 

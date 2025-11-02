@@ -190,7 +190,7 @@ export async function GET(req: Request) {
       currentPhase: 'manual',
       nextGameStart: null,
       preBuyMinutes: 2,
-      winnerDisplaySeconds: 1,
+      winnerDisplaySeconds: 10,
       purchaseBlockSeconds: 5,
       currentGame: 'bingo_crash'
     };

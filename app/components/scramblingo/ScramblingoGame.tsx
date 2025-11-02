@@ -203,7 +203,7 @@ export default function Scramblingo({ alias, walletBalance = 1000, roundId }: Sc
                 setWinnerPreviewLetters(chosen);
                 setWinnerPreviewId((mine?.id || single?.id) ?? null);
                 if (!winnerDetail) {
-                  const aliases = Array.from(new Set(pred.map((c:any)=>c.player_alias).filter(Boolean)));
+                  const aliases: string[] = Array.from(new Set(pred.map((c:any)=>c.player_alias).filter((a: any): a is string => Boolean(a) && typeof a === 'string')));
                   setWinnerDetail({ total: pred.length, aliases, singleLetters: chosen, cardId: (mine?.id || single?.id) ?? undefined });
                 }
               }
@@ -271,7 +271,7 @@ export default function Scramblingo({ alias, walletBalance = 1000, roundId }: Sc
           const single = data.predictedWinnerCards.length === 1 ? data.predictedWinnerCards[0] : null;
           const letters = (minePred?.letters?.length === 6 ? minePred.letters : (single?.letters?.length === 6 ? single.letters : undefined));
           if (letters) {
-            const aliases = Array.from(new Set(data.predictedWinnerCards.map((c:any)=>c.player_alias).filter(Boolean)));
+            const aliases: string[] = Array.from(new Set(data.predictedWinnerCards.map((c:any)=>c.player_alias).filter((a: any): a is string => Boolean(a) && typeof a === 'string')));
             setWinnerDetail({ total: data.predictedWinnerCards.length, aliases, singleLetters: letters });
           }
         }
@@ -286,7 +286,7 @@ export default function Scramblingo({ alias, walletBalance = 1000, roundId }: Sc
           if (r.ok && Array.isArray(j?.cards)) {
             const total = j.cards.length || 0;
             if (total > 0) {
-              const aliases = Array.from(new Set(j.cards.map((c:any)=>c.player_alias).filter(Boolean)));
+              const aliases: string[] = Array.from(new Set(j.cards.map((c:any)=>c.player_alias).filter((a: any): a is string => Boolean(a) && typeof a === 'string')));
               // prefer my winning card; fallback to only card if single winner
               let singleLetters: string[] | undefined;
               let singleId: string | undefined;

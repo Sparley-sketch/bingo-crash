@@ -219,7 +219,7 @@ export async function POST(req: NextRequest) {
           // Fallback: if no completed cards were persisted yet, split equally by precomputed aliases
           if (totalWinningCards === 0) {
             const aliasStr = (round as any).winner_alias || '';
-            const aliases: string[] = aliasStr.split(',').map((s: string) => s.trim()).filter((s): s is string => Boolean(s));
+            const aliases: string[] = aliasStr.split(',').map((s: string) => s.trim()).filter((s: string): s is string => Boolean(s));
             aliases.forEach((a: string) => winCounts.set(a, 1));
             totalWinningCards = aliases.length;
           }

@@ -257,7 +257,7 @@ export async function POST(req: Request) {
       console.error('Error creating card:', cardError);
       console.error('Card insert details:', { 
         cardId: newCard.id, 
-        roundId: round.id, 
+        roundId: roundToUse.id, 
         playerId: player.id,
         cardData: {
           name: newCard.name,

@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
       return authError;
     }
     
-    console.log('End round endpoint called');
+    console.log('🛑 End round endpoint called');
     
     // Try to get roundId from request body if provided
     let roundId = null;

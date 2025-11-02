@@ -28,6 +28,19 @@ export async function POST(req: NextRequest) {
       console.log('Could not fetch config, using default speed_ms:', error);
     }
 
+    // Determine current game type from scheduler
+    let gameType: string = 'bingo_crash';
+    try {
+      const { data: sched, error: schedErr } = await supabaseAdmin
+        .from(tableNames.config)
+        .select('value')
+        .eq('key', 'scheduler')
+        .maybeSingle();
+      if (!schedErr && sched?.value?.currentGame) {
+        gameType = sched.value.currentGame;
+      }
+    } catch {}
+
     // Create a new round with setup phase and reset prize pool
     const { data: newRound, error: insertError } = await supabaseAdmin
       .from(tableNames.rounds)
@@ -36,7 +49,8 @@ export async function POST(req: NextRequest) {
         called: [],
         speed_ms: speedMs,
         prize_pool: 0,
-        total_collected: 0
+        total_collected: 0,
+        game_type: gameType
       }])
       .select()
       .single();

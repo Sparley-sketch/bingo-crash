@@ -16,6 +16,7 @@ type SchedulerStatus = {
   preBuyMinutes: number;
   winnerDisplaySeconds: number;
   purchaseBlockSeconds: number;
+  currentGame: string;
 };
 type WalletInfo = { balance: number | null; hasPlayer: boolean };
 
@@ -50,7 +51,7 @@ export async function GET(req: Request) {
       // 1. Get current round state
       supabaseAdmin
         .from(tableNames.rounds)
-        .select('id, phase, called, speed_ms, prize_pool, winner_alias, winner_daubs')
+        .select('id, phase, called, speed_ms, prize_pool, winner_alias, winner_daubs, draw_order, winner_call_index')
         .order('created_at', { ascending: false })
         .limit(1)
         .single(),
@@ -78,9 +79,20 @@ export async function GET(req: Request) {
     
     if (alias) {
       const round = roundResult.status === 'fulfilled' && !roundResult.value.error ? roundResult.value.data : null;
+      const winnerMatch = (() => {
+        if (!round?.winner_alias) return false;
+        if (round.winner_alias === alias) return true;
+        // Handle comma-separated multi-winner aliases
+        try {
+          const tokens = String(round.winner_alias).split(',').map((s) => s.trim());
+          return tokens.includes(alias);
+        } catch {
+          return false;
+        }
+      })();
       const shouldLoadWallet = round && (
         round.phase === 'setup' || 
-        round.winner_alias === alias ||
+        winnerMatch ||
         // Add buy action detection here if needed
         false
       );
@@ -159,12 +171,14 @@ export async function GET(req: Request) {
           speed_ms: round.speed_ms || 800,
           live_cards_count: liveCardsCount,
           player_count: playerCount,
-          prize_pool: round.prize_pool || 0,
+          prize_pool: Number(round.prize_pool || 0),
           winner: round.winner_alias ? {
             alias: round.winner_alias,
             daubs: round.winner_daubs || 0
           } : null
         };
+
+        // (pot computation moved below after pricing & scheduler are defined)
       }
     }
 
@@ -177,7 +191,8 @@ export async function GET(req: Request) {
       nextGameStart: null,
       preBuyMinutes: 2,
       winnerDisplaySeconds: 1,
-      purchaseBlockSeconds: 5
+      purchaseBlockSeconds: 5,
+      currentGame: 'bingo_crash'
     };
 
     if (schedulerResult.status === 'fulfilled' && !schedulerResult.value.error) {
@@ -188,8 +203,14 @@ export async function GET(req: Request) {
         nextGameStart: null,
         currentPhase: 'setup',
         winnerDisplaySeconds: 1,
-        purchaseBlockSeconds: 5
+        purchaseBlockSeconds: 5,
+        currentGame: 'bingo_crash'
       };
+
+      // Always set the currentGame from config, regardless of scheduler enabled state
+      console.log('🎮 Game Status API - Scheduler config:', schedulerConfig);
+      console.log('🎮 Game Status API - Setting currentGame to:', schedulerConfig.currentGame || 'bingo_crash');
+      schedulerStatus.currentGame = schedulerConfig.currentGame || 'bingo_crash';
 
       if (schedulerConfig.enabled) {
         const now = new Date();
@@ -221,9 +242,165 @@ export async function GET(req: Request) {
           nextGameStart: schedulerConfig.nextGameStart,
           preBuyMinutes: schedulerConfig.preBuyMinutes,
           winnerDisplaySeconds: schedulerConfig.winnerDisplaySeconds,
-          purchaseBlockSeconds: schedulerConfig.purchaseBlockSeconds
+          purchaseBlockSeconds: schedulerConfig.purchaseBlockSeconds,
+          currentGame: schedulerConfig.currentGame || 'bingo_crash'
         };
       }
+    }
+
+    // Winner display auto-transition: keep 'ended' visible for duration then move to setup
+    try {
+      const sCfg = (schedulerResult.status === 'fulfilled' && !schedulerResult.value.error) ? (schedulerResult.value.data?.value || {}) : {};
+      if (sCfg.enabled && sCfg.currentPhase === 'winner_display') {
+        const at = sCfg.winnerDisplayAt ? new Date(sCfg.winnerDisplayAt).getTime() : 0;
+        const waitMs = (sCfg.winnerDisplaySeconds != null ? sCfg.winnerDisplaySeconds : 20) * 1000;
+        if (at && (Date.now() - at) >= waitMs) {
+          // Move scheduler to setup and create a setup round for the current game
+          const next = new Date(Date.now() + (sCfg.preBuyMinutes || 2) * 60 * 1000).toISOString();
+          const updated = { ...sCfg, currentPhase: 'setup', nextGameStart: next };
+          await supabaseAdmin
+            .from(tableNames.config)
+            .upsert({ key: 'scheduler', value: updated, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+
+          // Ensure setup round exists for this game
+          const { data: latestForGame } = await supabaseAdmin
+            .from(tableNames.rounds)
+            .select('id, phase')
+            .eq('game_type', updated.currentGame || 'bingo_crash')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (!latestForGame || latestForGame.phase !== 'setup') {
+            await supabaseAdmin
+              .from(tableNames.rounds)
+              .insert({ phase:'setup', called:[], speed_ms:800, prize_pool:0, total_collected:0, game_type: updated.currentGame || 'bingo_crash' });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️ Winner display auto-transition failed:', e);
+    }
+
+    // Scramblingo: Precompute draw order and winner in last N seconds of setup
+    try {
+      const isScramblingo = schedulerStatus.currentGame === 'scramblingo';
+      const inFinalSeconds = schedulerStatus.enabled && schedulerStatus.timeUntilNextGame !== null && schedulerStatus.timeUntilNextGame <= (schedulerStatus.purchaseBlockSeconds || 8);
+      if (isScramblingo && inFinalSeconds) {
+        // Fetch latest Scramblingo round in setup
+        const { data: setupRound, error: setupErr } = await supabaseAdmin
+          .from(tableNames.rounds)
+          .select('*')
+          .eq('game_type', 'scramblingo')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (!setupErr && setupRound && setupRound.phase === 'setup' && (!setupRound.draw_order || setupRound.draw_order.length === 0)) {
+          // Build shuffled 1..52
+          const nums = Array.from({ length: 52 }, (_, i) => i + 1);
+          for (let i = nums.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [nums[i], nums[j]] = [nums[j], nums[i]];
+          }
+
+          // Load purchased Scramblingo cards (purchased=true preferred, fallback to any cards)
+          const { data: cards } = await supabaseAdmin
+            .from(tableNames.cards)
+            .select('id, numbers, player_alias, purchased')
+            .eq('round_id', setupRound.id)
+            .eq('game_type', 'scramblingo');
+
+          let winnerIndex: number | null = null;
+          const winnerAliases: Set<string> = new Set();
+          (cards || []).forEach((c: any) => {
+            // If purchase flag exists, prioritize purchased cards only
+            if (cards?.some((x:any)=>x.purchased === true)) {
+              if (!c.purchased) return;
+            }
+            const target = new Set<number>(c?.numbers || []);
+            let matches = 0;
+            for (let idx = 0; idx < nums.length; idx++) {
+              if (target.has(nums[idx])) {
+                matches++;
+                if (matches >= 6) {
+                  // Store as 1-based call count
+                  const oneBased = idx + 1;
+                  if (winnerIndex === null || oneBased < winnerIndex) {
+                    winnerIndex = oneBased;
+                    winnerAliases.clear();
+                    if (c?.player_alias) winnerAliases.add(c.player_alias);
+                  } else if (winnerIndex === oneBased && c?.player_alias) {
+                    winnerAliases.add(c.player_alias);
+                  }
+                  break;
+                }
+              }
+            }
+          });
+
+          await supabaseAdmin
+            .from(tableNames.rounds)
+            .update({
+              draw_order: nums,
+              winner_call_index: winnerIndex,
+              winner_alias: winnerIndex !== null ? Array.from(winnerAliases).join(',') : null
+            })
+            .eq('id', setupRound.id);
+        }
+      }
+    } catch (e) {
+      console.error('Scramblingo precompute in status failed:', e);
+    }
+
+    // Ensure the round matches the currently selected game type
+    // If the fetched round is for a different game (or no round found),
+    // fetch the latest round filtered by the current game type so clients
+    // (like Scramblingo) receive a valid round id for their game.
+    try {
+      const currentGameType = schedulerStatus.currentGame || 'bingo_crash';
+      let shouldRefetchRoundForGame = true;
+      // If we already have a round id, check if it belongs to the current game
+      if (roundState.id) {
+        const { data: existingRound, error: existingRoundError } = await supabaseAdmin
+          .from(tableNames.rounds)
+          .select('id, game_type, phase, called, speed_ms, prize_pool, winner_alias, winner_daubs')
+          .eq('id', roundState.id)
+          .maybeSingle();
+        if (!existingRoundError && existingRound && existingRound.game_type === currentGameType) {
+          shouldRefetchRoundForGame = false;
+        }
+      }
+
+      if (shouldRefetchRoundForGame) {
+        const { data: gameRound, error: gameRoundError } = await supabaseAdmin
+          .from(tableNames.rounds)
+          .select('id, phase, called, speed_ms, prize_pool, winner_alias, winner_daubs')
+          .eq('game_type', currentGameType)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!gameRoundError && gameRound) {
+          // Optionally compute liveCardsCount/playerCount here if needed; keep zeros for now
+          roundState = {
+            id: gameRound.id,
+            phase: gameRound.phase,
+            called: gameRound.called || [],
+            speed_ms: gameRound.speed_ms || 800,
+            live_cards_count: roundState.live_cards_count,
+            player_count: roundState.player_count,
+            prize_pool: gameRound.prize_pool || 0,
+            winner: gameRound.winner_alias ? {
+              alias: gameRound.winner_alias,
+              daubs: gameRound.winner_daubs || 0
+            } : null
+          };
+        }
+      }
+    } catch (e) {
+      // Non-fatal: keep existing roundState
+      console.warn('⚠️ Failed to align round with current game type:', e);
     }
 
     // Process pricing configuration
@@ -243,6 +420,167 @@ export async function GET(req: Request) {
           }
         });
       }
+    }
+
+        // Compute players near win (1 letter away = 5/6 complete) for Scramblingo
+        let playersNearWin = 0;
+        try {
+          const isScramblingo = schedulerStatus.currentGame === 'scramblingo';
+          if (isScramblingo && roundState.id && roundState.phase === 'live') {
+            // Count distinct players with cards that have exactly 5 daubs (5/6 complete)
+            const { count: nearWinCount } = await supabaseAdmin
+              .from(tableNames.cards)
+              .select('player_alias', { count: 'exact', head: true })
+              .eq('round_id', roundState.id)
+              .eq('game_type', 'scramblingo')
+              .not('completed', 'eq', true);
+            
+            // Filter to only cards with exactly 5 daubs
+            const { data: cardsData } = await supabaseAdmin
+              .from(tableNames.cards)
+              .select('player_alias, daubed_positions')
+              .eq('round_id', roundState.id)
+              .eq('game_type', 'scramblingo');
+            
+            if (cardsData) {
+              const playersWith5Daubs = new Set(
+                cardsData
+                  .filter(c => Array.isArray(c.daubed_positions) && c.daubed_positions.filter(Boolean).length === 5)
+                  .map(c => c.player_alias)
+                  .filter(Boolean)
+              );
+              playersNearWin = playersWith5Daubs.size;
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to calculate players near win:', e);
+        }
+
+        // Compute Scramblingo pot reliably (after pricing and scheduler are known)
+        try {
+          const isScramblingo = schedulerStatus.currentGame === 'scramblingo';
+          if (isScramblingo && roundState.id && (roundState.phase === 'setup' || roundState.phase === 'live')) {
+            let purchasedCount = 0;
+            const purchasedRes = await supabaseAdmin
+              .from(tableNames.cards)
+              .select('id', { count: 'exact', head: true })
+              .eq('round_id', roundState.id)
+              .eq('game_type', 'scramblingo')
+              .eq('purchased', true);
+            purchasedCount = purchasedRes.count || 0;
+            if (purchasedCount === 0) {
+              const allRes = await supabaseAdmin
+                .from(tableNames.cards)
+                .select('id', { count: 'exact', head: true })
+                .eq('round_id', roundState.id)
+                .eq('game_type', 'scramblingo');
+              purchasedCount = allRes.count || 0;
+            }
+            const bets = purchasedCount * (pricing.cardPrice || 0);
+            roundState.prize_pool = Math.floor(bets * 0.65);
+          } else if (isScramblingo && roundState.id && roundState.phase === 'ended' && !roundState.prize_pool) {
+            const { count } = await supabaseAdmin
+              .from(tableNames.cards)
+              .select('id', { count: 'exact', head: true })
+              .eq('round_id', roundState.id)
+              .eq('game_type', 'scramblingo');
+            const bets = (count || 0) * (pricing.cardPrice || 0);
+            roundState.prize_pool = Math.floor(bets * 0.65);
+          }
+        } catch (e) {
+          console.warn('⚠️ Failed to compute current pot:', e);
+        }
+
+    // Predict winning cards for Scramblingo using precomputed draw_order and winner_call_index
+    let predictedWinnerCards: Array<{ id?: string; player_alias: string; letters: string[] }> = [];
+    try {
+      if (schedulerStatus.currentGame === 'scramblingo' && roundState.id) {
+        const { data: roundMeta } = await supabaseAdmin
+          .from(tableNames.rounds)
+          .select('id, draw_order, winner_call_index')
+          .eq('id', roundState.id)
+          .maybeSingle();
+        const drawOrder: number[] = (roundMeta?.draw_order || []) as number[];
+        const winnerIdx: number = Number(roundMeta?.winner_call_index ?? 0);
+        if (Array.isArray(drawOrder) && drawOrder.length > 0 && winnerIdx > 0) {
+          const k = Math.min(winnerIdx, drawOrder.length);
+          const calledSet = new Set(drawOrder.slice(0, k));
+          const { data: cardsForPred } = await supabaseAdmin
+            .from(tableNames.cards)
+            .select('id, player_alias, numbers, letters')
+            .eq('round_id', roundState.id)
+            .eq('game_type', 'scramblingo')
+            .eq('purchased', true);
+          if (Array.isArray(cardsForPred)) {
+            for (const c of cardsForPred) {
+              const nums: number[] = (c.numbers || []) as number[];
+              if (Array.isArray(nums) && nums.length === 6 && nums.every(n => calledSet.has(Number(n)))) {
+                const letters: string[] = Array.isArray(c.letters) && c.letters.length === 6
+                  ? (c.letters as string[])
+                  : nums.map(n => String.fromCharCode( (n<=26 ? 64 + n : 70 + n) ));
+                predictedWinnerCards.push({ id: c.id, player_alias: c.player_alias, letters });
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️ Failed to compute predicted winner cards:', e);
+    }
+
+    // Ensure a setup round exists for the current game when scheduler is in setup
+    // OR when no round exists at all (first load scenario)
+    try {
+      const currentGame = schedulerStatus.currentGame || 'bingo_crash';
+      const shouldEnsureRound = (
+        (schedulerStatus.enabled && schedulerStatus.currentPhase === 'setup') ||
+        (!roundState.id && currentGame === 'bingo_crash') // First load: ensure Bingo Crash has a round
+      );
+
+      if (shouldEnsureRound) {
+        // Fetch latest round for this game
+        const { data: latestForGame } = await supabaseAdmin
+          .from(tableNames.rounds)
+          .select('id, phase, called, speed_ms, prize_pool, winner_alias, winner_daubs')
+          .eq('game_type', currentGame)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!latestForGame || latestForGame.phase !== 'setup') {
+          // Create a setup round to keep Admin Round Control in sync with scheduler
+          // OR for first load when no round exists
+          console.log(`🎮 Game Status API - Creating setup round for ${currentGame} (first load or scheduler setup)`);
+          const { data: created } = await supabaseAdmin
+            .from(tableNames.rounds)
+            .insert({
+              phase: 'setup',
+              called: [],
+              speed_ms: 800,
+              prize_pool: 0,
+              total_collected: 0,
+              game_type: currentGame
+            })
+            .select()
+            .single();
+
+          if (created) {
+            roundState = {
+              id: created.id,
+              phase: created.phase,
+              called: created.called || [],
+              speed_ms: created.speed_ms || 800,
+              live_cards_count: 0,
+              player_count: 0,
+              prize_pool: created.prize_pool || 0,
+              winner: null
+            } as any;
+            console.log(`✅ Game Status API - Created setup round ${created.id} for ${currentGame}`);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️ Failed to ensure setup round for current game:', e);
     }
 
     // Process wallet balance
@@ -275,11 +613,16 @@ export async function GET(req: Request) {
     }
 
     // Build merged response
+    console.log('🎮 Game Status API - Final schedulerStatus:', schedulerStatus);
     const mergedResponse = {
-      roundState,
+      roundState: {
+        ...roundState,
+        players_near_win: playersNearWin
+      },
       schedulerStatus,
       pricing,
       wallet,
+      predictedWinnerCards,
       timestamp: new Date().toISOString()
     };
 
@@ -316,7 +659,8 @@ export async function GET(req: Request) {
         nextGameStart: null,
         preBuyMinutes: 2,
         winnerDisplaySeconds: 1,
-        purchaseBlockSeconds: 5
+        purchaseBlockSeconds: 5,
+        currentGame: 'bingo_crash'
       },
       pricing: {
         cardPrice: 10,

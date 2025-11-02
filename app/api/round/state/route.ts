@@ -23,10 +23,25 @@ export async function GET() {
   }
   
   try {
-    // Get current round
-    const { data: round, error: roundError } = await supabaseAdmin
+    // Determine current game from scheduler
+    let currentGame: string | null = null;
+    try {
+      const { data: sched, error: schedErr } = await supabaseAdmin
+        .from(tableNames.config)
+        .select('value')
+        .eq('key', 'scheduler')
+        .maybeSingle();
+      if (!schedErr && sched?.value?.currentGame) currentGame = sched.value.currentGame;
+    } catch {}
+
+    // Get current round (filtered by selected game if available)
+    let query = supabaseAdmin
       .from(tableNames.rounds)
-      .select('*')
+      .select('*');
+    if (currentGame) {
+      query = query.eq('game_type', currentGame);
+    }
+    const { data: round, error: roundError } = await query
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
@@ -53,26 +68,35 @@ export async function GET() {
     let playerCount = 0;
     
     if (round.phase === 'live' || round.phase === 'ended') {
-      const [liveCardsResult, playersResult] = await Promise.all([
-        supabaseAdmin
+      const liveCardsResult = await supabaseAdmin
+        .from(tableNames.cards)
+        .select('id', { count: 'exact', head: true })
+        .eq('round_id', round.id)
+        .eq('exploded', false)
+        .eq('paused', false);
+      liveCardsCount = liveCardsResult.count || 0;
+
+      // Derive player count for Scramblingo from distinct player_alias on cards
+      if ((round as any).game_type === 'scramblingo') {
+        const { data: aliases, error: aliasErr } = await supabaseAdmin
           .from(tableNames.cards)
-          .select('id', { count: 'exact', head: true })
+          .select('player_alias')
           .eq('round_id', round.id)
-          .eq('exploded', false)
-          .eq('paused', false),
-        supabaseAdmin
+          .eq('game_type', 'scramblingo');
+        if (!aliasErr && aliases) {
+          playerCount = new Set(aliases.filter((r:any)=>r.player_alias).map((r:any)=>r.player_alias)).size;
+        }
+      } else {
+        const playersResult = await supabaseAdmin
           .from(tableNames.players)
           .select('id', { count: 'exact', head: true })
-          .eq('round_id', round.id)
-      ]);
-
-      liveCardsCount = liveCardsResult.count || 0;
-      playerCount = playersResult.count || 0;
+          .eq('round_id', round.id);
+        playerCount = playersResult.count || 0;
+      }
     }
 
-    // Auto-end game when all cards are exploded or locked (live_cards_count = 0)
-    // BUT only if there were cards initially (to allow manually started rounds with no cards)
-    if (round.phase === 'live' && liveCardsCount === 0 && playerCount > 0) {
+    // Auto-end safeguard (Bingo Crash only). For Scramblingo we rely on deterministic winner end.
+    if ((round as any).game_type !== 'scramblingo' && round.phase === 'live' && liveCardsCount === 0 && playerCount > 0) {
       // Compute winner before ending the round
       let winner = null;
       if (playerCount > 0) {
@@ -185,7 +209,10 @@ export async function GET() {
       player_count: playerCount,
       winner: winner,
       prize_pool: round.prize_pool || 0,
-      total_collected: round.total_collected || 0
+      total_collected: round.total_collected || 0,
+      // Scramblingo deterministic fields (optional)
+      draw_order: (round as any).draw_order || null,
+      winner_call_index: (round as any).winner_call_index ?? null
     };
     
     // Update cache

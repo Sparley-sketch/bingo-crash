@@ -25,7 +25,7 @@ export default function AdminClient() {
   const [busy, setBusy] = React.useState<string | null>(null);
 
   // Polling + Auto-run
-  const [pollMs, setPollMs] = React.useState(800);
+  const [pollMs, setPollMs] = React.useState(1500);
   const [polling, setPolling] = React.useState(true);
   const [autoRun, setAutoRun] = React.useState(false);
 
@@ -50,6 +50,14 @@ export default function AdminClient() {
   const [sessionWarning, setSessionWarning] = React.useState(false);
   const [sessionExpired, setSessionExpired] = React.useState(false);
   const [timeUntilExpiry, setTimeUntilExpiry] = React.useState(30 * 60); // seconds
+
+  // Game switching state
+  const [currentGame, setCurrentGame] = React.useState('bingo_crash');
+  const [userSelectedGame, setUserSelectedGame] = React.useState(false); // Track if user manually selected
+  const [availableGames, setAvailableGames] = React.useState([
+    { id: 'bingo_crash', name: 'Bingo Crash', description: 'Classic bingo with crash mechanics' },
+    { id: 'scramblingo', name: 'Scramblingo', description: 'Letter-based bingo with 1x6 cards' }
+  ]);
 
   // ---------------- session management ----------------
   const supabase = createClientComponentClient();
@@ -87,15 +95,24 @@ export default function AdminClient() {
 
   // ---------------- helpers ----------------
   async function fetchStateOnce() {
-    const r = await fetch(`/api/round/state?ts=${Date.now()}`, {
-      cache: 'no-store',
-      headers: { Accept: 'application/json' },
-      next: { revalidate: 0 },
-    });
-    const json = (await r.json()) as RoundState;
-    console.log('📊 Fetched state:', json);
-    setState(json);
-    return json;
+    try {
+      const r = await fetch(`/api/round/state?ts=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+        next: { revalidate: 0 },
+      });
+      if (!r.ok) {
+        console.warn('⚠️  /api/round/state returned', r.status);
+        return state as any;
+      }
+      const json = (await r.json().catch(() => (state as any))) as RoundState;
+      console.log('📊 Fetched state:', json);
+      if (json) setState(json);
+      return json;
+    } catch (e) {
+      console.error('⚠️  Failed to fetch /api/round/state:', e);
+      return state as any;
+    }
   }
 
   async function post(path: string) {
@@ -114,8 +131,13 @@ export default function AdminClient() {
         ...(body ? { body: JSON.stringify(body) } : {})
       });
       
-      const response = await r.json().catch(() => ({}));
-      console.log(`📡 Response from ${path}:`, response);
+      if (!r.ok && r.status !== 409) {
+        const err = await r.json().catch(() => ({} as any));
+        console.warn(`⚠️  ${path} returned ${r.status}`, err);
+      } else {
+        const response = await r.json().catch(() => ({}));
+        console.log(`📡 Response from ${path}:`, response);
+      }
       
       // Re-pull twice to avoid race with DB write
       console.log('🔄 Fetching state after API call...');
@@ -155,11 +177,21 @@ export default function AdminClient() {
   }
 
   async function loadSchedulerConfig() {
-    const r = await fetch(`/api/scheduler?ts=${Date.now()}`, { cache: 'no-store' });
+    const r = await fetch(`/api/game/status?ts=${Date.now()}`, { cache: 'no-store' });
     const data = await r.json();
-    setSchedulerConfig(data);
-    if (data?.preBuyMinutes != null) {
-      setPreBuySeconds(data.preBuyMinutes * 60);
+    console.log('🎮 Admin - Loading scheduler config:', data);
+    if (data?.schedulerStatus) {
+      setSchedulerConfig(data.schedulerStatus);
+      if (data.schedulerStatus.preBuyMinutes != null) {
+        setPreBuySeconds(data.schedulerStatus.preBuyMinutes * 60);
+      }
+      // Only set currentGame if user hasn't manually selected a game
+      if (data.schedulerStatus.currentGame && !userSelectedGame) {
+        console.log('🎮 Admin - Setting current game from config (no user selection):', data.schedulerStatus.currentGame);
+        setCurrentGame(data.schedulerStatus.currentGame);
+      } else if (userSelectedGame) {
+        console.log('🎮 Admin - Preserving user-selected game:', currentGame);
+      }
     }
   }
 
@@ -170,7 +202,7 @@ export default function AdminClient() {
       const res = await fetch('/api/scheduler/control', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'start', preBuyMinutes, winnerDisplaySeconds: 1 })
+        body: JSON.stringify({ action: 'start', preBuyMinutes, winnerDisplaySeconds: 1, gameType: currentGame })
       });
       const j = await res.json().catch(()=>({}));
       if (!res.ok) {
@@ -187,6 +219,9 @@ export default function AdminClient() {
 
   async function stopScheduler() {
     try {
+      setBusy('stop');
+      setAutoRun(false);
+      setPolling(false);
       const res = await fetch('/api/scheduler/control', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -196,12 +231,54 @@ export default function AdminClient() {
       if (!res.ok) {
         alert(`Stop scheduler failed: ${j.error || res.statusText}`);
       } else {
-        // Reload scheduler config
+        // Optimistically reflect stopped state immediately
+        setSchedulerConfig(prev => ({
+          ...(prev || {} as any),
+          enabled: false,
+          nextGameStart: null,
+          currentPhase: 'manual'
+        }));
+        setSchedulerStatus(prev => ({
+          ...(prev || {} as any),
+          enabled: false,
+          timeUntilNextGame: null,
+          currentPhase: 'manual',
+          nextGameStart: null
+        }));
+        // Then confirm from server
         await loadSchedulerConfig();
       }
     } catch (error) {
       console.error('Error stopping scheduler:', error);
       alert('Error stopping scheduler');
+    } finally { setBusy(null); setPolling(true); }
+  }
+
+  async function switchGame(gameType: string) {
+    try {
+      console.log(`🎮 Admin - Switching to game: ${gameType}`);
+      const res = await fetch('/api/scheduler/control', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'switch_game', gameType })
+      });
+      const j = await res.json().catch(()=>({}));
+      console.log(`🎮 Admin - API response:`, j);
+      if (!res.ok) {
+        alert(`Switch game failed: ${j.error || res.statusText}`);
+      } else {
+        console.log(`🎮 Admin - Setting current game to: ${gameType}`);
+        setCurrentGame(gameType);
+        setUserSelectedGame(true); // Mark that user manually selected this game
+        // Don't reload scheduler config - it will override our selection
+        // Just refresh game state
+        await fetchStateOnce();
+        console.log(`🎮 Admin - Switched to ${availableGames.find(g => g.id === gameType)?.name || gameType}`);
+        // Don't show alert - just switch silently
+      }
+    } catch (error) {
+      console.error('Error switching game:', error);
+      alert('Error switching game');
     }
   }
 
@@ -275,7 +352,7 @@ export default function AdminClient() {
 
   React.useEffect(() => {
     if (!polling) return;
-    const id = setInterval(fetchStateOnce, pollMs);
+    const id = setInterval(fetchStateOnce, Math.max(1200, pollMs));
     return () => clearInterval(id);
   }, [pollMs, polling]);
 
@@ -370,15 +447,19 @@ export default function AdminClient() {
     let stop = false;
     async function loadSchedulerStatus() {
       try {
-        const r = await fetch('/api/scheduler/status', { cache: 'no-store' });
+        const r = await fetch('/api/game/status', { cache: 'no-store' });
         const data = await r.json();
-        if (!stop) setSchedulerStatus(data);
+        if (!stop && data?.schedulerStatus) {
+          setSchedulerStatus(data.schedulerStatus);
+          // Don't override currentGame from polling - user selection takes priority
+          console.log('🎮 Admin - Polling scheduler status, preserving user selection:', userSelectedGame ? currentGame : 'none');
+        }
       } catch {}
     }
     loadSchedulerStatus();
-    const t = setInterval(loadSchedulerStatus, 1500); // 1.5s for scheduler (less critical)
+    const t = setInterval(loadSchedulerStatus, 2000); // relax scheduler polling
     return () => { stop = true; clearInterval(t); };
-  }, []);
+  }, [userSelectedGame, currentGame]);
 
   // Handle complete scheduler cycle (auto-start, winner display, setup, next game)
   React.useEffect(() => {
@@ -399,10 +480,12 @@ export default function AdminClient() {
           // Enable auto-run for scheduled games
           setAutoRun(true);
           // Refresh scheduler config after auto-start
-          const res = await fetch('/api/scheduler');
+          const res = await fetch('/api/game/status');
           if (res.ok) {
-            const config = await res.json();
-            setSchedulerConfig(config);
+            const data = await res.json();
+            if (data?.schedulerStatus) {
+              setSchedulerConfig(data.schedulerStatus);
+            }
           }
           return;
         }
@@ -426,10 +509,12 @@ export default function AdminClient() {
           }
           
           // Refresh scheduler config after cycle action
-          const res = await fetch('/api/scheduler');
+          const res = await fetch('/api/game/status');
           if (res.ok) {
-            const config = await res.json();
-            setSchedulerConfig(config);
+            const data = await res.json();
+            if (data?.schedulerStatus) {
+              setSchedulerConfig(data.schedulerStatus);
+            }
           }
           // Also refresh main state to reflect new round/phase
           await fetchStateOnce();
@@ -440,12 +525,13 @@ export default function AdminClient() {
     }
     
     handleSchedulerCycle();
-    const t = setInterval(handleSchedulerCycle, 1000); // Back to every second
+    const t = setInterval(handleSchedulerCycle, 2000); // relax scheduler cycle checks
     return () => { stop = true; clearInterval(t); };
   }, [schedulerConfig?.enabled]);
 
   const phase = state?.phase ?? '—';
   const called = Array.isArray(state?.called) ? state!.called.length : 0;
+  const maxBalls = currentGame === 'scramblingo' ? 52 : 25;
   const speed = (state?.speed_ms ?? Number(cfgValue)) || 800;
   const liveCards = state?.live_cards_count ?? 0;
   const playerCount = state?.player_count ?? 0;
@@ -465,7 +551,7 @@ export default function AdminClient() {
             <h1>Admin — Config</h1>
             <div className="status">
               <span>Phase: <b className="cap">{phase}</b></span>
-              <span>· Called: <b>{called}</b>/25</span>
+              <span>· Called: <b>{called}</b>/{maxBalls}</span>
               <span>· Speed: <b>{speed}</b> ms</span>
               <span>· Session: <b>{Math.floor(timeUntilExpiry / 60)}:{(timeUntilExpiry % 60).toString().padStart(2, '0')}</b></span>
             </div>
@@ -623,6 +709,49 @@ export default function AdminClient() {
         </div>
       </section>
 
+      {/* Game Selection Section */}
+      <section className="card">
+        <h3>🎮 Game Selection</h3>
+        <div className="row between">
+          <div className="field grow">
+            <label>Current Game</label>
+            <div className="game-selection">
+              {availableGames.map(game => (
+                <button
+                  key={game.id}
+                  className={`game-btn ${currentGame === game.id ? 'active' : ''}`}
+                  onClick={() => switchGame(game.id)}
+                  disabled={!!busy}
+                >
+                  <div className="game-name">{game.name}</div>
+                  <div className="game-desc">{game.description}</div>
+                  {currentGame === game.id && (
+                    <div className="active-indicator">✓ Active</div>
+                  )}
+                </button>
+              ))}
+            </div>
+            <div className="game-status">
+              <p>Selected game: <strong>{availableGames.find(g => g.id === currentGame)?.name || currentGame}</strong></p>
+              <p>✅ UI switches immediately when you click a game button.</p>
+              <p>🎮 Scheduler runs whatever game is currently selected.</p>
+              {currentGame === 'scramblingo' && Array.isArray(state?.draw_order) && (
+                <div style={{marginTop:8, color:'#b9c0d3'}}>
+                  <div>Predetermined sequence (first 20):</div>
+                  <div style={{fontFamily:'monospace', fontSize:12, wordBreak:'break-all'}}>
+                    {(state.draw_order as number[]).slice(0,20).join(', ')}{(state.draw_order.length>20)?'…':''}
+                  </div>
+                  <div>Winner call index: <b>{state?.winner_call_index ?? '—'}</b></div>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="actions">
+            <button className="btn" onClick={loadSchedulerConfig}>Reload</button>
+          </div>
+        </div>
+      </section>
+
       {/* Games Scheduler Section */}
       <section className="card">
         <h3>Games Scheduler</h3>
@@ -653,6 +782,7 @@ export default function AdminClient() {
                 <div>Status: <b>{schedulerStatus.currentPhase}</b></div>
                 <div>Next game in: <b>{formatTimeUntilNextGame(schedulerStatus.timeUntilNextGame || 0)}</b></div>
                 <div>Pre-buy enabled: <b>{schedulerStatus.canPurchaseCards ? 'Yes' : 'No'}</b></div>
+                <div>Current game: <b>{availableGames.find(g => g.id === currentGame)?.name || currentGame}</b></div>
             </div>
           )}
         </div>
@@ -669,7 +799,7 @@ export default function AdminClient() {
       {/* Control card */}
       <section className="card" style={{ opacity: (schedulerConfig?.enabled) ? 0.6 : 1 }}>
         <div className="row between">
-          <div className="title">Round Control · <span className="cap">{phase}</span> · {called}/25</div>
+          <div className="title">Round Control · <span className="cap">{phase}</span> · {called}/{maxBalls}</div>
           <div className="row smgap">
             <label className="check"><input type="checkbox" checked={polling} onChange={e => setPolling(e.target.checked)} />Polling</label>
             <span>Poll: <b>{pollMs}</b> ms</span>
@@ -681,7 +811,7 @@ export default function AdminClient() {
 
         <div className="row smgap wrap">
           <button className="btn success" onClick={() => post('/api/round/start')} disabled={!!busy || schedulerConfig?.enabled}>Start Round</button>
-          <button className="btn info"    onClick={() => post('/api/round/call')}  disabled={!!busy || schedulerConfig?.enabled}>Call Next</button>
+          <button className="btn info"    onClick={() => post('/api/round/call')}  disabled={!!busy || schedulerConfig?.enabled || phase !== 'live'}>Call Next</button>
           <button className="btn warn"    onClick={() => post('/api/round/end')}   disabled={!!busy || schedulerConfig?.enabled}>End Round</button>
           <button className="btn purple"  onClick={() => post('/api/round/reset')} disabled={!!busy || schedulerConfig?.enabled}>Reset to Setup</button>
 
@@ -752,6 +882,61 @@ export default function AdminClient() {
         .session-warning-content h3 { color: #fbbf24; margin: 0 0 12px; font-size: 20px; font-weight: 600; }
         .session-warning-content p { color: #e2e8f0; margin: 0 0 20px; font-size: 16px; }
         .session-warning-actions { display: flex; gap: 12px; justify-content: center; }
+
+        .game-selection { display: flex; gap: 12px; flex-wrap: wrap; }
+        .game-btn { 
+          background: rgba(255,255,255,.06); 
+          border: 1px solid rgba(255,255,255,.12); 
+          border-radius: 12px; 
+          padding: 16px; 
+          cursor: pointer; 
+          transition: all 0.2s; 
+          text-align: left;
+          min-width: 200px;
+        }
+        .game-btn:hover:not(:disabled) { 
+          background: rgba(255,255,255,.12); 
+          transform: translateY(-2px);
+          box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        .game-btn.active { 
+          background: #2b6cff; 
+          border-color: #2b6cff; 
+          color: white;
+        }
+        .game-btn:disabled { 
+          opacity: 0.5; 
+          cursor: not-allowed; 
+        }
+        .game-name { 
+          font-weight: 600; 
+          font-size: 16px; 
+          margin-bottom: 4px; 
+        }
+        .game-desc { 
+          font-size: 12px; 
+          color: rgba(255,255,255,0.7); 
+        }
+        .game-btn.active .game-desc { 
+          color: rgba(255,255,255,0.9); 
+        }
+        .active-indicator {
+          font-size: 12px;
+          color: #4ade80;
+          font-weight: bold;
+          margin-top: 4px;
+        }
+        .game-status {
+          margin-top: 15px;
+          padding: 10px;
+          background: rgba(255,255,255,0.05);
+          border-radius: 8px;
+          font-size: 14px;
+          color: #aab3cc;
+        }
+        .game-status p {
+          margin: 5px 0;
+        }
       `}</style>
     </main>
   );

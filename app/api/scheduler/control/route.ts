@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { tableNames } from '@/lib/config';
 import { verifyAdminAuth } from '@/lib/adminAuth';
+import { GAME_TYPES, GAME_TYPE_VALIDATION } from '@/lib/gameConstants';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,10 +15,15 @@ export async function POST(req: NextRequest) {
     }
     
     const body = await req.json().catch(() => ({}));
-    const { action, preBuyMinutes, winnerDisplaySeconds } = body;
+    const { action, preBuyMinutes, winnerDisplaySeconds, gameType } = body;
 
-    if (!action || !['start', 'stop', 'reschedule'].includes(action)) {
-      return NextResponse.json({ error: 'Invalid action. Must be start, stop, or reschedule' }, { status: 400 });
+    if (!action || !['start', 'stop', 'reschedule', 'switch_game'].includes(action)) {
+      return NextResponse.json({ error: 'Invalid action. Must be start, stop, reschedule, or switch_game' }, { status: 400 });
+    }
+
+    // Validate game type if provided
+    if (gameType && !Object.values(GAME_TYPES).includes(gameType)) {
+      return NextResponse.json({ error: 'Invalid game type' }, { status: 400 });
     }
 
     // Get current scheduler config
@@ -38,7 +44,10 @@ export async function POST(req: NextRequest) {
       nextGameStart: null,
       currentPhase: 'setup',
       winnerDisplaySeconds: 1,
-      purchaseBlockSeconds: 5
+      purchaseBlockSeconds: 5,
+      currentGame: GAME_TYPES.BINGO_CRASH,
+      gameRotation: false,
+      rotationInterval: 60 // minutes
     };
 
     let updatedConfig = { ...currentConfig };
@@ -54,8 +63,11 @@ export async function POST(req: NextRequest) {
         preBuyMinutes: preBuyMinutes || currentConfig.preBuyMinutes,
         winnerDisplaySeconds: winnerDisplaySeconds !== undefined ? winnerDisplaySeconds : currentConfig.winnerDisplaySeconds,
         nextGameStart: nextGameTime.toISOString(),
-        currentPhase: 'setup'
+        currentPhase: 'setup',
+        currentGame: currentConfig.currentGame // Preserve the current game selection
       };
+      
+      console.log(`🎮 Starting scheduler for game: ${currentConfig.currentGame}`);
     } else if (action === 'stop') {
       // Stop scheduler
       updatedConfig = {
@@ -79,6 +91,20 @@ export async function POST(req: NextRequest) {
         nextGameStart: nextGameTime.toISOString(),
         currentPhase: 'setup'
       };
+    } else if (action === 'switch_game') {
+      // Switch to a different game
+      if (!gameType) {
+        return NextResponse.json({ error: 'Game type is required for switch_game action' }, { status: 400 });
+      }
+      
+      updatedConfig = {
+        ...currentConfig,
+        currentGame: gameType,
+        currentPhase: 'setup',
+        nextGameStart: null // Reset next game start when switching
+      };
+      
+      console.log(`🎮 Switching to game: ${gameType}`);
     }
 
     // Save updated config

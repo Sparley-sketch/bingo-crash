@@ -1,19 +1,45 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import ScramblingoGame from '@/app/components/scramblingo/ScramblingoGame';
 
 export default function PlayPage() {
   const [durationMs, setDurationMs] = useState(800);
   const [loading, setLoading] = useState(true);
   const [gameEnabled, setGameEnabled] = useState(true);
+  const [alias, setAlias] = useState<string>('');
+  const [showAliasModal, setShowAliasModal] = useState(false);
   const [showPreloadVideo, setShowPreloadVideo] = useState(false);
   const [videoEnded, setVideoEnded] = useState(false);
   const [backgroundLoading, setBackgroundLoading] = useState(false);
   const [videoMuted, setVideoMuted] = useState(true);
+  const [currentGame, setCurrentGame] = useState('bingo_crash');
+  const [gameData, setGameData] = useState<any>(null);
+  const [forceRender, setForceRender] = useState(0);
   const router = useRouter();
+  
+  // Use ref to always access the latest currentGame value in the polling interval
+  const currentGameRef = useRef(currentGame);
+  useEffect(() => {
+    currentGameRef.current = currentGame;
+  }, [currentGame]);
+
+  // Watch for currentGame changes
+  useEffect(() => {
+    console.log('🎮 currentGame changed to:', currentGame);
+    setForceRender(prev => prev + 1);
+  }, [currentGame]);
 
   useEffect(() => {
+    // Load alias from storage
+    const storedAlias = localStorage.getItem('player_alias') || localStorage.getItem('bingo-alias');
+    if (storedAlias) {
+      setAlias(storedAlias);
+      // Normalize to canonical key
+      localStorage.setItem('player_alias', storedAlias);
+    }
+
     // Check if this is the first visit (no localStorage flag)
     const hasSeenPreload = localStorage.getItem('bingo-crash-preload-seen');
     if (!hasSeenPreload) {
@@ -63,6 +89,73 @@ export default function PlayPage() {
           }
         }
 
+        // Get current game and game data
+        // Use alias from state (set from localStorage above) or from localStorage directly
+        const currentAlias = alias || localStorage.getItem('player_alias') || localStorage.getItem('bingo-alias') || '';
+        const statusUrl = '/api/game/status?ts=' + Date.now() + (currentAlias ? `&alias=${encodeURIComponent(currentAlias)}` : '');
+        const gameRes = await fetch(statusUrl, { cache: 'no-store' });
+        if (gameRes.ok) {
+          const gameData = await gameRes.json();
+          console.log('🎮 Game data received:', gameData);
+          setGameData(gameData);
+          // Only show alias modal if:
+          // 1. No alias stored locally AND
+          // 2. Server confirms player doesn't exist
+          const hasLocalAlias = currentAlias && currentAlias.trim().length > 0;
+          if (!hasLocalAlias && gameData?.wallet && gameData.wallet.hasPlayer === false) {
+            setShowAliasModal(true);
+          } else if (hasLocalAlias) {
+            // If we have a local alias, ensure it's set in state
+            if (!alias && currentAlias) {
+              setAlias(currentAlias);
+            }
+            // Hide modal if we have an alias
+            setShowAliasModal(false);
+          }
+          
+          // Check scheduler config for current game
+          if (gameData.schedulerStatus?.currentGame) {
+            console.log('🎮 Setting current game to:', gameData.schedulerStatus.currentGame);
+            setCurrentGame(gameData.schedulerStatus.currentGame);
+          } else {
+            console.log('🎮 No currentGame in schedulerStatus, using default bingo_crash');
+            setCurrentGame('bingo_crash');
+          }
+        } else {
+          console.log('🎮 Failed to fetch game status, using default bingo_crash');
+          setCurrentGame('bingo_crash');
+        }
+        
+        // Also check for immediate game changes (in case admin just switched)
+        const immediateAlias = alias || localStorage.getItem('player_alias') || localStorage.getItem('bingo-alias') || '';
+        const immediateGameRes = await fetch('/api/game/status?ts=' + Date.now() + (immediateAlias ? `&alias=${encodeURIComponent(immediateAlias)}` : ''), { cache: 'no-store' });
+        if (immediateGameRes.ok) {
+          const immediateGameData = await immediateGameRes.json();
+          if (immediateGameData.schedulerStatus?.currentGame) {
+            console.log('🎮 Immediate check - current game:', immediateGameData.schedulerStatus.currentGame);
+            setCurrentGame(immediateGameData.schedulerStatus.currentGame);
+          }
+        }
+        
+        // Add a few quick checks for immediate game changes
+        for (let i = 0; i < 3; i++) {
+          setTimeout(async () => {
+            try {
+              const quickAlias = alias || localStorage.getItem('player_alias') || localStorage.getItem('bingo-alias') || '';
+              const quickRes = await fetch('/api/game/status?ts=' + Date.now() + (quickAlias ? `&alias=${encodeURIComponent(quickAlias)}` : ''), { cache: 'no-store' });
+              if (quickRes.ok) {
+                const quickData = await quickRes.json();
+                if (quickData.schedulerStatus?.currentGame) {
+                  console.log(`🎮 Quick check ${i + 1} - current game:`, quickData.schedulerStatus.currentGame);
+                  setCurrentGame(quickData.schedulerStatus.currentGame);
+                }
+              }
+            } catch (error) {
+              console.error('Quick check error:', error);
+            }
+          }, (i + 1) * 500); // Check at 0.5s, 1s, 1.5s
+        }
+
         // Simple background loading indicator (no actual preloading to avoid conflicts)
         setBackgroundLoading(true);
         
@@ -82,7 +175,7 @@ export default function PlayPage() {
     // Initial check
     checkGameAccess();
 
-    // Poll for game access changes every 20 seconds (security requirement)
+    // Poll for game access changes and game switching every 5 seconds
     const interval = setInterval(async () => {
       try {
         const accessRes = await fetch('/api/game-access', { cache: 'no-store' });
@@ -96,10 +189,47 @@ export default function PlayPage() {
             return;
           }
         }
+
+        // Check for game changes
+        const pollingAlias = alias || localStorage.getItem('player_alias') || localStorage.getItem('bingo-alias') || '';
+        const gameRes = await fetch('/api/game/status?ts=' + Date.now() + (pollingAlias ? `&alias=${encodeURIComponent(pollingAlias)}` : ''), { cache: 'no-store' });
+        if (gameRes.ok) {
+          const gameData = await gameRes.json();
+          console.log('🎮 Polling - received game data:', gameData);
+          setGameData(gameData);
+          
+          // Only show alias modal if no local alias and server says no player
+          const hasLocalAlias = pollingAlias && pollingAlias.trim().length > 0;
+          if (!hasLocalAlias && gameData?.wallet && gameData.wallet.hasPlayer === false) {
+            setShowAliasModal(true);
+          } else if (hasLocalAlias) {
+            setShowAliasModal(false);
+          }
+          
+          if (gameData.schedulerStatus?.currentGame) {
+            const newGame = gameData.schedulerStatus.currentGame;
+            const currentGameValue = currentGameRef.current; // Use ref to get latest value
+            console.log('🎮 Polling - current game in data:', newGame, 'current state (from ref):', currentGameValue);
+            if (newGame !== currentGameValue) {
+              console.log('🎮 Game changed from', currentGameValue, 'to', newGame);
+              setCurrentGame(newGame);
+              // Force a re-render by updating state
+              console.log('🎮 UI should now switch to:', newGame);
+              // Force a re-render by updating gameData as well
+              setGameData(gameData);
+            } else {
+              console.log('🎮 Polling - game unchanged:', newGame);
+            }
+          } else {
+            console.log('🎮 Polling - no currentGame in schedulerStatus:', gameData.schedulerStatus);
+          }
+        } else {
+          console.log('🎮 Polling - failed to fetch game status:', gameRes.status);
+        }
       } catch (error) {
         console.error('Error polling game access:', error);
       }
-    }, 20000); // 20 seconds instead of 2 seconds
+    }, 1000); // 1 second to detect game changes faster
 
     return () => clearInterval(interval);
   }, [router]);
@@ -388,23 +518,92 @@ export default function PlayPage() {
     );
   }
 
-  const src = `/bingo-v37/index.html?round_ms=${durationMs}`;
+  // Debug: Show current game state
+  console.log('🎮 Play page render - currentGame:', currentGame, 'gameData:', gameData);
+  console.log('🎮 Play page render - schedulerStatus:', gameData?.schedulerStatus);
+  console.log('🎮 Play page render - currentGame from scheduler:', gameData?.schedulerStatus?.currentGame);
 
+
+  // Show Scramblingo game if selected
+  if (currentGame === 'scramblingo') {
+    console.log('🎮 Showing Scramblingo game. Current game:', currentGame, 'forceRender:', forceRender);
+    return (
+      <main key={`scramblingo-${forceRender}`} className="wrap" style={{ maxWidth: 'unset', padding: 0, background: '#0f1220', minHeight: '100vh' }}>
+        {showAliasModal && (
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:2000 }}>
+            <div style={{ background:'#111936', color:'#fff', padding:20, borderRadius:12, width:360, border:'1px solid rgba(255,255,255,.15)' }}>
+              <div style={{ fontSize:18, fontWeight:800, marginBottom:10 }}>Choose Alias</div>
+              <input
+                value={alias}
+                onChange={e => setAlias(e.target.value)}
+                placeholder="Enter alias"
+                style={{ width:'100%', padding:'10px 12px', borderRadius:8, border:'1px solid rgba(255,255,255,.2)', background:'#0c1020', color:'#fff', marginBottom:12 }}
+              />
+              <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+                <button onClick={() => setShowAliasModal(false)} style={{ padding:'8px 14px', background:'#666', color:'#fff', border:'none', borderRadius:8 }}>Cancel</button>
+                <button
+                  onClick={async () => {
+                    const clean = alias.trim();
+                    if (!clean) return;
+                    try {
+                      const res = await fetch('/api/player/upsert', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ alias: clean }) });
+                      const j = await res.json();
+                      if (res.ok && j?.wallet?.alias) {
+                        localStorage.setItem('player_alias', clean);
+                        localStorage.setItem('bingo-alias', clean);
+                        setShowAliasModal(false);
+                        const r = await fetch('/api/game/status?ts=' + Date.now() + '&alias=' + encodeURIComponent(clean), { cache:'no-store' });
+                        if (r.ok) setGameData(await r.json());
+                      }
+                    } catch {}
+                  }}
+                  style={{ padding:'8px 14px', background:'#2b6cff', color:'#fff', border:'none', borderRadius:8 }}
+                >Save</button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Sequence overlay removed as it is now visible in Admin */}
+        <ScramblingoGame 
+          alias={gameData?.wallet?.alias || alias || 'TestPlayer'}
+          walletBalance={gameData?.wallet?.balance ?? 1000}
+          roundId={gameData?.roundState?.id}
+        />
+      </main>
+    );
+  }
+
+  // Show Bingo Crash game (explicit check, same pattern as Scramblingo)
+  if (currentGame === 'bingo_crash') {
+    const src = `/bingo-v37/index.html?round_ms=${durationMs}`;
+    console.log('🎮 Showing Bingo Crash game. Current game:', currentGame, 'forceRender:', forceRender);
+    return (
+      <main key={`bingo-crash-${forceRender}`} className="wrap" style={{ maxWidth: 'unset', padding: 0 }}>
+        <iframe
+          key={`iframe-${forceRender}`}
+          src={src}
+          style={{ 
+            border: 'none', 
+            width: '100%', 
+            height: '100vh',
+            background: '#0f1220' // Match video background
+          }}
+          title="Bingo + Crash"
+          loading="eager"
+          allow="autoplay; fullscreen"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+        />
+      </main>
+    );
+  }
+
+  // Fallback - should never reach here
   return (
-    <main className="wrap" style={{ maxWidth: 'unset', padding: 0 }}>
-      <iframe
-        src={src}
-        style={{ 
-          border: 'none', 
-          width: '100%', 
-          height: '100vh',
-          background: '#0f1220' // Match video background
-        }}
-        title="Bingo + Crash"
-        loading="eager"
-        allow="autoplay; fullscreen"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-      />
+    <main className="wrap" style={{ maxWidth: 'unset', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+      <div style={{ textAlign: 'center', color: '#fff' }}>
+        <h2>Unknown Game</h2>
+        <p>Current game: {currentGame}</p>
+      </div>
     </main>
   );
 }

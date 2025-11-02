@@ -11,3 +11,176 @@ a { color: #9ecbff; text-decoration: none; }
 input, textarea { background: #0e0f1c; color: var(--fg); border: 1px solid #2b2d42; border-radius: 10px; padding: 10px; width: 100%; }
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 8px 10px; border-bottom: 1px solid #2b2d42; text-align: left; }
+
+/* Base fluid sizing + safe areas */
+:root {
+  --fs-sm: clamp(12px, 1.2vw + 8px, 14px);
+  --fs-md: clamp(14px, 1.6vw + 8px, 16px);
+  --fs-lg: clamp(18px, 2.2vw + 10px, 22px);
+  --gap-sm: clamp(6px, 1vw + 2px, 10px);
+  --gap-md: clamp(10px, 1.5vw + 4px, 14px);
+}
+html, body {
+  height: 100%;
+  background: #0f1220;
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden; /* prevent horizontal scroll on mobile */
+}
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Button + touch targets */
+button, .btn {
+  min-height: 44px; /* iOS HIG */
+  padding: 10px 16px;
+  font-size: var(--fs-md);
+  border-radius: 10px;
+}
+
+/* Common containers */
+.wrap {
+  padding: var(--gap-md);
+}
+
+/* Scramblingo letter grid (fixed 13 columns for 4 rows of 52 letters) */
+.letters-container {
+  display: grid;
+  grid-template-columns: repeat(13, 1fr);
+  gap: var(--gap-sm);
+  width: 100%;
+  max-width: 100%;
+}
+@media (min-width: 769px) {
+  .letters-container {
+    max-width: 800px;
+    margin: 0 auto;
+    gap: 4px;
+  }
+}
+.letter-btn {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+@media (min-width: 769px) {
+  .letter-btn {
+    font-size: 12px;
+    padding: 4px;
+  }
+}
+
+/* Purchased card slots: scale smoothly */
+.purchased-card-slots, .cards-grid {
+  gap: var(--gap-sm);
+}
+.purchased-card-slots .pc-slot {
+  width: clamp(42px, 9.5vw, 60px);
+  height: clamp(42px, 9.5vw, 60px);
+  font-size: clamp(16px, 3.5vw, 20px);
+}
+
+/* Bingo iframe fills screen without overflow */
+iframe {
+  display: block;
+  width: 100vw;
+  height: 100dvh; /* modern mobile viewport unit */
+  border: 0;
+}
+
+/* Notch/rounded corners (iPhone 12–15, Pro/Max) */
+@supports (padding: max(0px)) {
+  .wrap {
+    padding-left: max(var(--gap-md), env(safe-area-inset-left));
+    padding-right: max(var(--gap-md), env(safe-area-inset-right));
+  }
+}
+
+/* Portrait: < 400px width (iPhone SE/compact Android) */
+@media (max-width: 400px) and (orientation: portrait) {
+  .letters-container {
+    gap: 0px;
+  }
+  .letter-btn {
+    padding: 0px;
+    font-size: 6px;
+  }
+  .game-header h2 {
+    font-size: var(--fs-lg);
+  }
+}
+
+/* Main iPhone sizes: 390–430 width (12/13/14/15, Pro/Max) */
+@media (min-width: 390px) and (max-width: 430px) and (orientation: portrait) {
+  .letters-container {
+    gap: 1px;
+  }
+  .purchased-card-slots .pc-slot {
+    width: 48px;
+    height: 48px;
+  }
+  .letter-btn {
+    font-size: 6px;
+    padding: 0px;
+  }
+}
+
+/* Tall Androids (Pixel 7/8, Galaxy S/Ultra) */
+@media (min-width: 412px) and (orientation: portrait) {
+  .letters-container {
+    gap: 1px;
+  }
+  .purchased-card-slots .pc-slot {
+    width: 50px;
+    height: 50px;
+  }
+  .letter-btn {
+    font-size: 7px;
+    padding: 0px;
+  }
+}
+
+/* Landscape optimizations */
+@media (orientation: landscape) {
+  .letters-container { grid-template-columns: repeat(13, 1fr); }
+  .purchased-card-slots .pc-slot { width: clamp(38px, 6.2vw, 48px); height: clamp(38px, 6.2vw, 48px); }
+  .buy-btn, .random-btn { padding: 8px 12px; }
+}
+
+/* Mid-size phones/tablets */
+@media (max-width: 768px) and (orientation: portrait) {
+  .wrap {
+    padding: 12px;
+  }
+  .letters-container {
+    gap: 1px;
+  }
+  .letter-btn {
+    font-size: 7px;
+    padding: 1px;
+  }
+}
+
+/* Ensure scramblingo-game container doesn't overflow */
+.scramblingo-game {
+  max-width: 100%;
+  overflow-x: hidden;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* Reduce motion for low-power devices */
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+
+/* Performance: avoid heavy shadows on mobile */
+@media (max-width: 768px) {
+  .purchased-card, .game-header {
+    box-shadow: 0 4px 10px rgba(0,0,0,.25);
+  }
+}

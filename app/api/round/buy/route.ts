@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { tableNames, isDev } from '@/lib/config';
 import { getCertifiedShuffle } from '@/lib/certifiedRNG';
+import { GAME_TYPES } from '@/lib/gameConstants';
 
 export const dynamic = 'force-dynamic';
 
@@ -74,10 +75,26 @@ export async function POST(req: Request) {
 
     console.log(`Pricing: card=${cardPrice}, shield=${shieldCost}, total=${totalCost}`);
 
-    // Get current round
+    // Determine current game type from scheduler (default to bingo_crash for this endpoint)
+    let currentGame = GAME_TYPES.BINGO_CRASH;
+    try {
+      const { data: sched } = await supabaseAdmin
+        .from(tableNames.config)
+        .select('value')
+        .eq('key', 'scheduler')
+        .maybeSingle();
+      if (sched?.value?.currentGame) {
+        currentGame = sched.value.currentGame;
+      }
+    } catch (e) {
+      console.warn('⚠️ Could not fetch scheduler config, defaulting to bingo_crash:', e);
+    }
+
+    // Get current round for the correct game type
     const { data: round, error: roundError } = await supabaseAdmin
       .from(tableNames.rounds)
-      .select('id')
+      .select('id, game_type')
+      .eq('game_type', currentGame) // Filter by current game type
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
@@ -87,10 +104,37 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Failed to fetch round' }, { status: 500 });
     }
 
-    if (!round) {
+    let roundToUse = round;
+    if (!roundToUse) {
+      // Create a setup round for the current game type if none exists
+      console.log(`⚠️ No round found for ${currentGame}, creating setup round...`);
+      const { data: newRound, error: createError } = await supabaseAdmin
+        .from(tableNames.rounds)
+        .insert([{
+          phase: 'setup',
+          called: [],
+          speed_ms: 800,
+          prize_pool: 0,
+          total_collected: 0,
+          game_type: currentGame
+        }])
+        .select('id')
+        .single();
+      
+      if (createError || !newRound) {
+        console.error('Error creating setup round:', createError);
+        return NextResponse.json({ error: 'No round found and failed to create one' }, { status: 500 });
+      }
+      
+      console.log(`✅ Created setup round ${newRound.id} for ${currentGame}`);
+      // Use the newly created round
+      roundToUse = { id: newRound.id, game_type: currentGame };
+    }
+    
+    if (!roundToUse || !roundToUse.id) {
       return NextResponse.json({ error: 'No round found' }, { status: 404 });
     }
-
+    
     const globalPlayersTable = isDev ? 'global_players_dev' : 'global_players';
 
     // Get or create global player (wallet persists across rounds)
@@ -148,12 +192,12 @@ export async function POST(req: Request) {
     console.log(`Global wallet updated: ${currentBalance} -> ${newBalance} (deducted ${totalCost})`);
 
     // Get or create round-specific player (for game tracking)
-    console.log(`Looking for round player: alias="${alias}", round_id=${round.id}`);
+    console.log(`Looking for round player: alias="${alias}", round_id=${roundToUse.id}`);
     
     let { data: player, error: playerError } = await supabaseAdmin
       .from(tableNames.players)
       .select('id')
-      .eq('round_id', round.id)
+      .eq('round_id', roundToUse.id)
       .eq('alias', alias)
       .single();
 
@@ -161,7 +205,7 @@ export async function POST(req: Request) {
       // Create round-specific player (wallet_balance not used here)
       const { data: newPlayer, error: insertError } = await supabaseAdmin
         .from(tableNames.players)
-        .insert([{ round_id: round.id, alias }])
+        .insert([{ round_id: roundToUse.id, alias }])
         .select('id')
         .single();
 
@@ -191,7 +235,7 @@ export async function POST(req: Request) {
       .from(tableNames.cards)
       .insert([{
         id: newCard.id,
-        round_id: round.id,
+        round_id: roundToUse.id,
         player_id: player.id,
         name: newCard.name,
         grid: newCard.grid,
@@ -205,7 +249,8 @@ export async function POST(req: Request) {
         just_exploded: newCard.justExploded,
         just_saved: newCard.justSaved,
         card_cost: cardPrice,
-        shield_cost: shieldCost
+        shield_cost: shieldCost,
+        game_type: currentGame // Ensure card is marked with correct game type
       }]);
 
     if (cardError) {
@@ -235,12 +280,14 @@ export async function POST(req: Request) {
     const { data: currentRound, error: roundFetchError } = await supabaseAdmin
       .from(tableNames.rounds)
       .select('total_collected, prize_pool')
-      .eq('id', round.id)
+      .eq('id', roundToUse.id)
       .single();
 
     if (!roundFetchError && currentRound) {
       const newTotalCollected = Math.round(((Number(currentRound.total_collected) || 0) + totalCost) * 100) / 100;
       const newPrizePool = Math.round(newTotalCollected * 0.65 * 100) / 100;
+
+      console.log(`💰 Updating prize pool for round ${roundToUse.id}: total_collected=${newTotalCollected}, prize_pool=${newPrizePool}`);
 
       const { error: prizeError } = await supabaseAdmin
         .from(tableNames.rounds)
@@ -248,7 +295,7 @@ export async function POST(req: Request) {
           total_collected: newTotalCollected,
           prize_pool: newPrizePool
         })
-        .eq('id', round.id);
+        .eq('id', roundToUse.id);
 
       if (prizeError) {
         console.error('Error updating prize pool:', prizeError);

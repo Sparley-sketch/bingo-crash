@@ -31,8 +31,15 @@ export async function GET() {
         .select('value')
         .eq('key', 'scheduler')
         .maybeSingle();
-      if (!schedErr && sched?.value?.currentGame) currentGame = sched.value.currentGame;
-    } catch {}
+      if (!schedErr && sched?.value?.currentGame) {
+        currentGame = sched.value.currentGame;
+        console.log(`🎮 Round State API - Current game from scheduler: ${currentGame}`);
+      } else {
+        console.warn('⚠️ Round State API - No currentGame in scheduler, defaulting to all games');
+      }
+    } catch (e) {
+      console.warn('⚠️ Round State API - Error fetching scheduler:', e);
+    }
 
     // Get current round (filtered by selected game if available)
     let query = supabaseAdmin
@@ -40,11 +47,18 @@ export async function GET() {
       .select('*');
     if (currentGame) {
       query = query.eq('game_type', currentGame);
+      console.log(`🎮 Round State API - Filtering rounds by game_type: ${currentGame}`);
     }
     const { data: round, error: roundError } = await query
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
+    
+    if (round) {
+      console.log(`🎮 Round State API - Found round ${round.id}, phase: ${round.phase}, game_type: ${(round as any).game_type}`);
+    } else {
+      console.warn('⚠️ Round State API - No round found for current game');
+    }
 
     if (roundError && roundError.code !== 'PGRST116') {
       console.error('Error fetching round:', roundError);

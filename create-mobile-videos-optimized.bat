@@ -93,3 +93,9 @@ echo 🚀 Mobile video optimization complete!
 echo 💡 The system will now automatically select the best format based on device performance.
 echo.
 pause
+
+
+
+
+
+

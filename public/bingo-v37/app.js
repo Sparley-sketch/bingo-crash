@@ -946,8 +946,13 @@ function Modal({open, onClose, children, title, primaryText='Got it', onPrimary,
 
 function App(){
   // Alias + wallet (with localStorage persistence)
-  const [alias, setAlias]     = useState(() => localStorage.getItem('bingo-alias') || '');
-  const [askAlias, setAsk]    = useState(() => !localStorage.getItem('bingo-alias'));
+  const initialAlias = (() => {
+    const a = localStorage.getItem('player_alias') || localStorage.getItem('bingo-alias') || '';
+    if (a) localStorage.setItem('player_alias', a);
+    return a;
+  })();
+  const [alias, setAlias]     = useState(initialAlias);
+  const [askAlias, setAsk]    = useState(() => !initialAlias);
   const [wallet, setWallet]   = useState(null); // Will be updated from server
   const [resetKey, setResetKey] = useState(0);
 
@@ -1270,7 +1275,7 @@ function App(){
 
   // Main polling using merged API endpoint
   useEffect(()=>{
-    let mounted=true, lastPhase='setup', lastCount=0;
+    let mounted=true, lastPhase='setup', lastCount=0, isFirstLoad=true;
 
     async function maybeEndRoundOnServer(id){
       if (endPostedRef.current || !id) return;
@@ -1367,9 +1372,22 @@ function App(){
           // No need for separate API calls
         }
 
+        // On first load, initialize lastCount to match existing called numbers
+        // This prevents processing old balls that were called before the page loaded
+        // BUT still update the display so users can see what's been called
+        if (isFirstLoad) {
+          lastCount = newCalls.length;
+          isFirstLoad = false;
+          console.log('🎮 First load complete - initialized lastCount to', lastCount, 'to skip processing', newCalls.length, 'existing calls (but UI will show them)');
+          // On first load, immediately update the called display if game is live
+          if (newPhase === 'live' && newCalls.length > 0) {
+            setCalled(newCalls);
+          }
+        }
+
         // Process new balls if we have more than before
         if (newCalls.length > lastCount) {
-          // Apply new calls to owned cards (only after first load)
+          // Apply new calls to owned cards (only new balls since last check)
           const news = newCalls.slice(lastCount);
           const newBallTime = Date.now();
           const newBallTimestamp = new Date().toISOString();
@@ -1379,11 +1397,18 @@ function App(){
             console.log(`🎲 New balls: [${news.join(', ')}] (${newCalls.length}/25)`);
           }
           
-          let next = player.cards;
-          news.forEach(n => { next = applyCallToCards(next, n, audio, volume); });
-          setPlayer(p=>({...p, cards: next}));
+          // Only process balls if player has cards (prevents errors on first load)
+          if (player.cards && player.cards.length > 0) {
+            let next = player.cards;
+            news.forEach(n => { next = applyCallToCards(next, n, audio, volume); });
+            setPlayer(p=>({...p, cards: next}));
+          } else if (DEBUG) {
+            console.log('⚠️ Skipping ball processing - no cards owned yet (cards will load correct state from server)');
+          }
           
-          // CRITICAL: Update lastCount immediately after processing new balls
+          // CRITICAL: Always update lastCount after checking for new balls
+          // This prevents reprocessing the same balls on next poll
+          // If player has no cards, those calls are already recorded and cards will load with correct state from server
           lastCount = newCalls.length;
 
           // Trigger rolling ball animation for the latest called number
@@ -1437,16 +1462,19 @@ function App(){
           setPhase(newPhase);
           setSpeedMs(Number(s.speed_ms)||800);
         
-        // Update called numbers, but preserve history during setup phase
-        // Only clear history when we detect a completely new round (different round ID)
+        // Update called numbers display - ALWAYS update during live phase
+        // This ensures the UI shows all called balls even on first load
+        // Only preserve history during setup phase
         const isNewRound = roundId !== s.id;
         
         if (newPhase !== 'setup') {
+          // Always update called numbers during live/ended phases
           setCalled(newCalls);
         } else if (isNewRound) {
           // New round - clear history
           setCalled(newCalls);
         }
+        // Note: If phase is 'setup' and it's not a new round, we preserve the existing called array
         setLiveCardsCount(Number(s.live_cards_count) || 0);
 
         // If server says round ended, sequence winner popup and stop any local auto-caller
@@ -2051,6 +2079,7 @@ function App(){
           if(!val){ alert('Please enter an alias.'); return; }
           setAlias(val);
           localStorage.setItem('bingo-alias', val);
+          localStorage.setItem('player_alias', val);
           setAsk(false);
         }}
       >

@@ -76,3 +76,4 @@ export const ERROR_MESSAGES = {
   CONFIG_ERROR: 'Game configuration error'
 } as const;
 
+

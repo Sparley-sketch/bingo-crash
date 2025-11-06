@@ -1276,6 +1276,8 @@ function App(){
   // Main polling using merged API endpoint
   useEffect(()=>{
     let mounted=true, lastPhase='setup', lastCount=0, isFirstLoad=true;
+    // Track the round ID to reset lastCount when round changes
+    let trackedRoundId = null;
 
     async function maybeEndRoundOnServer(id){
       if (endPostedRef.current || !id) return;
@@ -1330,7 +1332,18 @@ function App(){
 
         const newPhase = s.phase || 'setup';
         const newCalls = Array.isArray(s.called) ? s.called : [];
-        setRoundId(s.id || null);
+        const currentRoundId = s.id || null;
+        setRoundId(currentRoundId);
+        
+        // Reset lastCount when round ID changes (new round started)
+        if (trackedRoundId !== null && trackedRoundId !== currentRoundId) {
+          lastCount = 0;
+          isFirstLoad = true; // Treat as first load for new round
+          if (DEBUG) {
+            console.log(`🔄 New round detected: ${trackedRoundId} -> ${currentRoundId}, resetting lastCount`);
+          }
+        }
+        trackedRoundId = currentRoundId;
         
         // Update all state from merged response
         setSchedulerStatus(schedulerStatus);
@@ -1372,6 +1385,21 @@ function App(){
           // No need for separate API calls
         }
 
+        // CRITICAL: Update called state IMMEDIATELY when transitioning to live phase
+        // This ensures balls are displayed even before any cards are processed
+        const isTransitioningToLive = lastPhase !== 'live' && newPhase === 'live';
+        if (isTransitioningToLive) {
+          // Immediately update called state to show balls when entering live phase
+          setCalled(newCalls);
+          // Reset lastCount to 0 so all existing balls are processed
+          lastCount = 0;
+          isFirstLoad = false; // Don't treat as first load anymore
+          
+          if (DEBUG && newCalls.length > 0) {
+            console.log(`🎯 Transitioning to LIVE phase with ${newCalls.length} balls already called`);
+          }
+        }
+
         // On first load, initialize lastCount to match existing called numbers
         // This prevents processing old balls that were called before the page loaded
         // BUT still update the display so users can see what's been called
@@ -1385,10 +1413,13 @@ function App(){
           }
         }
 
-        // Process new balls if we have more than before
-        if (newCalls.length > lastCount) {
-          // Apply new calls to owned cards (only new balls since last check)
-          const news = newCalls.slice(lastCount);
+        // Process new balls if we have more than before OR if we're transitioning to live phase
+        const shouldProcessBalls = newCalls.length > lastCount || (isTransitioningToLive && newCalls.length > 0);
+        if (shouldProcessBalls) {
+          // Apply new calls to owned cards
+          const news = isTransitioningToLive && lastCount === 0
+            ? newCalls  // All balls if transitioning to live phase (process all existing calls)
+            : newCalls.slice(lastCount);  // Only new balls since last update
           const newBallTime = Date.now();
           const newBallTimestamp = new Date().toISOString();
           
@@ -1406,10 +1437,13 @@ function App(){
             console.log('⚠️ Skipping ball processing - no cards owned yet (cards will load correct state from server)');
           }
           
-          // CRITICAL: Always update lastCount after checking for new balls
-          // This prevents reprocessing the same balls on next poll
-          // If player has no cards, those calls are already recorded and cards will load with correct state from server
+          // CRITICAL: Update lastCount to match server state immediately after processing
+          // This ensures we stay in sync with the server
           lastCount = newCalls.length;
+          
+          if (DEBUG) {
+            console.log(`✅ Updated lastCount to ${lastCount} to match server`);
+          }
 
           // Trigger rolling ball animation for the latest called number
           if (news.length > 0) {
@@ -1462,19 +1496,22 @@ function App(){
           setPhase(newPhase);
           setSpeedMs(Number(s.speed_ms)||800);
         
-        // Update called numbers display - ALWAYS update during live phase
-        // This ensures the UI shows all called balls even on first load
-        // Only preserve history during setup phase
+        // Update called numbers - always show current called balls from server
+        // This ensures balls are displayed immediately when a new round starts, even without cards
         const isNewRound = roundId !== s.id;
         
+        // CRITICAL: Always sync called state with server in live phase
+        // This must happen AFTER processing balls to ensure lastCount is updated
         if (newPhase !== 'setup') {
-          // Always update called numbers during live/ended phases
+          // Live phase - ALWAYS update called balls to match server exactly
+          // This ensures balls are visible and synchronized with server state
+          // Always update to ensure we're in sync (React will optimize if values are the same)
           setCalled(newCalls);
         } else if (isNewRound) {
-          // New round - clear history
+          // New round in setup phase - clear history
           setCalled(newCalls);
         }
-        // Note: If phase is 'setup' and it's not a new round, we preserve the existing called array
+        // If same round in setup phase, keep existing called array (preserves history)
         setLiveCardsCount(Number(s.live_cards_count) || 0);
 
         // If server says round ended, sequence winner popup and stop any local auto-caller
@@ -1603,6 +1640,38 @@ function App(){
       preloadShieldVideo();
     }
   }, [phase]);
+
+  // Listen for reset events from admin panel (via localStorage/storage event/custom event)
+  React.useEffect(() => {
+    const handleReset = () => {
+      console.log('🔄 Reset event detected - refreshing page to ensure clean state');
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
+    };
+    const handleStorageChange = (e) => {
+      if (e.key === 'bingo-crash-reset') { handleReset(); }
+    };
+    const handleCustomEvent = () => { handleReset(); };
+    const handleResetCheck = () => {
+      try {
+        const resetFlag = localStorage.getItem('bingo-crash-reset');
+        if (resetFlag) {
+          localStorage.removeItem('bingo-crash-reset');
+          handleReset();
+        }
+      } catch (e) {}
+    };
+    handleResetCheck();
+    const checkInterval = setInterval(handleResetCheck, 500);
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('bingo-crash-reset', handleCustomEvent);
+    return () => {
+      clearInterval(checkInterval);
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('bingo-crash-reset', handleCustomEvent);
+    };
+  }, []);
 
   const lastCalled = called[called.length-1];
   
@@ -2021,7 +2090,7 @@ function App(){
         showDontShowAgain={true}
         onDontShowAgain={handleDontShowAgain}
       >
-        • Use the <b>1-click purchase</b> button or manually <b>select and buy</b> up to 4 cards.
+        • <b>Goal:</b> Lock your card with most Daubs before it explodes.
 		{'\n'}{'\n'}• A <b>shield</b> is available to purchase per card and will protect you from the <b>first</b> "Bomb".
 		{'\n'}{'\n'}• Called numbers are daubed automatically, unless...
 		{'\n'}{'\n'}• ...where a called number has a <b>bomb</b>, your card explodes <i>(if not shielded)</i>.

@@ -156,6 +156,25 @@ export default function AdminClient() {
       await new Promise((res) => setTimeout(res, 120));
       await fetchStateOnce();
       console.log('✅ State fetch completed');
+      
+      // If this was a reset, force additional refresh and notify clients
+      if (path === '/api/round/reset') {
+        console.log('🔄 Reset detected - forcing additional refresh...');
+        // Wait a bit more for DB to be fully ready
+        await new Promise((res) => setTimeout(res, 200));
+        await fetchStateOnce();
+        // Broadcast reset event to all clients via localStorage
+        // This will trigger refresh in same-tab (via polling) and other tabs (via storage event)
+        try {
+          const resetTimestamp = Date.now().toString();
+          localStorage.setItem('bingo-crash-reset', resetTimestamp);
+          // Also dispatch a custom event for same-tab clients
+          window.dispatchEvent(new CustomEvent('bingo-crash-reset', { detail: { timestamp: resetTimestamp } }));
+          console.log('✅ Reset event broadcasted to clients');
+        } catch (e) {
+          console.warn('Could not broadcast reset event:', e);
+        }
+      }
     } finally {
       setBusy(null);
     }

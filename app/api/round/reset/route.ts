@@ -12,6 +12,21 @@ export async function POST(req: NextRequest) {
     if (authError) {
       return authError;
     }
+    
+    // First, end any existing active rounds (live or setup) to ensure clean state
+    const { error: endError } = await supabaseAdmin
+      .from(tableNames.rounds)
+      .update({ 
+        phase: 'ended',
+        ended_at: new Date().toISOString()
+      })
+      .in('phase', ['setup', 'live']);
+
+    if (endError) {
+      console.warn('Warning: Could not end existing rounds:', endError);
+      // Continue anyway - we'll create a new round
+    }
+
     // Get speed_ms from config
     let speedMs = 800; // default
     try {
@@ -39,7 +54,9 @@ export async function POST(req: NextRequest) {
       if (!schedErr && sched?.value?.currentGame) {
         gameType = sched.value.currentGame;
       }
-    } catch {}
+    } catch (error) {
+      console.log('Could not fetch scheduler config, using default game type:', error);
+    }
 
     // Create a new round with setup phase and reset prize pool
     const { data: newRound, error: insertError } = await supabaseAdmin
@@ -59,6 +76,8 @@ export async function POST(req: NextRequest) {
       console.error('Error creating new round:', insertError);
       return NextResponse.json({ error: 'Failed to create new round' }, { status: 500 });
     }
+
+    console.log(`✅ Reset to setup: Created new round ${newRound.id} with phase ${newRound.phase}`);
 
     return NextResponse.json({ 
       ok: true, 
